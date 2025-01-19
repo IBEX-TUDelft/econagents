@@ -8,31 +8,29 @@ vcs = "git"
 style = "semver"
 
 [tool.poetry]
-name = "pythontemplate"
+name = "econagents"
 version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
-homepage = "https://github.com/GIT_USERNAME/GIT_REPONAME"
-repository = "https://github.com/GIT_USERNAME/GIT_REPONAME"
+homepage = "https://github.com/iwanalabs/economic-agents"
+repository = "https://github.com/iwanalabs/economic-agents"
 license = "Apache-2.0"
 description = ""
-authors = ["YOUR_NAME_HERE"]
-readme = "README.rst"
-packages = [{include = "pythontemplate"}]
-include = ["pythontemplate/*.so", "pythontemplate/*.pyd"]  # Compiled extensions
+authors = ["Dylan"]
+readme = "README.md"
+packages = [{include = "econagents"}]
+include = ["econagents/*.so", "econagents/*.pyd"]  # Compiled extensions
 
 [tool.poetry.build]
 generate-setup-file = false
 
 [tool.poetry.scripts]
-pythontemplate = "pythontemplate.cli.main:run_app"
 
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
 python = "^3.9"
 typing-extensions = "^4.12.2"
-rich = ">=10.11.0"
-cyclopts = "^3.1.5"
 
 [tool.poetry.group.docs.dependencies]
+myst-parser = {extras = ["linkify"], version = "^3.0.1"}
 sphinx = "~7.4.7"
 sphinx_rtd_theme = "~3.0.2"
 gitpython = ">=3.1.31"
@@ -178,7 +176,7 @@ skip = 'poetry.lock,'
 
 [tool.creosote]
 venvs=[".venv"]
-paths=["pythontemplate"]
+paths=["econagents"]
 deps-file="pyproject.toml"
 sections=["tool.poetry.dependencies"]
 exclude-deps =[

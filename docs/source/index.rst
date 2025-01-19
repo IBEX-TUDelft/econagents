@@ -1,8 +1,8 @@
-Welcome to pythontemplate's documentation!
+Welcome to econagents's documentation!
 ==========================================
 
-.. include:: ../../README_TEMPLATE.rst
-  :start-after: inclusion-marker-do-not-remove
+.. include:: ../../README.md
+  :parser: myst_parser.sphinx_
 
 .. toctree::
    :maxdepth: 2
