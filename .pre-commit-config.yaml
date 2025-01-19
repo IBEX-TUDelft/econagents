@@ -31,10 +31,10 @@ repos:
         args: [--markdown-linebreak-ext=md]
         exclude: \.(html|svg)$
 
-  - repo: https://github.com/fredrikaverpil/creosote.git
-    rev: v4.0.0
-    hooks:
-      - id: creosote
+  # - repo: https://github.com/fredrikaverpil/creosote.git
+  #   rev: v4.0.0
+  #   hooks:
+  #     - id: creosote
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0
@@ -42,8 +42,3 @@ repos:
       - id: codespell
         additional_dependencies:
           - tomli
-
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.392.post0
-    hooks:
-      - id: pyright

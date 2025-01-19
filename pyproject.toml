@@ -28,6 +28,8 @@ generate-setup-file = false
 # Be as loose as possible if writing a library.
 python = "^3.9"
 typing-extensions = "^4.12.2"
+openai = "^1.59.8"
+langsmith = "^0.2.11"
 
 [tool.poetry.group.docs.dependencies]
 myst-parser = {extras = ["linkify"], version = "^3.0.1"}
