@@ -31,11 +31,6 @@ repos:
         args: [--markdown-linebreak-ext=md]
         exclude: \.(html|svg)$
 
-  # - repo: https://github.com/fredrikaverpil/creosote.git
-  #   rev: v4.0.0
-  #   hooks:
-  #     - id: creosote
-
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0
     hooks:
