@@ -52,7 +52,7 @@ def get_agent_logger(agent_id, game_id):
 
     Path(agent_log_file).touch()
 
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] [Agent %(agent_id)s] %(message)s")
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] [AGENT %(agent_id)s] %(message)s")
 
     file_handler = logging.FileHandler(agent_log_file)
     file_handler.setFormatter(formatter)
@@ -108,7 +108,7 @@ async def start_simulation(ws_url, game_id, recovery, agent_id):
 
     try:
         agent_logger.info(f"Connecting to WebSocket URL: {ws_url}")
-        client = WebSocketClient(url=ws_url, game_id=game_id, recovery=recovery, verbose=True, logger=agent_logger)
+        client = WebSocketClient(url=ws_url, game_id=game_id, recovery=recovery, logger=agent_logger)
         await client.start()
 
     except Exception:
@@ -123,8 +123,6 @@ def validate_game_params(game_id, agents, game_type, use_config):
         raise ValueError("Missing required parameter: 'agents'")
     if not game_type:
         raise ValueError("Missing required parameter: 'game_type'")
-    if use_config and not Path(LOG_PATH / "game" / f"game_{game_id}.json").exists():
-        raise ValueError("Game config provided but no config file exists")
 
 
 def save_game_config(game_config):
@@ -137,22 +135,36 @@ def load_game_config(game_id):
         return json.load(f)
 
 
-async def spawn_agents(game_id, agents, game_type, use_config=False):
+def get_game_config(game_id, agents, game_type, use_config="auto"):
+    if use_config == "auto":
+        if Path(LOG_PATH / "game" / f"game_{game_id}.json").exists():
+            game_config = load_game_config(game_id)
+        else:
+            game_config = {"game_id": game_id, "agents": agents, "game_type": game_type, "recovery_codes": []}
+            game_config["recovery_codes"] = [get_recovery_code(HOSTNAME, game_id) for _ in range(agents)]
+            save_game_config(game_config)
+    elif use_config:
+        if Path(LOG_PATH / "game" / f"game_{game_id}.json").exists():
+            game_config = load_game_config(game_id)
+        else:
+            raise ValueError("Game config provided but no config file exists")
+    else:
+        game_config = {"game_id": game_id, "agents": agents, "game_type": game_type, "recovery_codes": []}
+        game_config["recovery_codes"] = [get_recovery_code(HOSTNAME, game_id) for _ in range(agents)]
+        save_game_config(game_config)
+
+    return game_config
+
+
+async def spawn_agents(game_id, agents, game_type, use_config="auto"):
     game_logger = get_game_logger(game_id)
     game_logger.info(f"Spawning {agents} agents for game {game_id}")
 
     try:
         validate_game_params(game_id, agents, game_type, use_config)
 
-        if use_config:
-            game_config = load_game_config(game_id)
-        else:
-            game_config = {"game_id": game_id, "agents": agents, "game_type": game_type, "recovery_codes": []}
-            game_config["recovery_codes"] = [get_recovery_code(HOSTNAME, game_id) for _ in range(agents)]
-
+        game_config = get_game_config(game_id, agents, game_type, use_config)
         game_logger.info(f"Game config: {game_config}")
-
-        save_game_config(game_config)
 
         ws_url = f"ws://{HOSTNAME}:3088/wss"
         tasks = []
@@ -175,4 +187,4 @@ if __name__ == "__main__":
     Path(LOG_PATH / "agents").mkdir(parents=True, exist_ok=True)
     Path(LOG_PATH / "game").mkdir(parents=True, exist_ok=True)
 
-    asyncio.run(spawn_agents(game_id=161, agents=6, game_type="harberger", use_config=True))
+    asyncio.run(spawn_agents(game_id=163, agents=6, game_type="harberger"))
