@@ -187,4 +187,4 @@ if __name__ == "__main__":
     Path(LOG_PATH / "agents").mkdir(parents=True, exist_ok=True)
     Path(LOG_PATH / "game").mkdir(parents=True, exist_ok=True)
 
-    asyncio.run(spawn_agents(game_id=163, agents=6, game_type="harberger"))
+    asyncio.run(spawn_agents(game_id=166, agents=6, game_type="harberger"))
