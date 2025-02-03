@@ -33,6 +33,8 @@ langsmith = "^0.2.11"
 websockets = "^14.2"
 websocket-client = "^1.8.0"
 jsonschema = "^4.23.0"
+requests = "^2.31.0"
+types-requests = "^2.31.0"
 
 [tool.poetry.group.docs.dependencies]
 myst-parser = {extras = ["linkify"], version = "^3.0.1"}

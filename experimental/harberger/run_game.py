@@ -10,7 +10,9 @@ import requests
 
 from econagents.ws.client import WebSocketClient
 
-HOSTNAME = "188.166.34.67"
+HOSTNAME = os.getenv("HOSTNAME")
+PORT = os.getenv("PORT")
+
 LOG_PATH = Path(__file__).parent / "logs"
 
 ctx_agent_id = ContextVar("agent_id", default="N/A")
@@ -166,7 +168,7 @@ async def spawn_agents(game_id, agents, game_type, use_config="auto"):
         game_config = get_game_config(game_id, agents, game_type, use_config)
         game_logger.info(f"Game config: {game_config}")
 
-        ws_url = f"ws://{HOSTNAME}:3088/wss"
+        ws_url = f"ws://{HOSTNAME}:{PORT}/wss"
         tasks = []
         game_logger.info("Starting simulations")
 
