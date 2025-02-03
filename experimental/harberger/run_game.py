@@ -2,18 +2,21 @@ import asyncio
 import json
 import logging
 import os
-import shutil
 from contextvars import ContextVar
 from pathlib import Path
 
 import requests
+from dotenv import load_dotenv
 
 from econagents.ws.client import WebSocketClient
+
+load_dotenv()
 
 HOSTNAME = os.getenv("HOSTNAME")
 PORT = os.getenv("PORT")
 
 LOG_PATH = Path(__file__).parent / "logs"
+GAMES_PATH = Path(__file__).parent / "specs" / "games"
 
 ctx_agent_id = ContextVar("agent_id", default="N/A")
 
@@ -158,21 +161,30 @@ def get_game_config(game_id, agents, game_type, use_config="auto"):
     return game_config
 
 
-async def spawn_agents(game_id, agents, game_type, use_config="auto"):
+def load_game_spec(game_id: int) -> dict:
+    """Load a game specification from the games directory."""
+    spec_file = GAMES_PATH / f"game_{game_id}.json"
+    if not spec_file.exists():
+        raise ValueError(f"Game spec file not found: {spec_file}")
+
+    with spec_file.open() as f:
+        return json.load(f)
+
+
+async def spawn_agents(game_id: int):
+    """Spawn agents for a game using its specification file."""
     game_logger = get_game_logger(game_id)
-    game_logger.info(f"Spawning {agents} agents for game {game_id}")
+    game_logger.info(f"Loading spec for game {game_id}")
 
     try:
-        validate_game_params(game_id, agents, game_type, use_config)
-
-        game_config = get_game_config(game_id, agents, game_type, use_config)
-        game_logger.info(f"Game config: {game_config}")
+        game_spec = load_game_spec(game_id)
+        game_logger.info(f"Game spec loaded: {game_spec}")
 
         ws_url = f"ws://{HOSTNAME}:{PORT}/wss"
         tasks = []
         game_logger.info("Starting simulations")
 
-        for idx, recovery_code in enumerate(game_config["recovery_codes"]):
+        for idx, recovery_code in enumerate(game_spec["recovery_codes"]):
             tasks.append(start_simulation(ws_url, game_id, recovery_code, idx + 1))
         await asyncio.gather(*tasks)
 
@@ -189,4 +201,4 @@ if __name__ == "__main__":
     Path(LOG_PATH / "agents").mkdir(parents=True, exist_ok=True)
     Path(LOG_PATH / "game").mkdir(parents=True, exist_ok=True)
 
-    asyncio.run(spawn_agents(game_id=166, agents=6, game_type="harberger"))
+    asyncio.run(spawn_agents(game_id=171))
