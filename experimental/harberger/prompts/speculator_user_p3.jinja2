@@ -1,0 +1,35 @@
+Instructions for this phase:
+
+1. **Game Information**:
+   - Phase: {{ phase_name }} (Phase {{ phase }})
+   - Your Role: Speculator (Player #{{ player_number }})
+   - Name: {{ player_name }}
+
+2. **Available Information**:
+  2.1. **Declarations**:
+    - Winning Condition: {{ winning_condition_description }} ({{ winning_condition }})
+    {% for declaration in declarations %}
+      - Player #{{ declaration.number }} ({{ declaration.role }}), declared value: {{ declaration.declared_value|round|int }}, percentile: {{ declaration.percentile|round|int }}%
+    {% endfor %}
+
+  2.2. **Value Boundaries**:
+    {% for role, conditions in boundaries.items() %}
+    - {{ role }}:
+      {% for condition, bounds in conditions.items() %}
+      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
+      {% endfor %}
+    {% endfor %}
+
+3. **Your Decision to Make**:
+   - Decide which properties to purchase based on their declared values and your assessment of true value
+   - You should provide the id of the player you want to trade with
+   - Provide the output as a JSON object:
+    {
+      "purchases" : [1, 2, 3] # ids of the players you want to trade with
+    }
+
+Remember:
+- Your goal is to profit from correctly identifying mispriced properties and trading tax shares
+- Consider both the declared values and potential true values when making decisions
+- Use the signals and market information to inform your trading strategy
+- Be mindful of the tax rates and their impact on property values

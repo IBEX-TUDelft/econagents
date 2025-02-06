@@ -8,7 +8,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-from econagents.ws.client import WebSocketClient
+from experimental.harberger.agent_manager import AgentManager
+from experimental.harberger.agents import DeveloperAgent, OwnerAgent, Speculator
 
 load_dotenv()
 
@@ -107,14 +108,14 @@ def get_game_logger(game_id):
     return game_logger
 
 
-async def start_simulation(ws_url, game_id, recovery, agent_id):
+async def start_simulation(ws_url, login_payload, game_id, agent_id):
     agent_logger = get_agent_logger(agent_id, game_id)
     ctx_agent_id.set(agent_id)
 
     try:
         agent_logger.info(f"Connecting to WebSocket URL: {ws_url}")
-        client = WebSocketClient(url=ws_url, game_id=game_id, recovery=recovery, logger=agent_logger)
-        await client.start()
+        game = AgentManager(url=ws_url, login_payload=login_payload, game_id=game_id, logger=agent_logger)
+        await game.start()
 
     except Exception:
         agent_logger.exception(f"Error in simulation for Agent {agent_id}")
@@ -185,7 +186,12 @@ async def spawn_agents(game_id: int):
         game_logger.info("Starting simulations")
 
         for idx, recovery_code in enumerate(game_spec["recovery_codes"]):
-            tasks.append(start_simulation(ws_url, game_id, recovery_code, idx + 1))
+            login_payload = {
+                "gameId": game_id,
+                "type": "join",
+                "recovery": recovery_code,
+            }
+            tasks.append(start_simulation(ws_url, login_payload, game_id, idx + 1))
         await asyncio.gather(*tasks)
 
     except Exception:
@@ -201,4 +207,4 @@ if __name__ == "__main__":
     Path(LOG_PATH / "agents").mkdir(parents=True, exist_ok=True)
     Path(LOG_PATH / "game").mkdir(parents=True, exist_ok=True)
 
-    asyncio.run(spawn_agents(game_id=171))
+    asyncio.run(spawn_agents(game_id=172))

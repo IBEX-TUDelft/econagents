@@ -247,3 +247,4 @@ econagents/*.html
 
 # Poetry
 poetry.toml
+.vscode/settings.json

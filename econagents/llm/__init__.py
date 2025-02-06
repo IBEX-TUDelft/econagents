@@ -1,3 +1,3 @@
-from econagents.llm.llm_api import LLMInterface
+from econagents.llm.openai import ChatOpenAI
 
-__all__: list[str] = ["LLMInterface"]
+__all__: list[str] = ["ChatOpenAI"]
