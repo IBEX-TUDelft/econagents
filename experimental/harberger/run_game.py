@@ -4,12 +4,13 @@ import logging
 import os
 from contextvars import ContextVar
 from pathlib import Path
+from datetime import datetime
 
 import requests
 from dotenv import load_dotenv
 
 from experimental.harberger.agent_manager import AgentManager
-from experimental.harberger.agents import DeveloperAgent, OwnerAgent, Speculator
+from experimental.harberger.create_game import create_game_from_specs
 
 load_dotenv()
 
@@ -202,9 +203,33 @@ async def spawn_agents(game_id: int):
         game_logger.info("Game finished")
 
 
+async def create_and_run_game(specs_path: Path) -> None:
+    """Create a new game from specs and run it."""
+    if not specs_path.exists():
+        raise ValueError(f"Specs file not found at: {specs_path}")
+
+    game_name = f"harberger {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    game_server_url = f"http://{HOSTNAME}"
+
+    try:
+        game_id = create_game_from_specs(specs_path=specs_path, base_url=game_server_url, game_name=game_name)
+        game_logger = get_game_logger(game_id)
+        game_logger.info(f"Created new game with ID: {game_id}")
+        await spawn_agents(game_id)
+
+    except Exception as e:
+        game_logger.error(f"Failed to create and run game: {e}")
+        raise
+
+
 if __name__ == "__main__":
     Path(LOG_PATH).mkdir(parents=True, exist_ok=True)
     Path(LOG_PATH / "agents").mkdir(parents=True, exist_ok=True)
     Path(LOG_PATH / "game").mkdir(parents=True, exist_ok=True)
 
-    asyncio.run(spawn_agents(game_id=172))
+    # Create and run a new game:
+    specs_path = Path(__file__).parent / "specs/example/harberger.json"
+    asyncio.run(create_and_run_game(specs_path))
+
+    # Run an existing game:
+    # asyncio.run(spawn_agents(game_id=181))

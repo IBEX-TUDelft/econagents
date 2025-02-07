@@ -5,55 +5,11 @@ from typing import Any, ClassVar
 
 import numpy as np
 from jinja2.sandbox import SandboxedEnvironment
-from pydantic import BaseModel, Field
 
 from econagents.llm.openai import ChatOpenAI
+from experimental.harberger.models import Message
 from experimental.harberger.config import PATH_PROMPTS
-
-
-class Mappings(BaseModel):
-    roles: dict[int, str]
-    phases: dict[int, str]
-    conditions: dict[int, str]
-
-
-class State(BaseModel):
-    # Basic info
-    player_name: str = ""
-    player_number: int = 0
-    players: list[dict[str, Any]] = Field(default_factory=list)
-    phase: int = 0
-
-    # Wallet and market info
-    wallet: dict[str, Any] = Field(default_factory=dict)
-    tax_rate: float = 0
-    initial_tax_rate: float = 0
-    final_tax_rate: float = 0
-
-    # Value boundaries and conditions
-    boundaries: dict[str, Any] = Field(default_factory=dict)
-    conditions: list[dict[str, Any]] = Field(default_factory=list)
-
-    # Market signals
-    value_signals: list[float] = Field(default_factory=list)
-    public_signal: list[float] = Field(default_factory=list)
-    winning_condition: int = 0
-    winning_condition_description: str = ""
-
-    # Property declarations
-    declarations: list[dict[str, Any]] = Field(default_factory=list)
-    total_declared_values: list[float] = Field(default_factory=list)
-
-
-class Agent(ABC):
-    role: ClassVar[int]
-    name: ClassVar[str]
-    llm: ChatOpenAI
-
-    @abstractmethod
-    def update_state(self, event: dict[str, Any]):
-        pass
-
+from experimental.harberger.models import Mappings, State
 
 mappings = Mappings(
     roles={
@@ -77,58 +33,67 @@ mappings = Mappings(
 )
 
 
-class Speculator(Agent):
-    role = 1
-    name = "Speculator"
+class Agent(ABC):
+    role: ClassVar[int]
+    name: ClassVar[str]
+    llm: ChatOpenAI
 
+    @abstractmethod
+    def update_state(self, event: Message):
+        pass
+
+
+class HarbergerAgent(Agent):
     def __init__(self, logger: logging.Logger, llm: ChatOpenAI, game_id: int):
-        self.state = State()
+        self.llm = llm
         self.game_id = game_id
         self.logger = logger
-        self.llm = llm
+        self.state = State()
 
     def update_state(
         self,
-        event: dict[str, Any],
+        event: Message,
     ):
-        if event["type"] != "event":
+        if event.msg_type != "event":
             return
 
-        event_type = event["eventType"]
-        data = event.get("data", {})
+        if event.event_type == "players-known":
+            self.state.players = event.data["players"]
 
-        if event_type == "players-known":
-            self.state.players = data["players"]
+        elif event.event_type == "phase-transition":
+            self.state.phase = event.data["phase"]
 
-        elif event_type == "phase-transition":
-            self.state.phase = data["phase"]
+        elif event.event_type == "assign-role":
+            self.state.wallet = event.data["wallet"]
+            self.state.boundaries = event.data["boundaries"]
+            self.state.tax_rate = event.data["taxRate"]
+            self.state.initial_tax_rate = event.data["initialTaxRate"]
+            self.state.final_tax_rate = event.data["finalTaxRate"]
+            self.state.conditions = event.data["conditions"]
 
-        elif event_type == "assign-role":
-            self.state.wallet = data["wallet"][0]  # TODO: deduplicate wallet?
-            self.state.boundaries = data["boundaries"]
-            self.state.tax_rate = data["taxRate"]
-            self.state.initial_tax_rate = data["initialTaxRate"]
-            self.state.final_tax_rate = data["finalTaxRate"]
-            self.state.conditions = data["conditions"]
+        elif event.event_type == "value-signals":
+            self.state.value_signals = event.data["signals"]
+            self.state.public_signal = event.data["publicSignal"]
+            self.state.winning_condition = event.data["condition"]
+            self.state.winning_condition_description = mappings.conditions[event.data["condition"]]
+            self.state.tax_rate = event.data["taxRate"]
 
-        elif event_type == "assign-name":
-            self.state.player_name = data["name"]
-            self.state.player_number = data["number"]
+        elif event.event_type == "assign-name":
+            self.state.player_name = event.data["name"]
+            self.state.player_number = event.data["number"]
 
-        elif event_type == "value-signals":
-            self.state.value_signals = data["signals"]
-            self.state.public_signal = data["publicSignal"]
-            self.state.winning_condition = data["condition"]
-            self.state.winning_condition_description = mappings.conditions[data["condition"]]
-            self.state.tax_rate = data["taxRate"]
-
-        elif event_type == "declarations-published":
-            self.state.declarations = data["declarations"]
-            self.state.winning_condition = data["winningCondition"]
-            self.state.winning_condition_description = mappings.conditions[data["winningCondition"]]
+        elif event.event_type == "declarations-published":
+            self.state.declarations = event.data["declarations"]
+            self.state.winning_condition = event.data["winningCondition"]
+            self.state.winning_condition_description = mappings.conditions[event.data["winningCondition"]]
             self.state.total_declared_values = [
                 sum(declaration["d"][self.state.winning_condition] for declaration in self.state.declarations)
             ]
+
+
+class Speculator(HarbergerAgent):
+    role = 1
+    name = "Speculator"
 
     def _load_system_prompt(self):
         with (PATH_PROMPTS / "speculator_system.jinja2").open("r") as f:
@@ -199,6 +164,8 @@ class Speculator(Agent):
             "player_name": self.state.player_name,
             "name": self.state.player_name,
             "boundaries": self.state.boundaries,
+            "winning_condition": self.state.winning_condition,
+            "winning_condition_description": self.state.winning_condition_description,
             "declarations": [
                 {
                     "role": mappings.roles[roles[i]],
@@ -251,17 +218,53 @@ class Speculator(Agent):
         pass  # TODO: Implement results phase handling
 
 
-class Owner(Agent):
+class Owner(HarbergerAgent):
     role = 3
     name = "Owner"
 
-    def update_state(self, event: dict[str, Any]):
-        pass
+    async def handle_phase(self, phase: int):
+        """Main phase handler that dispatches to specific phase handlers."""
+        if phase == 2 or phase == 7:
+            return await self._handle_declaration_phase()
+        return None
+
+    async def _handle_declaration_phase(self):
+        """Handle the declaration phase by generating random values within boundaries."""
+        declarations = []
+        for condition in ["noProject", "projectA"]:
+            min_value = self.state.boundaries["owner"][condition]["low"]
+            max_value = self.state.boundaries["owner"][condition]["high"]
+            declarations.append(int(np.random.uniform(min_value, max_value)))
+        declarations.append(0)
+        payload = {
+            "gameId": self.game_id,
+            "type": "declare",
+            "declaration": declarations,
+        }
+        return payload
 
 
-class Developer(Agent):
+class Developer(HarbergerAgent):
     role = 2
     name = "Developer"
 
-    def update_state(self, event: dict[str, Any]):
-        pass
+    async def handle_phase(self, phase: int):
+        """Main phase handler that dispatches to specific phase handlers."""
+        if phase == 2 or phase == 7:
+            return await self._handle_declaration_phase()
+        return None
+
+    async def _handle_declaration_phase(self):
+        """Handle the declaration phase by generating random values within boundaries."""
+        declarations = []
+        for condition in ["noProject", "projectA"]:
+            min_value = self.state.boundaries["developer"][condition]["low"]
+            max_value = self.state.boundaries["developer"][condition]["high"]
+            declarations.append(int(np.random.uniform(min_value, max_value)))
+        declarations.append(0)
+        payload = {
+            "gameId": self.game_id,
+            "type": "declare",
+            "declaration": declarations,
+        }
+        return payload

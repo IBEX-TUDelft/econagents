@@ -69,13 +69,13 @@
   "timers": {
     "phase_0": null,
     "phase_1": 10,
-    "phase_2": 90,
-    "phase_3": 120,
+    "phase_2": 30,
+    "phase_3": 30,
     "phase_4": 3,
     "phase_5": 3,
-    "phase_6": 270,
-    "phase_7": 60,
-    "phase_8": 90,
+    "phase_6": 30,
+    "phase_7": 30,
+    "phase_8": 30,
     "phase_9": 10
   },
   "round_count": "1",

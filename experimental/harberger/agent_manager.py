@@ -1,23 +1,17 @@
+import asyncio
 import json
 import logging
 import random
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from pydantic import BaseModel
-
 from econagents.core.websocket import WebSocketClient
-from experimental.harberger.agents import Agent
-
-
-class Message(BaseModel):
-    msg_type: str
-    event_type: str
-    data: dict[str, Any]
+from econagents.llm.openai import ChatOpenAI
+from experimental.harberger.agents import Agent, Developer, Owner, Speculator
+from experimental.harberger.models import Message
 
 
 class AgentManager(WebSocketClient):
-    agent: Optional[Agent] = None
     name: Optional[str] = None
     role: Optional[str] = None
 
@@ -25,11 +19,33 @@ class AgentManager(WebSocketClient):
         self.game_id = game_id
         self.login_payload = login_payload
         self.logger = logger
-
+        self._agent: Optional[Agent] = None
+        self.llm = ChatOpenAI()
         super().__init__(url, login_payload, game_id, logger)
 
-    def _extract_message_data(self, msg: dict[str, Any]) -> Optional[Message]:
+    @property
+    def agent(self) -> Optional[Agent]:
+        return self._agent  # Return the cached agent if already initialized
+
+    def _initialize_agent(self) -> Agent:
+        """
+        Create and cache the agent instance based on the assigned role.
+        """
+        if self._agent is None:
+            if self.role == 1:
+                self._agent = Speculator(llm=self.llm, game_id=self.game_id, logger=self.logger)
+            elif self.role == 2:
+                self._agent = Developer(llm=self.llm, game_id=self.game_id, logger=self.logger)
+            elif self.role == 3:
+                self._agent = Owner(llm=self.llm, game_id=self.game_id, logger=self.logger)
+            else:
+                self.logger.error("Invalid role assigned; cannot initialize agent.")
+                raise ValueError("Invalid role for agent initialization.")
+        return self._agent
+
+    def _extract_message_data(self, message: str) -> Optional[Message]:
         try:
+            msg = json.loads(message)
             msg_type = msg.get("type", "")
             event_type = msg.get("eventType", "")
             data = msg.get("data", {})
@@ -47,7 +63,7 @@ class AgentManager(WebSocketClient):
             return
 
         if msg.msg_type == "event" and self.agent:
-            self.agent.update_state(msg.data)
+            self.agent.update_state(msg)
 
         if msg.msg_type == "event" and msg.event_type == "assign-name":
             self.name = msg.data.get("name")
@@ -57,6 +73,8 @@ class AgentManager(WebSocketClient):
         elif msg.msg_type == "event" and msg.event_type == "assign-role":
             self.role = msg.data.get("role", None)
             self.logger.info(f"Role assigned: {self.role}")
+            self._initialize_agent()
+            self.agent.update_state(msg)
 
         elif msg.msg_type == "event" and msg.event_type == "players-known":
             self.known_players = msg.data.get("players", [])
@@ -66,7 +84,7 @@ class AgentManager(WebSocketClient):
             self.current_phase = msg.data.get("phase")
             round_number = msg.data.get("round", 1)
             self.logger.info(f"Transitioning to phase {self.current_phase}, round {round_number}")
-            await self._handle_phase(self.current_phase, msg)
+            await self._handle_phase(self.current_phase)
 
     async def _handle_phase(self, phase):
         """
@@ -81,11 +99,9 @@ class AgentManager(WebSocketClient):
         """
         # Phase 2 => if role=Owner(3) or Developer(2), declare random values
         if phase == 2 and self.role in [3, 2]:
-            dec1 = random.randint(250000, 600000)
-            dec2 = random.randint(150000, 400000)
-            declare_msg = {"gameId": self.game_id, "type": "declare", "declaration": [dec1, dec2, 0]}
-            await self.send_message(json.dumps(declare_msg))
-            self.logger.info(f"Declared values: {declare_msg['declaration']}")
+            result = await self.agent.handle_phase(phase)
+            await self.send_message(json.dumps(result))
+            self.logger.info(f"Declared values: {result['declaration']}")
 
         # Phase 3 => if role=Speculator(1), try a random speculation
         elif phase == 3 and self.role == 1:
@@ -95,27 +111,51 @@ class AgentManager(WebSocketClient):
 
         # Phase 6 => Market: if role=Speculator(1), place a random ask order
         elif phase == 6 and self.role == 1:
-            post_msg = {
-                "gameId": self.game_id,
-                "type": "post-order",
-                "order": {
-                    "price": random.randint(3000, 10000),
-                    "quantity": 1,
-                    "condition": 0,
-                    "type": "ask",
-                    "now": False,
-                },
-            }
+            if self.role == 1:
+                post_msg = {
+                    "gameId": self.game_id,
+                    "type": "post-order",
+                    "order": {
+                        "price": 100,
+                        "quantity": 4,
+                        "condition": self.agent.state.winning_condition,
+                        "type": "ask",
+                        "now": False,
+                    },
+                }
+            elif self.role == 2:
+                post_msg = {
+                    "gameId": self.game_id,
+                    "type": "post-order",
+                    "order": {
+                        "price": 100,
+                        "quantity": 2,
+                        "condition": self.agent.state.winning_condition,
+                        "type": "bid",
+                        "now": False,
+                    },
+                }
+            else:
+                await asyncio.sleep(1)
+                post_msg = {
+                    "gameId": self.game_id,
+                    "type": "post-order",
+                    "order": {
+                        "price": 100,
+                        "quantity": 1,
+                        "condition": self.agent.state.winning_condition,
+                        "type": "bid",
+                        "now": True,
+                    },
+                }
             await self.send_message(json.dumps(post_msg))
             self.logger.info(f"Posted market order: {post_msg['order']}")
 
         # Phase 7 => declare again if role=Owner(3) or Developer(2)
         elif phase == 7 and self.role in [2, 3]:
-            dec1 = random.randint(250000, 600000)
-            dec2 = random.randint(150000, 400000)
-            declare_msg = {"gameId": self.game_id, "type": "declare", "declaration": [dec1, dec2, 0]}
-            await self.send_message(json.dumps(declare_msg))
-            self.logger.info(f"Declared (second time): {declare_msg['declaration']}")
+            result = await self.agent.handle_phase(phase)
+            await self.send_message(json.dumps(result))
+            self.logger.info(f"Declared (second time): {result['declaration']}")
 
         # Phase 8 => speculation again if role=Speculator(1)
         elif phase == 8 and self.role == 1:

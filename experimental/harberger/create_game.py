@@ -82,13 +82,13 @@ def save_game_data(game_id: int, game_name: str, num_agents: int, recovery_codes
         raise
 
 
-def create_game_from_specs(specs_path: Path, base_url: str, game_name: str):
+def create_game_from_specs(specs_path: Path, base_url: str, game_name: str) -> int:
     username = os.getenv("GAME_USERNAME")
     password = os.getenv("GAME_PASSWORD")
 
     if not username or not password:
         logger.error("Missing credentials. Please set GAME_USERNAME and GAME_PASSWORD environment variables.")
-        return
+        raise ValueError("Missing credentials")
 
     try:
         game_params = load_game_specs(specs_path)
@@ -112,11 +112,15 @@ def create_game_from_specs(specs_path: Path, base_url: str, game_name: str):
             # Save game data
             save_game_data(game_id, game_name, num_agents, recovery_codes)
 
+            return game_id
         else:
-            logger.error(f"Failed to create game: {result.get('message', 'Unknown error')}")
+            error_msg = result.get("message", "Unknown error")
+            logger.error(f"Failed to create game: {error_msg}")
+            raise ValueError(f"Failed to create game: {error_msg}")
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")
+        raise
 
 
 if __name__ == "__main__":
