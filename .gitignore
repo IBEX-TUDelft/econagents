@@ -249,5 +249,5 @@ econagents/*.html
 poetry.toml
 .vscode/settings.json
 
-harberger/specs/games/
+experimental/harberger/specs/games/
 server_docs/
