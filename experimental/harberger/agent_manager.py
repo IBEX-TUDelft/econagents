@@ -101,6 +101,7 @@ class AgentManager(WebSocketClient):
             self.state.initial_tax_rate = event.data["initialTaxRate"]
             self.state.final_tax_rate = event.data["finalTaxRate"]
             self.state.conditions = event.data["conditions"]
+            self.state.property = event.data.get("property", {})
 
         elif event.event_type == "value-signals":
             self.state.value_signals = event.data["signals"]

@@ -9,7 +9,7 @@ Instructions for this phase:
   2.1. **Declarations**:
     - Winning Condition: {{ winning_condition_description }} ({{ winning_condition }})
     {% for declaration in declarations %}
-      - Player #{{ declaration.number }} ({{ declaration.role }}), declared value: {{ declaration.declared_value|round|int }}, percentile: {{ declaration.percentile|round|int }}%
+      - Player #{{ declaration.number }} ({{ declaration.role }}), declared value: {{ declaration.declared_value }}, percentile: {{ declaration.percentile }}%
     {% endfor %}
 
   2.2. **Value Boundaries**:

@@ -24,6 +24,7 @@ class State(BaseModel):
     # Value boundaries and conditions
     boundaries: dict[str, Any] = Field(default_factory=dict)
     conditions: list[dict[str, Any]] = Field(default_factory=list)
+    property: dict[str, Any] = Field(default_factory=dict)
 
     # Market signals
     value_signals: list[float] = Field(default_factory=list)

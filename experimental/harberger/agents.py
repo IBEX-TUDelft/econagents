@@ -66,7 +66,16 @@ class Speculator(HarbergerAgent):
         system_prompt = self._load_system_prompt().render()
         user_prompt = self._build_speculation_user_prompt(state)
         messages = self.llm.build_messages(system_prompt, user_prompt)
-        response = await self.llm.get_response(messages)
+        response = await self.llm.get_response(
+            messages=messages,
+            tracing_extra={
+                "game_id": self.game_id,
+                "phase": state.phase,
+                "role": self.role,
+                "player_number": state.player_number,
+                "player_name": state.player_name,
+            },
+        )
         self.logger.info(response)
         return self._parse_speculation_response(response, state)
 
@@ -144,6 +153,16 @@ class Owner(HarbergerAgent):
     role = 3
     name = "Owner"
 
+    def _load_system_prompt(self):
+        with (PATH_PROMPTS / "owner_system.jinja2").open("r") as f:
+            template_str = f.read()
+            return SandboxedEnvironment(autoescape=True).from_string(template_str)
+
+    def _load_user_prompt(self, phase: int):
+        with (PATH_PROMPTS / f"owner_user_p{phase}.jinja2").open("r") as f:
+            template_str = f.read()
+            return SandboxedEnvironment(autoescape=True).from_string(template_str)
+
     async def handle_phase(self, phase: int, state: State):
         """Main phase handler that dispatches to specific phase handlers."""
         if phase == 2 or phase == 7:
@@ -153,17 +172,51 @@ class Owner(HarbergerAgent):
         return None
 
     async def _handle_declaration_phase(self, state: State):
-        """Handle the declaration phase by generating random values within boundaries."""
-        declarations = []
-        for condition in ["noProject", "projectA"]:
-            min_value = state.boundaries["owner"][condition]["low"]
-            max_value = state.boundaries["owner"][condition]["high"]
-            declarations.append(int(np.random.uniform(min_value, max_value)))
-        declarations.append(0)
+        """Handle the declaration phase using LLM."""
+        system_prompt = self._load_system_prompt().render()
+        user_prompt = self._build_declaration_user_prompt(state)
+        messages = self.llm.build_messages(system_prompt, user_prompt)
+        response = await self.llm.get_response(
+            messages=messages,
+            tracing_extra={
+                "game_id": self.game_id,
+                "phase": state.phase,
+                "role": self.role,
+                "player_number": state.player_number,
+                "player_name": state.player_name,
+            },
+        )
+        self.logger.info(response)
+        return self._parse_declaration_response(response)
+
+    def _build_declaration_user_prompt(self, state: State):
+        context = {
+            "phase": state.phase,
+            "phase_name": mappings.phases[state.phase],
+            "player_number": state.player_number,
+            "player_name": state.player_name,
+            "conditions": state.conditions,
+            "property": state.property,
+            "boundaries": state.boundaries,
+            "tax_rate": state.tax_rate,
+            "winning_condition": state.winning_condition,
+            "winning_condition_description": state.winning_condition_description,
+            "declarations": state.declarations,
+            "public_signal": state.public_signal,
+            "value_signals": state.value_signals,
+        }
+        return self._load_user_prompt(state.phase).render(**context)
+
+    def _parse_declaration_response(self, response: str):
+        response_json = json.loads(response)
         payload = {
             "gameId": self.game_id,
             "type": "declare",
-            "declaration": declarations,
+            "declaration": [
+                response_json["value_no_project"],
+                response_json["value_project"],
+                0,
+            ],
         }
         return payload
 
@@ -186,6 +239,16 @@ class Owner(HarbergerAgent):
 class Developer(HarbergerAgent):
     role = 2
     name = "Developer"
+
+    def _load_system_prompt(self):
+        with (PATH_PROMPTS / "developer_system.jinja2").open("r") as f:
+            template_str = f.read()
+            return SandboxedEnvironment(autoescape=True).from_string(template_str)
+
+    def _load_user_prompt(self, phase: int):
+        with (PATH_PROMPTS / f"developer_user_p{phase}.jinja2").open("r") as f:
+            template_str = f.read()
+            return SandboxedEnvironment(autoescape=True).from_string(template_str)
 
     async def handle_phase(self, phase: int, state: State):
         """Main phase handler that dispatches to specific phase handlers."""
@@ -211,16 +274,51 @@ class Developer(HarbergerAgent):
         return payload
 
     async def _handle_declaration_phase(self, state: State):
-        """Handle the declaration phase by generating random values within boundaries."""
-        declarations = []
-        for condition in ["noProject", "projectA"]:
-            min_value = state.boundaries["developer"][condition]["low"]
-            max_value = state.boundaries["developer"][condition]["high"]
-            declarations.append(int(np.random.uniform(min_value, max_value)))
-        declarations.append(0)
+        """Handle the declaration phase using LLM."""
+        system_prompt = self._load_system_prompt().render()
+        user_prompt = self._build_declaration_user_prompt(state)
+        messages = self.llm.build_messages(system_prompt, user_prompt)
+        response = await self.llm.get_response(
+            messages=messages,
+            tracing_extra={
+                "game_id": self.game_id,
+                "phase": state.phase,
+                "role": self.role,
+                "player_number": state.player_number,
+                "player_name": state.player_name,
+            },
+        )
+        self.logger.info(response)
+        return self._parse_declaration_response(response)
+
+    def _build_declaration_user_prompt(self, state: State):
+        context = {
+            "phase": state.phase,
+            "phase_name": mappings.phases[state.phase],
+            "player_number": state.player_number,
+            "player_name": state.player_name,
+            "conditions": state.conditions,
+            "property": state.property,
+            "boundaries": state.boundaries,
+            "initial_tax_rate": state.initial_tax_rate,
+            "final_tax_rate": state.final_tax_rate,
+            "winning_condition": state.winning_condition,
+            "winning_condition_description": state.winning_condition_description,
+            "declarations": state.declarations,
+            "public_signal": state.public_signal,
+            "value_signals": state.value_signals,
+        }
+        return self._load_user_prompt(state.phase).render(**context)
+
+    def _parse_declaration_response(self, response: str):
+        response_json = json.loads(response)
         payload = {
             "gameId": self.game_id,
             "type": "declare",
-            "declaration": declarations,
+            "declaration": [
+                response_json["value_no_project"],
+                response_json["value_project"],
+                0,
+            ],
         }
         return payload

@@ -2,6 +2,7 @@ from typing import Any, Optional
 
 from langsmith.wrappers import wrap_openai
 from openai import AsyncOpenAI
+from langsmith import traceable
 
 
 class ChatOpenAI:
@@ -24,11 +25,18 @@ class ChatOpenAI:
             {"role": "user", "content": user_prompt},
         ]
 
-    async def get_response(self, messages: list[dict[str, Any]], **kwargs: Any):
+    @traceable
+    async def get_response(
+        self,
+        messages: list[dict[str, Any]],
+        tracing_extra: dict[str, Any],
+        **kwargs: Any,
+    ):
         response = await self.client.chat.completions.create(
             messages=messages,  # type: ignore
             model=self.model_name,
             response_format={"type": "json_object"},
+            langsmith_extra=tracing_extra,
             **kwargs,
         )
         return response.choices[0].message.content
