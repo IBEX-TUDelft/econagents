@@ -250,3 +250,4 @@ poetry.toml
 .vscode/settings.json
 
 harberger/specs/games/
+server_docs/
