@@ -8,7 +8,8 @@ from typing import Any, Optional
 from econagents.core.websocket import WebSocketClient
 from econagents.llm.openai import ChatOpenAI
 from experimental.harberger.agents import Agent, Developer, Owner, Speculator
-from experimental.harberger.models import Message, State, mappings
+from experimental.harberger.models import Message, mappings
+from experimental.harberger.state import GameState
 
 
 class AgentManager(WebSocketClient):
@@ -21,7 +22,8 @@ class AgentManager(WebSocketClient):
         self.logger = logger
         self._agent: Optional[Agent] = None
         self.llm = ChatOpenAI()
-        self.state = State()
+        self.state = GameState()
+        self.in_market_phase = False
         super().__init__(url, login_payload, game_id, logger)
 
     @property
@@ -64,82 +66,63 @@ class AgentManager(WebSocketClient):
             return
 
         if msg.msg_type == "event":
-            self._update_state(msg)
+            # Update state using the enhanced GameState class
+            self.state.update_state(msg)
 
-        if msg.msg_type == "event" and msg.event_type == "assign-name":
-            self.name = msg.data.get("name")
-            self.logger.info(f"Name assigned: {self.name}")
-            await self._send_player_ready()
+            if msg.event_type == "assign-name":
+                self.name = msg.data.get("name")
+                self.logger.info(f"Name assigned: {self.name}")
+                await self._send_player_ready()
 
-        elif msg.msg_type == "event" and msg.event_type == "assign-role":
-            self.role = msg.data.get("role", None)
-            self.logger.info(f"Role assigned: {self.role}")
-            self._initialize_agent()
+            elif msg.event_type == "assign-role":
+                self.role = msg.data.get("role", None)
+                self.logger.info(f"Role assigned: {self.role}")
+                self._initialize_agent()
 
-        elif msg.msg_type == "event" and msg.event_type == "players-known":
-            self.known_players = msg.data.get("players", [])
-            self.logger.info(f"Known players: {self.known_players}")
+            elif msg.event_type == "players-known":
+                self.known_players = msg.data.get("players", [])
+                self.logger.info(f"Known players: {self.known_players}")
 
-        elif msg.msg_type == "event" and msg.event_type == "phase-transition":
-            self.current_phase = msg.data.get("phase")
-            round_number = msg.data.get("round", 1)
-            self.logger.info(f"Transitioning to phase {self.current_phase}, round {round_number}")
-            await self._handle_phase(self.current_phase)
+            elif msg.event_type == "phase-transition":
+                new_phase = msg.data.get("phase")
+                round_number = msg.data.get("round", 1)
+                self.logger.info(f"Transitioning to phase {new_phase}, round {round_number}")
 
-    def _update_state(self, event: Message):
-        """Update state based on incoming event message"""
-        if event.event_type == "players-known":
-            self.state.players = event.data["players"]
+                if self.in_market_phase and new_phase != 6:
+                    self.in_market_phase = False
+                self.current_phase = new_phase
 
-        elif event.event_type == "phase-transition":
-            self.state.phase = event.data["phase"]
-
-        elif event.event_type == "assign-role":
-            self.state.wallet = event.data["wallet"]
-            self.state.boundaries = event.data["boundaries"]
-            self.state.tax_rate = event.data["taxRate"]
-            self.state.initial_tax_rate = event.data["initialTaxRate"]
-            self.state.final_tax_rate = event.data["finalTaxRate"]
-            self.state.conditions = event.data["conditions"]
-            self.state.property = event.data.get("property", {})
-
-        elif event.event_type == "value-signals":
-            self.state.value_signals = event.data["signals"]
-            self.state.public_signal = event.data["publicSignal"]
-            self.state.winning_condition = event.data["condition"]
-            self.state.winning_condition_description = mappings.conditions[event.data["condition"]]
-            self.state.tax_rate = event.data["taxRate"]
-
-        elif event.event_type == "assign-name":
-            self.state.player_name = event.data["name"]
-            self.state.player_number = event.data["number"]
-
-        elif event.event_type == "declarations-published":
-            self.state.declarations = event.data["declarations"]
-            self.state.winning_condition = event.data["winningCondition"]
-            self.state.winning_condition_description = mappings.conditions[event.data["winningCondition"]]
-            self.state.total_declared_values = [
-                sum(declaration["d"][self.state.winning_condition] for declaration in self.state.declarations)
-            ]
+                await self._handle_phase(new_phase)
 
     async def _handle_phase(self, phase: int):
-        """
-        Execute a simple auto-action per phase
-        0 - Name assignment: All players must send "player-is-ready".
-        2 - Declaration: Owners (role=3) or Developers (role=2) declare random property values.
-        3 - Speculation: Speculators (role=1) might snipe random owners.
-        6 - Market: (Optional) we let players place a random "ask" order.
-        7 - Declaration again.
-        8 - Speculation again.
-        Phases 1, 4, 5, 9 do nothing in this minimal example.
-        """
+        """Handle the phase transition."""
         if not self.agent:
             return
 
-        payload = await self.agent.handle_phase(phase, self.state)
-        if payload:
-            await self.send_message(json.dumps(payload))
-            self.logger.info(f"Phase {phase} ({mappings.phases[phase]}), sent payload: {payload}")
+        if phase == 6:
+            self.logger.info("Entering market phase.")
+            self.in_market_phase = True
+            self.market_polling_task = asyncio.create_task(self._market_phase_loop())
+        else:
+            payload = await self.agent.handle_phase(phase, self.state)
+            if payload:
+                await self.send_message(json.dumps(payload))
+                self.logger.info(f"Phase {phase} ({mappings.phases[phase]}), sent payload: {payload}")
+
+    async def _market_phase_loop(self):
+        """Runs while we are in the market phase. Asks the agent to do something every X + random offset seconds."""
+        try:
+            while self.in_market_phase:
+                delay = random.uniform(15, 30)
+                await asyncio.sleep(delay)
+
+                payload = await self.agent.handle_market_phase_tick(self.state)
+
+                if payload:
+                    await self.send_message(json.dumps(payload))
+
+        except asyncio.CancelledError:
+            self.logger.info("Market polling loop cancelled because phase ended.")
 
     async def _send_player_ready(self):
         """

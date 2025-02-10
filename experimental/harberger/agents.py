@@ -8,7 +8,8 @@ from jinja2.sandbox import SandboxedEnvironment
 
 from econagents.llm.openai import ChatOpenAI
 from experimental.harberger.config import PATH_PROMPTS
-from experimental.harberger.models import State, mappings
+from experimental.harberger.models import mappings
+from experimental.harberger.state import GameState
 
 
 class Agent(ABC):
@@ -17,8 +18,13 @@ class Agent(ABC):
     llm: ChatOpenAI
 
     @abstractmethod
-    async def handle_phase(self, phase: int, state: State):
+    async def handle_phase(self, phase: int, state: GameState):
         """Base implementation of state update handler"""
+        pass
+
+    @abstractmethod
+    async def handle_market_phase_tick(self, state: GameState):
+        """Handle the market phase tick."""
         pass
 
 
@@ -28,41 +34,115 @@ class HarbergerAgent(Agent):
         self.game_id = game_id
         self.logger = logger
 
-    async def handle_phase(self, phase: int, state: State):
+    def _load_system_prompt(self, filename: str):
+        with (PATH_PROMPTS / filename).open("r") as f:
+            template_str = f.read()
+            return SandboxedEnvironment(autoescape=True).from_string(template_str)
+
+    def _load_user_prompt(self, filename: str):
+        with (PATH_PROMPTS / filename).open("r") as f:
+            template_str = f.read()
+            return SandboxedEnvironment(autoescape=True).from_string(template_str)
+
+    async def handle_phase(self, phase: int, state: GameState):
         """
         Main phase handler that dispatches to specific phase handlers.
         Must be implemented by subclasses.
         """
         pass
 
+    async def _build_market_user_prompt(self, state: GameState):
+        """Build the user prompt for the market phase."""
+        if state.property.get("v"):
+            property_value = state.property["v"][state.winning_condition]
+        else:
+            property_value = None
+
+        orders = list(state.market.orders.values())
+        bids = sorted(
+            [order for order in orders if order.type == "bid"],
+            key=lambda x: x.price,
+            reverse=True,  # Highest bid first
+        )
+        asks = sorted(
+            [order for order in orders if order.type == "ask"],
+            key=lambda x: x.price,
+            reverse=False,  # Lowest ask first
+        )
+        sorted_orders = bids + asks
+
+        context = {
+            "phase_name": mappings.phases[state.phase],
+            "phase": state.phase,
+            "role": mappings.roles[self.role],
+            "player_number": state.player_number,
+            "player_name": state.player_name,
+            "shares": state.wallet[state.winning_condition].get("shares", 0),
+            "balance": state.wallet[state.winning_condition].get("balance", 0),
+            "public_signal": state.public_signal[state.winning_condition],
+            "private_signal": state.value_signals[state.winning_condition],
+            "current_orders": sorted_orders,
+            "your_orders": state.market.get_orders_from_player(state.player_number),
+            "property_value": property_value,
+        }
+        return self._load_user_prompt("all_user_p6.jinja2").render(**context)
+
+    async def handle_market_phase_tick(self, state: GameState):
+        """Handle the market phase tick."""
+        messages = self.llm.build_messages(
+            system_prompt=self._load_system_prompt("all_system_p6.jinja2").render(),
+            user_prompt=await self._build_market_user_prompt(state),
+        )
+        response = await self.llm.get_response(
+            messages=messages,
+            tracing_extra={
+                "game_id": self.game_id,
+                "phase": state.phase,
+                "role": self.role,
+                "player_number": state.player_number,
+                "player_name": state.player_name,
+            },
+        )
+        return self._parse_market_response(response, state)
+
+    def _parse_market_response(self, response: str, state: GameState):
+        """Parse the market response."""
+        response_json = json.loads(response)
+        order = response_json["order"]
+        order["condition"] = state.winning_condition
+        if response_json["action"] == "post-order":
+            return {
+                "gameId": self.game_id,
+                "type": "post-order",
+                "order": order,
+            }
+        elif response_json["action"] == "cancel-order":
+            return {
+                "gameId": self.game_id,
+                "type": "cancel-order",
+                "order": order,
+            }
+        elif response_json["action"] == "do-nothing":
+            return {}
+        else:
+            raise ValueError(f"Unknown action: {response_json['action']}")
+
 
 class Speculator(HarbergerAgent):
     role = 1
     name = "Speculator"
 
-    def _load_system_prompt(self):
-        with (PATH_PROMPTS / "speculator_system.jinja2").open("r") as f:
-            template_str = f.read()
-            return SandboxedEnvironment(autoescape=True).from_string(template_str)
-
-    def _load_user_prompt(self, phase: int):
-        with (PATH_PROMPTS / f"speculator_user_p{phase}.jinja2").open("r") as f:
-            template_str = f.read()
-            return SandboxedEnvironment(autoescape=True).from_string(template_str)
-
-    async def handle_phase(self, phase: int, state: State):
+    async def handle_phase(self, phase: int, state: GameState):
         """
         Main phase handler that dispatches to specific phase handlers.
         """
         if phase == 3 or phase == 8:
             return await self._handle_speculation_phase(state)
-        if phase == 6:
-            return await self._handle_market_phase(state)
         return None
 
-    async def _handle_speculation_phase(self, state: State):
+    async def _handle_speculation_phase(self, state: GameState):
         """Handle the speculation phase (phases 3 and 8)."""
-        system_prompt = self._load_system_prompt().render()
+        system_prompt = self._load_system_prompt("speculator_system.jinja2").render()
         user_prompt = self._build_speculation_user_prompt(state)
         messages = self.llm.build_messages(system_prompt, user_prompt)
         response = await self.llm.get_response(
@@ -77,7 +157,7 @@ class Speculator(HarbergerAgent):
         )
         return self._parse_speculation_response(response, state)
 
-    def _build_speculation_user_prompt(self, state: State):
+    def _build_speculation_user_prompt(self, state: GameState):
         key = "projectA" if state.winning_condition == 1 else "noProject"
 
         developer_min = state.boundaries["developer"][key]["low"]
@@ -115,9 +195,9 @@ class Speculator(HarbergerAgent):
                 for i, _ in enumerate(state.declarations)
             ],
         }
-        return self._load_user_prompt(state.phase).render(**context)
+        return self._load_user_prompt(f"speculator_user_p{state.phase}.jinja2").render(**context)
 
-    def _parse_speculation_response(self, response: str, state: State):
+    def _parse_speculation_response(self, response: str, state: GameState):
         response_json = json.loads(response)
         snipe: list[list[dict[str, Any]]] = [[], []]
         snipe[state.winning_condition] = response_json["purchases"]
@@ -128,7 +208,7 @@ class Speculator(HarbergerAgent):
         }
         return payload
 
-    async def _handle_market_phase(self, state: State):
+    async def _handle_market_phase(self, state: GameState):
         payload = {
             "gameId": self.game_id,
             "type": "post-order",
@@ -142,7 +222,7 @@ class Speculator(HarbergerAgent):
         }
         return payload
 
-    async def _handle_results_phase(self, state: State):
+    async def _handle_results_phase(self, state: GameState):
         """Handle the results phase."""
         pass
 
@@ -151,27 +231,15 @@ class Owner(HarbergerAgent):
     role = 3
     name = "Owner"
 
-    def _load_system_prompt(self):
-        with (PATH_PROMPTS / "owner_system.jinja2").open("r") as f:
-            template_str = f.read()
-            return SandboxedEnvironment(autoescape=True).from_string(template_str)
-
-    def _load_user_prompt(self, phase: int):
-        with (PATH_PROMPTS / f"owner_user_p{phase}.jinja2").open("r") as f:
-            template_str = f.read()
-            return SandboxedEnvironment(autoescape=True).from_string(template_str)
-
-    async def handle_phase(self, phase: int, state: State):
+    async def handle_phase(self, phase: int, state: GameState):
         """Main phase handler that dispatches to specific phase handlers."""
         if phase == 2 or phase == 7:
             return await self._handle_declaration_phase(state)
-        if phase == 6:
-            return await self._handle_market_phase(state)
         return None
 
-    async def _handle_declaration_phase(self, state: State):
+    async def _handle_declaration_phase(self, state: GameState):
         """Handle the declaration phase using LLM."""
-        system_prompt = self._load_system_prompt().render()
+        system_prompt = self._load_system_prompt("owner_system.jinja2").render()
         user_prompt = self._build_declaration_user_prompt(state)
         messages = self.llm.build_messages(system_prompt, user_prompt)
         response = await self.llm.get_response(
@@ -186,7 +254,7 @@ class Owner(HarbergerAgent):
         )
         return self._parse_declaration_response(response)
 
-    def _build_declaration_user_prompt(self, state: State):
+    def _build_declaration_user_prompt(self, state: GameState):
         context = {
             "phase": state.phase,
             "phase_name": mappings.phases[state.phase],
@@ -202,7 +270,7 @@ class Owner(HarbergerAgent):
             "public_signal": state.public_signal,
             "value_signals": state.value_signals,
         }
-        return self._load_user_prompt(state.phase).render(**context)
+        return self._load_user_prompt(f"owner_user_p{state.phase}.jinja2").render(**context)
 
     def _parse_declaration_response(self, response: str):
         response_json = json.loads(response)
@@ -217,62 +285,20 @@ class Owner(HarbergerAgent):
         }
         return payload
 
-    async def _handle_market_phase(self, state: State):
-        """Handle the market phase."""
-        payload = {
-            "gameId": self.game_id,
-            "type": "post-order",
-            "order": {
-                "price": 100,
-                "quantity": 2,
-                "condition": state.winning_condition,
-                "type": "bid",
-                "now": False,
-            },
-        }
-        return payload
-
 
 class Developer(HarbergerAgent):
     role = 2
     name = "Developer"
 
-    def _load_system_prompt(self):
-        with (PATH_PROMPTS / "developer_system.jinja2").open("r") as f:
-            template_str = f.read()
-            return SandboxedEnvironment(autoescape=True).from_string(template_str)
-
-    def _load_user_prompt(self, phase: int):
-        with (PATH_PROMPTS / f"developer_user_p{phase}.jinja2").open("r") as f:
-            template_str = f.read()
-            return SandboxedEnvironment(autoescape=True).from_string(template_str)
-
-    async def handle_phase(self, phase: int, state: State):
+    async def handle_phase(self, phase: int, state: GameState):
         """Main phase handler that dispatches to specific phase handlers."""
         if phase == 2 or phase == 7:
             return await self._handle_declaration_phase(state)
-        if phase == 6:
-            return await self._handle_market_phase(state)
         return None
 
-    async def _handle_market_phase(self, state: State):
-        """Handle the market phase."""
-        payload = {
-            "gameId": self.game_id,
-            "type": "post-order",
-            "order": {
-                "price": 100,
-                "quantity": 1,
-                "condition": state.winning_condition,
-                "type": "bid",
-                "now": True,
-            },
-        }
-        return payload
-
-    async def _handle_declaration_phase(self, state: State):
+    async def _handle_declaration_phase(self, state: GameState):
         """Handle the declaration phase using LLM."""
-        system_prompt = self._load_system_prompt().render()
+        system_prompt = self._load_system_prompt("developer_system.jinja2").render()
         user_prompt = self._build_declaration_user_prompt(state)
         messages = self.llm.build_messages(system_prompt, user_prompt)
         response = await self.llm.get_response(
@@ -287,7 +313,7 @@ class Developer(HarbergerAgent):
         )
         return self._parse_declaration_response(response)
 
-    def _build_declaration_user_prompt(self, state: State):
+    def _build_declaration_user_prompt(self, state: GameState):
         context = {
             "phase": state.phase,
             "phase_name": mappings.phases[state.phase],
@@ -304,7 +330,7 @@ class Developer(HarbergerAgent):
             "public_signal": state.public_signal,
             "value_signals": state.value_signals,
         }
-        return self._load_user_prompt(state.phase).render(**context)
+        return self._load_user_prompt(f"developer_user_p{state.phase}.jinja2").render(**context)
 
     def _parse_declaration_response(self, response: str):
         response_json = json.loads(response)
