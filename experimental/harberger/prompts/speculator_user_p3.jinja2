@@ -12,7 +12,7 @@ Instructions for this phase:
       - Player #{{ declaration.number }} ({{ declaration.role }}), declared value: {{ declaration.declared_value }}, percentile: {{ declaration.percentile }}%
     {% endfor %}
 
-  2.2. **Value Boundaries**:
+  2.2. **Real Value Boundaries**:
     {% for role, conditions in boundaries.items() %}
     - {{ role }}:
       {% for condition, bounds in conditions.items() %}
@@ -31,5 +31,3 @@ Instructions for this phase:
 Remember:
 - Your goal is to profit from correctly identifying mispriced properties and trading tax shares
 - Consider both the declared values and potential true values when making decisions
-- Use the signals and market information to inform your trading strategy
-- Be mindful of the tax rates and their impact on property values

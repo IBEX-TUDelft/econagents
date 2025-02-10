@@ -7,9 +7,8 @@ import numpy as np
 from jinja2.sandbox import SandboxedEnvironment
 
 from econagents.llm.openai import ChatOpenAI
-from experimental.harberger.models import Message, mappings
 from experimental.harberger.config import PATH_PROMPTS
-from experimental.harberger.models import State
+from experimental.harberger.models import State, mappings
 
 
 class Agent(ABC):
@@ -76,7 +75,6 @@ class Speculator(HarbergerAgent):
                 "player_name": state.player_name,
             },
         )
-        self.logger.info(response)
         return self._parse_speculation_response(response, state)
 
     def _build_speculation_user_prompt(self, state: State):
@@ -94,9 +92,9 @@ class Speculator(HarbergerAgent):
         percentiles = []
         for r, d in zip(roles, declared_values):
             if r == 2:
-                percentiles.append((d - developer_min) / (developer_max - developer_min) * 100)
+                percentiles.append(round((d - developer_min) / (developer_max - developer_min) * 100, 2))
             else:
-                percentiles.append((d - owner_min) / (owner_max - owner_min) * 100)
+                percentiles.append(round((d - owner_min) / (owner_max - owner_min) * 100, 2))
 
         context = {
             "phase": state.phase,
@@ -186,7 +184,6 @@ class Owner(HarbergerAgent):
                 "player_name": state.player_name,
             },
         )
-        self.logger.info(response)
         return self._parse_declaration_response(response)
 
     def _build_declaration_user_prompt(self, state: State):
@@ -288,7 +285,6 @@ class Developer(HarbergerAgent):
                 "player_name": state.player_name,
             },
         )
-        self.logger.info(response)
         return self._parse_declaration_response(response)
 
     def _build_declaration_user_prompt(self, state: State):
