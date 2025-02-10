@@ -4,11 +4,13 @@ Instructions for this phase:
    - Phase: {{ phase_name }} (Phase {{ phase }})
    - Your Role: {{ role }} (Player #{{ player_number }})
    - Name: {{ player_name }}
-   - Initial Shares: {{ initial_shares }}
+   - Your Wallet:
+     - Shares: {{ shares }}
+     - Balance: {{ balance }}
 
 2. **Market Information**:
-   - Public Value Signal: {{ public_signal }}
-   - Your Private Signal: {{ private_signal }}
+   - Received public value signal (of tax shares): {{ public_signal }}
+   - Received private value signal (of tax shares): {{ private_signal }}
    {% if current_orders %}
    - Current orders:
      {% for order in current_orders %}
@@ -31,7 +33,7 @@ Instructions for this phase:
    {
        "action": "post-order",
        "order": {
-           "price": <number>,
+           "price": <number>, # if now=true, put 0 (will be ignored)
            "quantity": 1,
            "type": <"ask" or "bid">,
            "now": <true or false>
@@ -53,5 +55,6 @@ Instructions for this phase:
 
 Remember:
 - You can only trade one share at a time
+- You have limited time to trade
 - Setting "now": true will execute at the best available price
 - Orders can be canceled before they are fulfilled

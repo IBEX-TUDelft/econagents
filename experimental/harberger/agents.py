@@ -59,17 +59,17 @@ class HarbergerAgent(Agent):
             property_value = None
 
         orders = list(state.market.orders.values())
+        asks = sorted(
+            [order for order in orders if order.type == "ask"],
+            key=lambda x: x.price,
+            reverse=True,  # Lowest ask first
+        )
         bids = sorted(
             [order for order in orders if order.type == "bid"],
             key=lambda x: x.price,
             reverse=True,  # Highest bid first
         )
-        asks = sorted(
-            [order for order in orders if order.type == "ask"],
-            key=lambda x: x.price,
-            reverse=False,  # Lowest ask first
-        )
-        sorted_orders = bids + asks
+        sorted_orders = asks + bids
 
         context = {
             "phase_name": mappings.phases[state.phase],
