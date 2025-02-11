@@ -251,3 +251,4 @@ poetry.toml
 
 experimental/harberger/specs/games/
 server_docs/
+.cursorrules
