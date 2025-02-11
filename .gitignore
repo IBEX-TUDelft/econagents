@@ -248,4 +248,8 @@ econagents/*.html
 # Poetry
 poetry.toml
 
+.vscode/settings.json
+
 experimental/harberger/specs/games/
+server_docs/
+.cursorrules

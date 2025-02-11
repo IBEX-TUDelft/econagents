@@ -1,0 +1,39 @@
+Instructions for this phase:
+
+1. **Game Information**:
+   - Phase: {{ phase_name }} (Phase {{ phase }})
+   - Your Role: Developer (Player #{{ player_number }})
+   - Name: {{ player_name }}
+
+2. **Available Information**:
+  2.1. **Your True Land Values**:
+    - {{ property.name }}:
+      - No Project: {{ property.v[0] }}
+      - Project: {{ property.v[1] }}
+
+  2.2. **Value Boundaries**:
+    {% for role, conditions in boundaries.items() %}
+    - {{ role }}:
+      {% for condition, bounds in conditions.items() %}
+      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
+      {% endfor %}
+    {% endfor %}
+
+  2.3. **Tax Information**:
+    - Current tax rate: {{ tax_rate }}%
+
+3. **Your Decision to Make**:
+   - Declare your land value for both scenarios (Project and No Project)
+   - Your declaration will affect which scenario is chosen
+   - Provide the output as a JSON object:
+
+    {
+      "value_no_project": 100,
+      "value_project": 200
+    }
+
+Remember:
+- Your declarations affect both your tax payments and the Project decision
+- Under-declaring risks Speculator purchases and penalties
+- Consider the impact on your tax share values
+- The winning scenario will be determined by total declared values

@@ -15,7 +15,6 @@ repos:
       - id: check-docstring-first
       - id: check-shebang-scripts-are-executable
       - id: check-merge-conflict
-      - id: check-json
       - id: check-toml
       - id: check-xml
       - id: check-yaml
@@ -24,17 +23,9 @@ repos:
       - id: detect-private-key
       - id: end-of-file-fixer
         exclude: ^LICENSE|\.(html|csv|txt|svg|py)$
-      - id: pretty-format-json
-        args: ["--autofix", "--no-ensure-ascii", "--no-sort-keys"]
-      - id: requirements-txt-fixer
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
         exclude: \.(html|svg)$
-
-  # - repo: https://github.com/fredrikaverpil/creosote.git
-  #   rev: v4.0.0
-  #   hooks:
-  #     - id: creosote
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0
