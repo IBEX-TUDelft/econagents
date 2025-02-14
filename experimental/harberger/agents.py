@@ -12,23 +12,23 @@ from experimental.harberger.models import mappings
 from experimental.harberger.state import GameState
 
 
-class Agent(ABC):
-    role: ClassVar[int]
-    name: ClassVar[str]
-    llm: ChatOpenAI
+class Agent(ABC):  #SR: part of any game
+    role: ClassVar[int]     #SR: part of any game
+    name: ClassVar[str]     #SR: part of any game
+    llm: ChatOpenAI         #SR: part of any game
 
     @abstractmethod
     async def handle_phase(self, phase: int, state: GameState):
         """Base implementation of state update handler"""
         pass
 
-    @abstractmethod
+    @abstractmethod  #SR: part of market games, or continuous games
     async def handle_market_phase_tick(self, state: GameState):
         """Handle the market phase tick."""
         pass
 
-
-class HarbergerAgent(Agent):
+   #SR: agent handler concept is general, here I see components that are game specific come back. 
+class HarbergerAgent(Agent):  
     def __init__(self, logger: logging.Logger, llm: ChatOpenAI, game_id: int):
         self.llm = llm
         self.game_id = game_id
@@ -43,22 +43,25 @@ class HarbergerAgent(Agent):
         with (PATH_PROMPTS / filename).open("r") as f:
             template_str = f.read()
             return SandboxedEnvironment(autoescape=True).from_string(template_str)
-
+     #SR: part of any game, but it assumes that the phase is a turn-based system 
+     #SR: by turn-based I mean that tasks gets to executed in isolation, and the results are determined after all tasks are completed
     async def handle_phase(self, phase: int, state: GameState):
         """
         Main phase handler that dispatches to specific phase handlers.
         Must be implemented by subclasses.
         """
         pass
-
+    #SR: here we have the market as a specific case of a time-based (not turn-based) phase. Actions/choices here cause a direct change in the game state. 
+    #SR: for reuse it might make sense to define turn-based tasks and time-based tasks seperately as reusuable components. You lready do this for turnbase phase handlers by the looks of it
     async def _build_market_user_prompt(self, state: GameState):
         """Build the user prompt for the market phase."""
-        if state.property.get("v"):
+        
+        if state.property.get("v"):  #SR: game specific, private information
             property_value = state.property["v"][state.winning_condition]
         else:
             property_value = None
 
-        orders = list(state.market.orders.values())
+        orders = list(state.market.orders.values()) #SR: game specific, public information
         asks = sorted(
             [order for order in orders if order.type == "ask"],
             key=lambda x: x.price,
@@ -72,18 +75,20 @@ class HarbergerAgent(Agent):
         sorted_orders = asks + bids
 
         context = {
-            "phase_name": mappings.phases[state.phase],
+            #SR: General information, meta and proces information
             "phase": state.phase,
+            "phase_name": mappings.phases[state.phase],  
             "role": mappings.roles[self.role],
             "player_number": state.player_number,
             "player_name": state.player_name,
-            "shares": state.wallet[state.winning_condition].get("shares", 0),
-            "balance": state.wallet[state.winning_condition].get("balance", 0),
-            "public_signal": state.public_signal[state.winning_condition],
-            "private_signal": state.value_signals[state.winning_condition],
-            "current_orders": sorted_orders,
-            "your_orders": state.market.get_orders_from_player(state.player_number),
-            "property_value": property_value,
+            #SR: Game specific information
+            "shares": state.wallet[state.winning_condition].get("shares", 0),           #SR: private information
+            "balance": state.wallet[state.winning_condition].get("balance", 0),         #SR: private information
+            "public_signal": state.public_signal[state.winning_condition],              #SR: public information
+            "private_signal": state.value_signals[state.winning_condition],             #SR: private information
+            "current_orders": sorted_orders,                                            #SR: public information
+            "your_orders": state.market.get_orders_from_player(state.player_number),    #SR: private information
+            "property_value": property_value,                                           #SR: private information
         }
         return self._load_user_prompt("all_user_p6.jinja2").render(**context)
 
@@ -127,7 +132,7 @@ class HarbergerAgent(Agent):
         else:
             raise ValueError(f"Unknown action: {response_json['action']}")
 
-
+  #SR: Roles are game specific, and this is unlikely to get much reuse
 class Speculator(HarbergerAgent):
     role = 1
     name = "Speculator"

@@ -4,6 +4,10 @@ from pydantic import BaseModel, Field
 from experimental.harberger.models import Message, mappings
 
 
+# SR: all interactions on the market are specific to the design of the market, and thus game specific. 
+
+
+# SR: Most markets will have orders in both the aks/bid type, all have at least one of the two these could be reused by other market experiments
 class Order(BaseModel):
     id: int
     sender: int
@@ -13,7 +17,7 @@ class Order(BaseModel):
     condition: int
     now: bool = False
 
-
+# SR: all markets deal with transactions, those could be reused
 class Trade(BaseModel):
     from_id: int
     to_id: int
@@ -22,7 +26,7 @@ class Trade(BaseModel):
     condition: int
     median: Optional[float] = None
 
-
+# SR: Most markets will have an open orderbook, this could be reused
 class MarketState(BaseModel):
     """
     Represents the current state of the market:
@@ -114,38 +118,43 @@ class MarketState(BaseModel):
         )
         self.trades.append(new_trade)
 
-
+# SR: here we have a mix of general and game specific defintions
+# SR: all games have a gamestate, or state of the world in the definition file, but the content of this game state is game specific
+# SR: the same holds for its updating, game states and phases have to be updated in any game. What that means is game specific. 
 class GameState(BaseModel):
-    # Basic info
+    # Basic info, 
+    # SR: this block has meta-information and process information that will be present in any experiment
     player_name: str = ""
     player_number: Optional[int] = None
     players: list[dict[str, Any]] = Field(default_factory=list)
     phase: int = 0
 
-    # Wallet and market info
-    wallet: dict[str, Any] = Field(default_factory=dict)
-    tax_rate: float = 0
-    initial_tax_rate: float = 0
-    final_tax_rate: float = 0
+    # Wallet and market info, 
+    wallet: dict[str, Any] = Field(default_factory=dict)    # SR: part of private information
+    tax_rate: float = 0                                     # SR: part of public information
+    initial_tax_rate: float = 0                             # SR: part of public information
+    final_tax_rate: float = 0                               # SR: part of public information
 
     # Value boundaries and conditions
-    boundaries: dict[str, Any] = Field(default_factory=dict)
-    conditions: list[dict[str, Any]] = Field(default_factory=list)
-    property: dict[str, Any] = Field(default_factory=dict)
+    boundaries: dict[str, Any] = Field(default_factory=dict)        # SR: part of public information
+    conditions: list[dict[str, Any]] = Field(default_factory=list)  # SR: part of public information
+    property: dict[str, Any] = Field(default_factory=dict)          # SR: part of ?  information
 
     # Market signals
-    value_signals: list[float] = Field(default_factory=list)
-    public_signal: list[float] = Field(default_factory=list)
-    winning_condition: int = 0
-    winning_condition_description: str = ""
+    value_signals: list[float] = Field(default_factory=list)    # SR: part of private information
+    public_signal: list[float] = Field(default_factory=list)    # SR: part of public information
+    winning_condition: int = 0                                  # SR: part of public information
+    winning_condition_description: str = ""                     # SR: part of public information
 
     # Property declarations
-    declarations: list[dict[str, Any]] = Field(default_factory=list)
-    total_declared_values: list[float] = Field(default_factory=list)
+    declarations: list[dict[str, Any]] = Field(default_factory=list)    # SR: part of private information
+    total_declared_values: list[float] = Field(default_factory=list)    # SR: part of game state (I do not think we actually show this to participants)
 
     # Market state
-    market: MarketState = Field(default_factory=MarketState)
+    market: MarketState = Field(default_factory=MarketState)  # SR: part of public information
 
+    # SR: here we have a mix of general and game specific defintions
+    # SR: all games have a gamestate, or state of the world in the definition file, but the content of this game state is game specific
     def update_state(self, event: Message) -> None:
         """Update state based on incoming event message"""
         event_handlers = {
@@ -170,6 +179,7 @@ class GameState(BaseModel):
         """Handle players-known event"""
         self.players = data["players"]
 
+        # SR: all games have at least one phase, that phase has to end at some pointthis block has meta-information and process information that will be present in any experiment
     def _handle_phase_transition(self, data: dict[str, Any]) -> None:
         """Handle phase-transition event"""
         self.phase = data["phase"]
