@@ -210,12 +210,11 @@ async def create_and_run_game(specs_path: Path) -> None:
 
     try:
         game_id = create_game_from_specs(specs_path=specs_path, base_url=game_server_url, game_name=game_name)
-        game_logger = get_game_logger(game_id)
-        game_logger.info(f"Created new game with ID: {game_id}")
+        logging.info(f"Created new game with ID: {game_id}")
         await spawn_agents(game_id)
 
     except Exception:
-        game_logger.exception("Failed to create and run game")
+        logging.exception("Failed to create and run game")
         raise
 
 
