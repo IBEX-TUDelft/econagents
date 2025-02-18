@@ -50,7 +50,6 @@ def get_recovery_code(hostname, game_id):
 
 def get_agent_logger(agent_id, game_id):
     agent_log_file = LOG_PATH / "agents" / f"agent_{agent_id}.log"
-    game_log_file = LOG_PATH / "game" / f"game_{game_id}.log"
 
     agent_logger = logging.getLogger(f"agent_{agent_id}")
     agent_logger.setLevel(logging.DEBUG)
@@ -64,8 +63,6 @@ def get_agent_logger(agent_id, game_id):
 
     file_handler = logging.FileHandler(agent_log_file)
     file_handler.setFormatter(formatter)
-    game_file_handler = logging.FileHandler(game_log_file)
-    game_file_handler.setFormatter(formatter)
 
     context_filter = ContextInjectingFilter()
     file_handler.addFilter(context_filter)
@@ -76,7 +73,6 @@ def get_agent_logger(agent_id, game_id):
 
     agent_logger.addHandler(file_handler)
     agent_logger.addHandler(console_handler)
-    agent_logger.addHandler(game_file_handler)
 
     return agent_logger
 

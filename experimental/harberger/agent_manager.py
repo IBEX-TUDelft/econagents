@@ -58,7 +58,7 @@ class AgentManager(WebSocketClient):
         return Message(msg_type=msg_type, event_type=event_type, data=data)
 
     async def on_message(self, message):
-        self.logger.debug(f"← Received: {message}")
+        self.logger.debug(f"Received: {message}")
 
         msg = self._extract_message_data(message)
 

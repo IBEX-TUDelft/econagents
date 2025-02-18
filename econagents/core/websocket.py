@@ -36,7 +36,7 @@ class WebSocketClient:
 
     async def send_message(self, message):
         try:
-            self.logger.debug(f"→ Sending: {message}")
+            self.logger.debug(f"Sending: {message}")
             await self.ws.send(message)
         except Exception:
             self.logger.exception("Error sending message", exc_info=True)
