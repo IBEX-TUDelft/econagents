@@ -1,8 +1,8 @@
 from typing import Any, Optional
 
+from langsmith import traceable
 from langsmith.wrappers import wrap_openai
 from openai import AsyncOpenAI
-from langsmith import traceable
 
 
 class ChatOpenAI:

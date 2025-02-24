@@ -1,12 +1,14 @@
 import json
 import logging
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 import websockets
 
+from econagents.core.events import Message
 
-class WebSocketClient:
+
+class AgentManager:
     def __init__(self, url: str, login_payload: dict[str, Any], game_id: int, logger: logging.Logger):
         self.logger = logger
         self.url = url
@@ -16,8 +18,19 @@ class WebSocketClient:
         self.login_payload = login_payload
         self.game_id = game_id
 
+    def _extract_message_data(self, message: str) -> Optional[Message]:
+        try:
+            msg = json.loads(message)
+            msg_type = msg.get("type", "")
+            event_type = msg.get("eventType", "")
+            data = msg.get("data", {})
+        except json.JSONDecodeError:
+            self.logger.error("Invalid JSON received.")
+            return None
+        return Message(msg_type=msg_type, event_type=event_type, data=data)
+
     @abstractmethod
-    async def on_message(self, message):
+    async def on_message(self, message: Message):
         """Handle incoming messages from the server."""
         raise NotImplementedError("Subclasses must implement this method")
 
@@ -36,7 +49,7 @@ class WebSocketClient:
 
     async def send_message(self, message):
         try:
-            self.logger.debug(f"→ Sending: {message}")
+            self.logger.debug(f"Sending: {message}")
             await self.ws.send(message)
         except Exception:
             self.logger.exception("Error sending message", exc_info=True)
@@ -45,7 +58,9 @@ class WebSocketClient:
         while True:
             try:
                 message = await self.ws.recv()
-                await self.on_message(message)
+                msg = self._extract_message_data(message)
+                if msg:
+                    await self.on_message(msg)
             except websockets.exceptions.ConnectionClosed:
                 self.logger.info("WebSocket connection closed")
                 break

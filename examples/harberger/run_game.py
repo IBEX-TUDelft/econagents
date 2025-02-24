@@ -10,8 +10,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-from experimental.harberger.agent_manager import AgentManager
-from experimental.harberger.create_game import create_game_from_specs
+from examples.harberger.agent_manager import HarbergerAgentManager
+from examples.harberger.create_game import create_game_from_specs
 
 load_dotenv()
 
@@ -84,8 +84,8 @@ def get_agent_logger(agent_id, game_id):
 def get_game_logger(game_id):
     game_log_file = LOG_PATH / "game" / f"game_{game_id}.log"
 
-    if game_log_file.exists():
-        game_log_file.unlink()
+    # if game_log_file.exists():
+    #     game_log_file.unlink()
 
     Path(game_log_file).touch()
 
@@ -94,29 +94,24 @@ def get_game_logger(game_id):
 
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 
-    file_handler = logging.FileHandler(game_log_file)
-    file_handler.setFormatter(formatter)
-
     context_filter = ContextInjectingFilter()
-    file_handler.addFilter(context_filter)
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     console_handler.addFilter(context_filter)
 
-    game_logger.addHandler(file_handler)
     game_logger.addHandler(console_handler)
 
     return game_logger
 
 
-async def start_simulation(ws_url, login_payload, game_id, agent_id):
+async def spawn_agent(ws_url, login_payload, game_id, agent_id):
     agent_logger = get_agent_logger(agent_id, game_id)
     ctx_agent_id.set(agent_id)
 
     try:
         agent_logger.info(f"Connecting to WebSocket URL: {ws_url}")
-        game = AgentManager(url=ws_url, login_payload=login_payload, game_id=game_id, logger=agent_logger)
+        game = HarbergerAgentManager(url=ws_url, login_payload=login_payload, game_id=game_id, logger=agent_logger)
         await game.start()
 
     except Exception:
@@ -174,7 +169,7 @@ def load_game_spec(game_id: int) -> dict:
         return json.load(f)
 
 
-async def spawn_agents(game_id: int):
+async def spawn_agents_for_game(game_id: int):
     """Spawn agents for a game using its specification file."""
     game_logger = get_game_logger(game_id)
     game_logger.info(f"Loading spec for game {game_id}")
@@ -193,7 +188,7 @@ async def spawn_agents(game_id: int):
                 "type": "join",
                 "recovery": recovery_code,
             }
-            tasks.append(start_simulation(ws_url, login_payload, game_id, idx + 1))
+            tasks.append(spawn_agent(ws_url, login_payload, game_id, idx + 1))
         await asyncio.gather(*tasks)
 
     except Exception:
@@ -216,7 +211,7 @@ async def create_and_run_game(specs_path: Path) -> None:
         game_id = create_game_from_specs(specs_path=specs_path, base_url=game_server_url, game_name=game_name)
         game_logger = get_game_logger(game_id)
         game_logger.info(f"Created new game with ID: {game_id}")
-        await spawn_agents(game_id)
+        await spawn_agents_for_game(game_id)
 
     except Exception:
         game_logger.exception("Failed to create and run game")
@@ -234,7 +229,7 @@ if __name__ == "__main__":
 
     if args.game_id is not None:
         # Run existing game
-        asyncio.run(spawn_agents(game_id=args.game_id))
+        asyncio.run(spawn_agents_for_game(game_id=args.game_id))
     else:
         # Create and run new game
         specs_path = Path(__file__).parent / "specs/example/harberger.json"

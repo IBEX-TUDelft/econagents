@@ -2,17 +2,17 @@ import asyncio
 import json
 import logging
 import random
-from dataclasses import dataclass
 from typing import Any, Optional
 
-from econagents.core.websocket import WebSocketClient
+from econagents import AgentManager, HybridAgent, Message
 from econagents.llm.openai import ChatOpenAI
-from experimental.harberger.agents import Agent, Developer, Owner, Speculator
-from experimental.harberger.models import Message, mappings
-from experimental.harberger.state import GameState
+from examples.harberger.agents import Developer, Owner, Speculator
+from examples.harberger.config import PATH_PROMPTS
+from examples.harberger.models import mappings
+from examples.harberger.state import HarbergerGameState
 
 
-class AgentManager(WebSocketClient):
+class HarbergerAgentManager(AgentManager):
     name: Optional[str] = None
     role: Optional[str] = None
 
@@ -20,79 +20,76 @@ class AgentManager(WebSocketClient):
         self.game_id = game_id
         self.login_payload = login_payload
         self.logger = logger
-        self._agent: Optional[Agent] = None
+        self._agent: Optional[HybridAgent] = None
         self.llm = ChatOpenAI()
-        self.state = GameState()
+        self.state = HarbergerGameState()
         self.in_market_phase = False
         super().__init__(url, login_payload, game_id, logger)
 
     @property
-    def agent(self) -> Optional[Agent]:
+    def agent(self) -> Optional[HybridAgent]:
         return self._agent
 
-    def _initialize_agent(self) -> Agent:
+    def _initialize_agent(self) -> HybridAgent:
         """
         Create and cache the agent instance based on the assigned role.
         """
         if self._agent is None:
             if self.role == 1:
-                self._agent = Speculator(llm=self.llm, game_id=self.game_id, logger=self.logger)
+                self._agent = Speculator(
+                    llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=PATH_PROMPTS
+                )
             elif self.role == 2:
-                self._agent = Developer(llm=self.llm, game_id=self.game_id, logger=self.logger)
+                self._agent = Developer(
+                    llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=PATH_PROMPTS
+                )
             elif self.role == 3:
-                self._agent = Owner(llm=self.llm, game_id=self.game_id, logger=self.logger)
+                self._agent = Owner(llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=PATH_PROMPTS)
             else:
                 self.logger.error("Invalid role assigned; cannot initialize agent.")
                 raise ValueError("Invalid role for agent initialization.")
         return self._agent
 
-    def _extract_message_data(self, message: str) -> Optional[Message]:
-        try:
-            msg = json.loads(message)
-            msg_type = msg.get("type", "")
-            event_type = msg.get("eventType", "")
-            data = msg.get("data", {})
-        except json.JSONDecodeError:
-            self.logger.error("Invalid JSON received.")
-            return None
-        return Message(msg_type=msg_type, event_type=event_type, data=data)
+    async def _send_player_ready(self):
+        """
+        Send the 'player-is-ready' message so that the game can advance from the introduction.
+        """
+        ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
+        await self.send_message(json.dumps(ready_msg))
+        self.logger.info("Sent player-is-ready message.")
 
-    async def on_message(self, message):
+    async def on_message(self, message: Message):
         self.logger.debug(f"← Received: {message}")
 
-        msg = self._extract_message_data(message)
+        if message.msg_type == "event":
+            self.state.update_state(message)
+            self.logger.info(f"Updated state: {self.state.model_dump_json()}")
 
-        if not msg:
-            return
-
-        if msg.msg_type == "event":
-            # Update state using the enhanced GameState class
-            self.state.update_state(msg)
-
-            if msg.event_type == "assign-name":
-                self.name = msg.data.get("name")
+            if message.event_type == "assign-name":
+                self.name = message.data.get("name")
                 self.logger.info(f"Name assigned: {self.name}")
                 await self._send_player_ready()
 
-            elif msg.event_type == "assign-role":
-                self.role = msg.data.get("role", None)
+            elif message.event_type == "assign-role":
+                self.role = message.data.get("role", None)
                 self.logger.info(f"Role assigned: {self.role}")
                 self._initialize_agent()
 
-            elif msg.event_type == "players-known":
-                self.known_players = msg.data.get("players", [])
+            elif message.event_type == "players-known":
+                self.known_players = message.data.get("players", [])
                 self.logger.info(f"Known players: {self.known_players}")
 
-            elif msg.event_type == "phase-transition":
-                new_phase = msg.data.get("phase")
-                round_number = msg.data.get("round", 1)
+            elif message.event_type == "phase-transition":
+                new_phase = message.data.get("phase")
+                round_number = message.data.get("round", 1)
                 self.logger.info(f"Transitioning to phase {new_phase}, round {round_number}")
 
                 if self.in_market_phase and new_phase != 6:
                     self.in_market_phase = False
                 self.current_phase = new_phase
 
-                await self._handle_phase(new_phase)
+                if new_phase is not None:
+                    await self._handle_phase(new_phase)
 
     async def _handle_phase(self, phase: int):
         """Handle the phase transition."""
@@ -109,25 +106,18 @@ class AgentManager(WebSocketClient):
                 await self.send_message(json.dumps(payload))
                 self.logger.info(f"Phase {phase} ({mappings.phases[phase]}), sent payload: {payload}")
 
-    async def _market_phase_loop(self):
+    async def _market_phase_loop(self, min_delay: int = 10, max_delay: int = 20):
         """Runs while we are in the market phase. Asks the agent to do something every X + random offset seconds."""
+        if not self.agent:
+            return
+
         try:
             while self.in_market_phase:
-                delay = random.uniform(15, 30)
+                delay = random.randint(min_delay, max_delay)
                 await asyncio.sleep(delay)
-
-                payload = await self.agent.handle_market_phase_tick(self.state)
-
+                payload = await self.agent.handle_phase_tick(self.state)
                 if payload:
                     await self.send_message(json.dumps(payload))
 
         except asyncio.CancelledError:
             self.logger.info("Market polling loop cancelled because phase ended.")
-
-    async def _send_player_ready(self):
-        """
-        Send the 'player-is-ready' message so that the game can advance from the introduction.
-        """
-        ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
-        await self.send_message(json.dumps(ready_msg))
-        self.logger.info("Sent player-is-ready message.")
