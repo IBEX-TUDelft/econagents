@@ -28,15 +28,15 @@ generate-setup-file = false
 # Be as loose as possible if writing a library.
 python = ">=3.10,<3.13"
 typing-extensions = "^4.12.2"
-openai = "^1.60.2"
+openai = "^1.63.0"
 langsmith = "^0.3.1"
-numpy = "^2.2.2"
-websockets = "^14.2"
+numpy = "^2.2.3"
+websockets = "^15.0"
 pydantic = "^2.10.6"
 requests = "^2.32.3"
 
 [tool.poetry.group.docs.dependencies]
-myst-parser = {extras = ["linkify"], version = "^3.0.1"}
+myst-parser = {extras = ["linkify"], version = "^4.0.1"}
 sphinx = "~7.4.7"
 sphinx_rtd_theme = "~3.0.2"
 gitpython = ">=3.1.31"
