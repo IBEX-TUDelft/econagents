@@ -7,10 +7,12 @@ from dotenv import load_dotenv
 
 from econagents import Agent, Message, TurnBasedWithContinuousManager
 from econagents.llm.openai import ChatOpenAI
-from examples.harberger.agents import Developer, Owner, Speculator
-from examples.harberger.state import HarbergerGameState
+from examples.harberger_lite.agents import Developer, Owner, Speculator
+from examples.harberger_lite.state import HarbergerGameState
 
 load_dotenv()
+
+# This manages the interactions between the server and the agents
 
 
 class HarbergerAgentManager(TurnBasedWithContinuousManager):
@@ -34,6 +36,7 @@ class HarbergerAgentManager(TurnBasedWithContinuousManager):
         self.register_event_handler("assign-name", self._handle_name_assignment)
         self.register_event_handler("assign-role", self._handle_role_assignment)
 
+    # this is needed because the current server implementation requires the agent to be initialized after the role is assigned
     def _initialize_agent(self) -> Agent:
         """
         Create and cache the agent instance based on the assigned role.
@@ -55,11 +58,13 @@ class HarbergerAgentManager(TurnBasedWithContinuousManager):
                 raise ValueError("Invalid role for agent initialization.")
         return self._agent
 
+    # This is required by the server
     async def _handle_name_assignment(self, message: Message):
         """Handle the name assignment event."""
         ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
         await self.send_message(json.dumps(ready_msg))
 
+    # This is required by the server
     async def _handle_role_assignment(self, message: Message):
         """Handle the role assignment event."""
         self.role = message.data.get("role", None)

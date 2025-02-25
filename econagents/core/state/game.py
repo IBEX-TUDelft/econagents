@@ -53,6 +53,7 @@ class PublicInformation(BaseModel):
 class MetaInformation(BaseModel):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=False)
 
+    game_id: int = EventField(default=0)
     player_name: Optional[str] = EventField(default=None)
     player_number: Optional[int] = EventField(default=None)
     players: list[dict[str, Any]] = EventField(default_factory=list)

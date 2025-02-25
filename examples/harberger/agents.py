@@ -50,6 +50,7 @@ class HarbergerAgent(Agent):
         response_json = json.loads(response)
         order = response_json["order"]
         order["condition"] = state.public_information.winning_condition
+
         if response_json["action"] == "post-order":
             return {
                 "gameId": self.game_id,

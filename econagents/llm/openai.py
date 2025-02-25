@@ -17,7 +17,7 @@ class ChatOpenAI:
     ) -> None:
         """Initialize the LLM interface."""
         self.model_name = model_name
-        self.client = wrap_openai(AsyncOpenAI(api_key=api_key))
+        self.api_key = api_key
 
     def build_messages(self, system_prompt: str, user_prompt: str):
         return [
@@ -32,7 +32,8 @@ class ChatOpenAI:
         tracing_extra: dict[str, Any],
         **kwargs: Any,
     ):
-        response = await self.client.chat.completions.create(
+        client = wrap_openai(AsyncOpenAI(api_key=self.api_key))
+        response = await client.chat.completions.create(
             messages=messages,  # type: ignore
             model=self.model_name,
             response_format={"type": "json_object"},

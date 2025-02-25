@@ -12,15 +12,6 @@ from examples.harberger.manager import HarbergerAgentManager
 
 load_dotenv()
 
-# Load environment variables
-HOSTNAME = os.getenv("HOSTNAME")
-PORT = os.getenv("PORT")
-
-# Setup paths
-BASE_DIR = Path(__file__).parent
-LOG_PATH = BASE_DIR / "logs"
-GAMES_PATH = BASE_DIR / "specs" / "games"
-
 
 async def run_existing_game(game_id: int) -> None:
     """Run an existing Harberger tax game."""
@@ -52,6 +43,15 @@ async def create_and_run_game(specs_path: Path) -> None:
 
 
 if __name__ == "__main__":
+    # Load environment variables
+    HOSTNAME = os.getenv("HOSTNAME")
+    PORT = os.getenv("PORT")
+
+    # Setup paths
+    BASE_DIR = Path(__file__).parent
+    LOG_PATH = BASE_DIR / "logs"
+    GAMES_PATH = BASE_DIR / "specs" / "games"
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Run or create and run a Harberger tax game.")
     parser.add_argument("--game-id", type=int, help="ID of existing game to run", default=None)
@@ -62,5 +62,5 @@ if __name__ == "__main__":
         asyncio.run(run_existing_game(game_id=args.game_id))
     else:
         # Create and run new game
-        specs_path = BASE_DIR / "specs/example/harberger.json"
+        specs_path = BASE_DIR / "specs/harberger.json"
         asyncio.run(create_and_run_game(specs_path))

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, computed_field
 
 
 class Order(BaseModel):
@@ -13,7 +13,6 @@ class Order(BaseModel):
     now: bool = False
 
 
-# SR: all markets deal with transactions, those could be reused
 class Trade(BaseModel):
     from_id: int
     to_id: int
@@ -23,7 +22,6 @@ class Trade(BaseModel):
     median: Optional[float] = None
 
 
-# SR: Most markets will have an open orderbook, this could be reused
 class MarketState(BaseModel):
     """
     Represents the current state of the market:
@@ -31,8 +29,23 @@ class MarketState(BaseModel):
     - History of recent trades
     """
 
-    orders: dict[int, Order] = {}
-    trades: list[Trade] = []
+    orders: dict[int, Order] = Field(default_factory=dict)
+    trades: list[Trade] = Field(default_factory=list)
+
+    @computed_field
+    def order_book(self) -> str:
+        asks = sorted(
+            [order for order in self.orders.values() if order.type == "ask"],
+            key=lambda x: x.price,
+            reverse=True,
+        )
+        bids = sorted(
+            [order for order in self.orders.values() if order.type == "bid"],
+            key=lambda x: x.price,
+            reverse=True,
+        )
+        sorted_orders = asks + bids
+        return "\n".join([str(order) for order in sorted_orders])
 
     def process_event(self, event_type: str, data: dict):
         """
