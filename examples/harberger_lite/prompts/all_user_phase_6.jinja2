@@ -1,0 +1,49 @@
+Instructions for this phase:
+
+1. **Game Information**:
+   - Phase: Phase {{ meta.phase }}
+   - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+   - Your Wallet:
+     - Tax Shares: {{ private_information.wallet[public_information.winning_condition].shares }}
+     - Balance: {{ private_information.wallet[public_information.winning_condition].balance }}
+
+2. **Market Information**:
+   - Received public value signal (of tax shares): {{ public_information.public_signal[public_information.winning_condition] }}
+   - Received private value signal (of tax shares): {{ private_information.value_signals[public_information.winning_condition] }}
+   - Orders:
+   {{ public_information.market_state.order_book }}
+
+3. **Your Decision Options**:
+   Provide the output (one of these options) as a JSON object:
+   A. Post a new order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "post-order",
+       "order": {
+           "price": <number>, # if now=true, put 0 (will be ignored)
+           "quantity": 1,
+           "type": <"ask" or "bid">,
+           "now": <true or false>,
+           "condition": {{ public_information.winning_condition }}
+       },
+   }
+
+   B. Cancel an existing order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "cancel-order",
+       "order": {
+           "id": <order_id>,
+           "condition": {{ public_information.winning_condition }}
+       },
+   }
+
+   C. Do nothing:
+   {}
+
+Remember:
+- You can only trade one share at a time
+- You have limited time to trade
+- Setting "now": true will execute at the best available price
+- Orders can be canceled before they are fulfilled

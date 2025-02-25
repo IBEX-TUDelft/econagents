@@ -11,6 +11,10 @@ Welcome to econagents's documentation!
    self
    Installation
    Overview
+   Running_Experiments
+   Customizing_Agents
+   State_Management
+   Agent_Managers
    api
 
 

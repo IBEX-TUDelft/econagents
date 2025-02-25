@@ -8,6 +8,7 @@ from typing import Any
 import requests
 from dotenv import load_dotenv
 
+
 load_dotenv()
 
 HOSTNAME = os.getenv("HOSTNAME")
@@ -65,9 +66,9 @@ def get_recovery_code(base_url: str, game_id: int) -> str:
         raise
 
 
-def save_game_data(game_id: int, game_name: str, num_agents: int, recovery_codes: list[str]) -> None:
+def save_game_data(specs_path: Path, game_id: int, game_name: str, num_agents: int, recovery_codes: list[str]) -> None:
     """Save game data to a JSON file in the specs/games directory."""
-    specs_dir = Path(__file__).parent / "specs" / "games"
+    specs_dir = specs_path.parent / "games"
     specs_dir.mkdir(parents=True, exist_ok=True)
 
     game_data = {"game_id": game_id, "agents": num_agents, "game_name": game_name, "recovery_codes": recovery_codes}
@@ -110,7 +111,13 @@ def create_game_from_specs(specs_path: Path, base_url: str, game_name: str) -> i
             recovery_codes = [get_recovery_code(base_url, game_id) for _ in range(num_agents)]
 
             # Save game data
-            save_game_data(game_id, game_name, num_agents, recovery_codes)
+            save_game_data(
+                specs_path=specs_path,
+                game_id=game_id,
+                game_name=game_name,
+                num_agents=num_agents,
+                recovery_codes=recovery_codes,
+            )
 
             return game_id
         else:
