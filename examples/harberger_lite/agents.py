@@ -2,6 +2,8 @@ from econagents.core.agent import Agent
 
 # For each role, create an agent class that inherits from Agent
 # The prompts used by the agent are defined by a prompt resolution logic (check documentation for more details)
+# In general, the goal is to make it as easy as possible for experimenters to provide prompts for the agents without
+# having to write any code. This requires the LLM to do more work.
 
 
 class Speculator(Agent):

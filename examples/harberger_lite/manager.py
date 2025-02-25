@@ -13,6 +13,9 @@ from examples.harberger_lite.state import HarbergerGameState
 load_dotenv()
 
 # This manages the interactions between the server and the agents
+# It is a turn-based manager with continuous phases. It assumes that the server sends messages in the following format:
+# {"msg_type": <game_id>, "type": <event_type>, "data": <event_data>}
+# It can be initialized with or without a role. In this case, it uses custom logic to get the role from the server.
 
 
 class HarbergerAgentManager(TurnBasedWithContinuousManager):
