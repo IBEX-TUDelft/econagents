@@ -45,10 +45,6 @@ class HarbergerPublicInformation(PublicInformation):
 
 
 class HarbergerGameState(GameState):
-    """
-    Harberger game state that auto-generates property mappings from field metadata.
-    """
-
     meta: HarbergerMetaInformation = Field(default_factory=HarbergerMetaInformation)
     private_information: HarbergerPrivateInformation = Field(default_factory=HarbergerPrivateInformation)
     public_information: HarbergerPublicInformation = Field(default_factory=HarbergerPublicInformation)

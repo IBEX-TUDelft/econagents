@@ -2,7 +2,6 @@ import json
 from typing import Any, cast
 
 from econagents.core.agent import Agent
-from examples.harberger.config import game_mappings
 from examples.harberger.state import HarbergerGameState
 
 
@@ -27,11 +26,11 @@ class HarbergerAgent(Agent):
             reverse=True,  # Highest bid first
         )
         sorted_orders = asks + bids
+        roles_mapping = {1: "Speculator", 2: "Developer", 3: "Owner"}
 
         context = {
             "phase": state.meta.phase,
-            "phase_name": game_mappings.phases[state.meta.phase],
-            "role": game_mappings.roles[self.role],
+            "role": roles_mapping[self.role],
             "player_number": state.meta.player_number,
             "player_name": state.meta.player_name,
             "shares": state.private_information.wallet[state.public_information.winning_condition].get("shares", 0),
@@ -102,9 +101,9 @@ class Speculator(HarbergerAgent):
             else:
                 percentiles.append(round((d - owner_min) / (owner_max - owner_min) * 100, 2))
 
+        roles_mapping = {1: "Speculator", 2: "Developer", 3: "Owner"}
         context = {
             "phase": state.meta.phase,
-            "phase_name": game_mappings.phases[state.meta.phase],
             "player_number": state.meta.player_number,
             "player_name": state.meta.player_name,
             "name": state.meta.player_name,
@@ -113,7 +112,7 @@ class Speculator(HarbergerAgent):
             "winning_condition_description": state.public_information.winning_condition_description,
             "declarations": [
                 {
-                    "role": game_mappings.roles[roles[i]],
+                    "role": roles_mapping[roles[i]],
                     "number": numbers[i],
                     "declared_value": declared_values[i],
                     "percentile": percentiles[i],

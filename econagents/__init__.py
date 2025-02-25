@@ -3,7 +3,7 @@ econagents: A Python library for setting up and running economic experiments wit
 """
 
 from econagents.core.agent import Agent
-from econagents.core.agent_manager import AgentManager
+from econagents.core.manager import AgentManager, TurnBasedManager, TurnAndContinuousManager
 from econagents.core.events import Message
 from econagents.core.state.game import GameState
 from econagents.core.state.market import MarketState
@@ -11,4 +11,12 @@ from econagents.core.state.market import MarketState
 # Don't manually change, let poetry-dynamic-versioning handle it.
 __version__ = "0.1.0"
 
-__all__: list[str] = ["Agent", "AgentManager", "Message", "GameState", "MarketState"]
+__all__: list[str] = [
+    "Agent",
+    "AgentManager",
+    "TurnBasedManager",
+    "TurnAndContinuousManager",
+    "Message",
+    "GameState",
+    "MarketState",
+]
