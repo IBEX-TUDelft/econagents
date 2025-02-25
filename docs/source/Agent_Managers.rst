@@ -36,9 +36,6 @@ Example usage:
         logger=logging.getLogger("agent"),
     )
 
-    # Register an event handler
-    manager.register_event_handler("market_update", handle_market_update)
-
     # Start the manager
     await manager.start()
 
