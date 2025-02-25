@@ -4,7 +4,7 @@ from pydantic import Field
 
 from econagents.core.state.game import EventHandler, GameState, PrivateInformation, PropertyMapping, PublicInformation
 from econagents.core.state.market import MarketState
-from examples.harberger.models import property_mappings
+from examples.harberger.config import property_mappings
 
 
 class HarbergerPrivateInformation(PrivateInformation):

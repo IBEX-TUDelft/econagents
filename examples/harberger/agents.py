@@ -1,13 +1,13 @@
 import json
 from typing import Any, cast
 
-from econagents.core.agent import HybridAgent
-from examples.harberger.models import mappings
+from econagents.core.agent import Agent
+from examples.harberger.config import game_mappings
 from examples.harberger.state import HarbergerGameState
 
 
-class HarbergerAgent(HybridAgent):
-    def get_phase_tick_user_prompt(self, state: HarbergerGameState):
+class HarbergerAgent(Agent):
+    def get_phase_6_user_prompt(self, state: HarbergerGameState):
         """Build the user prompt for the market phase."""
 
         if state.private_information.property.get("v"):
@@ -30,8 +30,8 @@ class HarbergerAgent(HybridAgent):
 
         context = {
             "phase": state.meta.phase,
-            "phase_name": mappings.phases[state.meta.phase],
-            "role": mappings.roles[self.role],
+            "phase_name": game_mappings.phases[state.meta.phase],
+            "role": game_mappings.roles[self.role],
             "player_number": state.meta.player_number,
             "player_name": state.meta.player_name,
             "shares": state.private_information.wallet[state.public_information.winning_condition].get("shares", 0),
@@ -46,7 +46,7 @@ class HarbergerAgent(HybridAgent):
         }
         return self.render_prompt(context=context, prompt_type="user", phase=state.meta.phase)
 
-    def parse_phase_tick_llm_response(self, response: str, state: HarbergerGameState):
+    def parse_phase_6_llm_response(self, response: str, state: HarbergerGameState):
         """Parse the market response."""
         response_json = json.loads(response)
         order = response_json["order"]
@@ -69,13 +69,18 @@ class HarbergerAgent(HybridAgent):
             raise ValueError(f"Unknown action: {response_json['action']}")
 
 
-# SR: Roles are game specific, and this is unlikely to get much reuse
 class Speculator(HarbergerAgent):
     role = 1
     name = "Speculator"
-    task_phases = [3, 8]
+    task_phases = [3, 6, 8]
 
-    def get_phase_user_prompt(self, state: HarbergerGameState):
+    def get_phase_3_user_prompt(self, state: HarbergerGameState):
+        return self._get_speculation_user_prompt(state)
+
+    def get_phase_8_user_prompt(self, state: HarbergerGameState):
+        return self._get_speculation_user_prompt(state)
+
+    def _get_speculation_user_prompt(self, state: HarbergerGameState):
         key = "projectA" if state.public_information.winning_condition == 1 else "noProject"
 
         developer_min = state.public_information.boundaries["developer"][key]["low"]
@@ -99,7 +104,7 @@ class Speculator(HarbergerAgent):
 
         context = {
             "phase": state.meta.phase,
-            "phase_name": mappings.phases[state.meta.phase],
+            "phase_name": game_mappings.phases[state.meta.phase],
             "player_number": state.meta.player_number,
             "player_name": state.meta.player_name,
             "name": state.meta.player_name,
@@ -108,7 +113,7 @@ class Speculator(HarbergerAgent):
             "winning_condition_description": state.public_information.winning_condition_description,
             "declarations": [
                 {
-                    "role": mappings.roles[roles[i]],
+                    "role": game_mappings.roles[roles[i]],
                     "number": numbers[i],
                     "declared_value": declared_values[i],
                     "percentile": percentiles[i],
@@ -118,24 +123,35 @@ class Speculator(HarbergerAgent):
         }
         return self.render_prompt(context=context, prompt_type="user", phase=state.meta.phase)
 
-    def parse_phase_llm_response(self, response: str, state: HarbergerGameState):
+    def parse_phase_3_llm_response(self, response: str, state: HarbergerGameState):
+        return self._parse_speculation_response(response, state)
+
+    def parse_phase_8_llm_response(self, response: str, state: HarbergerGameState):
+        return self._parse_speculation_response(response, state)
+
+    def _parse_speculation_response(self, response: str, state: HarbergerGameState):
         response_json = json.loads(response)
         snipe: list[list[dict[str, Any]]] = [[], []]
         snipe[state.public_information.winning_condition] = response_json["purchases"]
-        payload = {
+        return {
             "gameId": self.game_id,
             "type": "done-speculating",
             "snipe": snipe,
         }
-        return payload
 
 
-class Owner(HarbergerAgent):
-    role = 3
-    name = "Owner"
-    task_phases = [2, 7]
+class Developer(HarbergerAgent):
+    role = 2
+    name = "Developer"
+    task_phases = [2, 6, 7]
 
-    def parse_phase_llm_response(self, response: str, state: HarbergerGameState):
+    def parse_phase_2_llm_response(self, response: str, state: HarbergerGameState):
+        return self._parse_declaration_response(response, state)
+
+    def parse_phase_7_llm_response(self, response: str, state: HarbergerGameState):
+        return self._parse_declaration_response(response, state)
+
+    def _parse_declaration_response(self, response: str, state: HarbergerGameState):
         response_json = json.loads(response)
         payload = {
             "gameId": self.game_id,
@@ -149,12 +165,18 @@ class Owner(HarbergerAgent):
         return payload
 
 
-class Developer(HarbergerAgent):
-    role = 2
-    name = "Developer"
-    task_phases = [2, 7]
+class Owner(HarbergerAgent):
+    role = 3
+    name = "Owner"
+    task_phases = [2, 6, 7]
 
-    def parse_phase_llm_response(self, response: str, state: HarbergerGameState):
+    def parse_phase_2_llm_response(self, response: str, state: HarbergerGameState):
+        return self._parse_declaration_response(response, state)
+
+    def parse_phase_7_llm_response(self, response: str, state: HarbergerGameState):
+        return self._parse_declaration_response(response, state)
+
+    def _parse_declaration_response(self, response: str, state: HarbergerGameState):
         response_json = json.loads(response)
         payload = {
             "gameId": self.game_id,
