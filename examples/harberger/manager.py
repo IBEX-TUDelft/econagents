@@ -50,19 +50,10 @@ class HarbergerAgentManager(TurnAndContinuousManager):
                 raise ValueError("Invalid role for agent initialization.")
         return self._agent
 
-    async def _send_player_ready(self):
-        """
-        Send the 'player-is-ready' message so that the game can advance from the introduction.
-        """
-        ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
-        await self.send_message(json.dumps(ready_msg))
-        self.logger.info("Sent player-is-ready message.")
-
     async def _handle_name_assignment(self, message: Message):
         """Handle the name assignment event."""
-        self.name = message.data.get("name")
-        self.logger.info(f"Name assigned: {self.name}")
-        await self._send_player_ready()
+        ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
+        await self.send_message(json.dumps(ready_msg))
 
     async def _handle_role_assignment(self, message: Message):
         """Handle the role assignment event."""
