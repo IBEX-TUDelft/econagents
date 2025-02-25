@@ -27,6 +27,13 @@ repos:
         args: [--markdown-linebreak-ext=md]
         exclude: \.(html|svg)$
 
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.8.1
+    hooks:
+      - id: nbstripout
+        description: Strip output from Jupyter notebooks
+        files: \.ipynb$
+
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0
     hooks:
