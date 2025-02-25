@@ -78,7 +78,7 @@ class GameState(BaseModel):
         super().__init__(**kwargs)
         self._property_mappings = self._get_property_mappings()
 
-    def update_state(self, event: Message) -> None:
+    def update(self, event: Message) -> None:
         """
         Generic state update method that handles both property mappings and custom event handlers.
 

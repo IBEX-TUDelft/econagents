@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-from examples.harberger.agent_manager import HarbergerAgentManager
+from examples.harberger.manager import HarbergerAgentManager
 from examples.harberger.create_game import create_game_from_specs
 
 load_dotenv()
