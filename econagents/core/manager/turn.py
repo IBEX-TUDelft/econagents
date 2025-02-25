@@ -119,7 +119,7 @@ class TurnBasedManager(AgentManager):
         return self
 
 
-class TurnAndContinuousManager(TurnBasedManager):
+class TurnBasedWithContinuousManager(TurnBasedManager):
     """
     A manager for games that combine turn-based and continuous action phases.
 

@@ -1,15 +1,19 @@
 import json
 import logging
+from pathlib import Path
 from typing import Any, Optional
 
-from econagents import Message, TurnAndContinuousManager, Agent
+from dotenv import load_dotenv
+
+from econagents import Agent, Message, TurnBasedWithContinuousManager
 from econagents.llm.openai import ChatOpenAI
 from examples.harberger.agents import Developer, Owner, Speculator
-from examples.harberger.config import PATH_PROMPTS
 from examples.harberger.state import HarbergerGameState
 
+load_dotenv()
 
-class HarbergerAgentManager(TurnAndContinuousManager):
+
+class HarbergerAgentManager(TurnBasedWithContinuousManager):
     name: Optional[str] = None
     role: Optional[str] = None
 
@@ -34,17 +38,18 @@ class HarbergerAgentManager(TurnAndContinuousManager):
         """
         Create and cache the agent instance based on the assigned role.
         """
+        path_prompts = Path(__file__).parent / "prompts"
         if self._agent is None:
             if self.role == 1:
                 self._agent = Speculator(
-                    llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=PATH_PROMPTS
+                    llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=path_prompts
                 )
             elif self.role == 2:
                 self._agent = Developer(
-                    llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=PATH_PROMPTS
+                    llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=path_prompts
                 )
             elif self.role == 3:
-                self._agent = Owner(llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=PATH_PROMPTS)
+                self._agent = Owner(llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=path_prompts)
             else:
                 self.logger.error("Invalid role assigned; cannot initialize agent.")
                 raise ValueError("Invalid role for agent initialization.")
