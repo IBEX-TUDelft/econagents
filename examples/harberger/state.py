@@ -1,36 +1,43 @@
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import Field
 
-from econagents.core.state.game import EventHandler, GameState, PrivateInformation, PropertyMapping, PublicInformation
+from econagents.core.state.fields import EventField
+from econagents.core.state.game import EventHandler, GameState, MetaInformation, PrivateInformation, PublicInformation
 from econagents.core.state.market import MarketState
-from examples.harberger.config import property_mappings
+
+
+class HarbergerMetaInformation(MetaInformation):
+    player_name: Optional[str] = EventField(default=None, event_key="name")
+    player_number: Optional[int] = EventField(default=None, event_key="number")
+    players: list[dict[str, Any]] = EventField(default_factory=list, event_key="players")
+    phase: int = EventField(default=0, event_key="phase")
 
 
 class HarbergerPrivateInformation(PrivateInformation):
-    wallet: list[dict[str, Any]] = Field(default_factory=list)
-    value_signals: list[float] = Field(default_factory=list)
-    declarations: list[dict[str, Any]] = Field(default_factory=list)
-    property: dict[str, Any] = Field(default_factory=dict)
+    wallet: list[dict[str, Any]] = EventField(default_factory=list)
+    value_signals: list[float] = EventField(default_factory=list, event_key="signals")
+    declarations: list[dict[str, Any]] = EventField(default_factory=list)
+    property: dict[str, Any] = EventField(default_factory=dict, exclude_events=["profit"])
 
 
 class HarbergerPublicInformation(PublicInformation):
     # Tax
-    tax_rate: float = 0
-    initial_tax_rate: float = 0
-    final_tax_rate: float = 0
+    tax_rate: float = EventField(default=0, event_key="taxRate")
+    initial_tax_rate: float = EventField(default=0, event_key="initialTaxRate")
+    final_tax_rate: float = EventField(default=0, event_key="finalTaxRate")
 
     # Boundaries and conditions
-    boundaries: dict[str, Any] = Field(default_factory=dict)
-    conditions: list[dict[str, Any]] = Field(default_factory=list)
+    boundaries: dict[str, Any] = EventField(default_factory=dict)
+    conditions: list[dict[str, Any]] = EventField(default_factory=list)
 
     # Market
-    value_signals: list[float] = Field(default_factory=list)
-    market_state: MarketState = Field(default_factory=MarketState)
-    public_signal: list[float] = Field(default_factory=list)
+    value_signals: list[float] = EventField(default_factory=list)
+    market_state: MarketState = EventField(default_factory=MarketState)
+    public_signal: list[float] = EventField(default_factory=list, event_key="publicSignal")
 
     # Winning condition
-    winning_condition: int = 0
+    winning_condition: int = EventField(default=0, event_key="winningCondition")
 
     @property
     def winning_condition_description(self) -> dict[str, Any]:
@@ -38,20 +45,18 @@ class HarbergerPublicInformation(PublicInformation):
 
 
 class HarbergerGameState(GameState):
+    """
+    Harberger game state that auto-generates property mappings from field metadata.
+    """
+
+    meta: HarbergerMetaInformation = Field(default_factory=HarbergerMetaInformation)
     private_information: HarbergerPrivateInformation = Field(default_factory=HarbergerPrivateInformation)
     public_information: HarbergerPublicInformation = Field(default_factory=HarbergerPublicInformation)
-
-    def get_property_mappings(self) -> list[PropertyMapping]:
-        return property_mappings
 
     def get_custom_handlers(self) -> dict[str, EventHandler]:
         """Provide custom event handlers for market events"""
         market_events = ["add-order", "update-order", "delete-order", "contract-fulfilled", "asset-movement"]
-        return {event: self._handle_market_event for event in market_events} | {"profit": self._handle_profit}
-
-    def _handle_profit(self, event_type: str, data: dict[str, Any]) -> None:
-        """Handle profit events"""
-        pass
+        return {event: self._handle_market_event for event in market_events}
 
     def _handle_market_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Handle market-related events by delegating to MarketState"""
