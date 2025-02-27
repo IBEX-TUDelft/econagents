@@ -1,0 +1,39 @@
+# Make Your Choice
+
+## Current Game State
+
+Round: {{meta.round}} of {{meta.total_rounds}}
+Your current score: {{private_information.total_score}}
+
+## Your History
+
+{% if private_information.history %}
+Previous rounds:
+{% for round in private_information.history %}
+Round {{round.round}}: You chose **{{round.choice}}**, opponent chose **{{round.opponent_choice}}**. You earned {{round.payoff}} points.
+{% endfor %}
+{% else %}
+This is the first round.
+{% endif %}
+
+## Payoff Matrix
+
+{{public_information.payoff_description}}
+
+## Instructions
+
+Based on the current game state and your strategy, please choose whether to **cooperate** or **defect** in this round.
+
+Respond with only one of the following:
+1. "COOPERATE" - if you choose to remain silent (cooperate)
+2. "DEFECT" - if you choose to testify against the other prisoner (defect)
+
+Provide your choice as a JSON object with the following fields:
+- `choice`: The choice you made
+
+Example:
+```json
+{
+    "choice": "COOPERATE",
+}
+```
