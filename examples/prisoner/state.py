@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import Field
 
@@ -23,9 +23,7 @@ class PDPrivate(PrivateInformation):
 class PDPublic(PublicInformation):
     """Public information for the Prisoner's Dilemma game."""
 
-    history: List[Dict[str, Any]] = EventField(default_factory=list)
-    current_round_results: Dict[str, Any] = EventField(default_factory=dict)
-    round_history: List[Dict[str, Any]] = EventField(default_factory=list)
+    history: list[dict[str, Any]] = EventField(default_factory=list)
 
 
 class PDGameState(GameState):

@@ -8,7 +8,6 @@ from econagents.core.agent import Agent
 from econagents.core.events import Message
 from econagents.core.manager.base import AgentManager
 from econagents.core.state.game import GameState
-from econagents.llm.openai import ChatOpenAI
 
 
 class TurnBasedManager(AgentManager):
@@ -25,10 +24,9 @@ class TurnBasedManager(AgentManager):
         game_id: int,
         logger: logging.Logger,
         phase_transition_event: str = "phase-transition",
-        phase_transition_event_key: str = "phase",
+        phase_identifier_key: str = "phase",
         state: Optional[GameState] = None,
         agent: Optional[Agent] = None,
-        llm: ChatOpenAI = ChatOpenAI(),
     ):
         """
         Initialize the TurnWithStateManager.
@@ -42,13 +40,13 @@ class TurnBasedManager(AgentManager):
             state: Optional game state object to track game state
             agent: Optional agent instance to handle game phases
         """
-        super().__init__(url, login_payload, game_id, logger, llm)
+        super().__init__(url, login_payload, game_id, logger)
         self.game_id = game_id
         self._agent = agent
         self.state = state
         self.current_phase = None
         self.phase_transition_event = phase_transition_event
-        self.phase_transition_event_key = phase_transition_event_key
+        self.phase_identifier_key = phase_identifier_key
 
         # Register the phase transition handler
         self.register_event_handler(self.phase_transition_event, self._handle_phase_transition)
@@ -75,7 +73,7 @@ class TurnBasedManager(AgentManager):
 
     async def _handle_phase_transition(self, message: Message):
         """Handle phase transition events."""
-        new_phase = message.data.get(self.phase_transition_event_key)
+        new_phase = message.data.get(self.phase_identifier_key)
         self.logger.info(f"Transitioning to phase {new_phase}")
 
         self.current_phase = new_phase
@@ -110,7 +108,7 @@ class TurnBasedManager(AgentManager):
 
         # This method provides a convenient API for registering custom phase handlers
         async def phase_handler(message: Message):
-            if message.data.get(self.phase_transition_event_key) == phase:
+            if message.data.get(self.phase_identifier_key) == phase:
                 payload = handler(phase, self.state)
                 if hasattr(payload, "__await__"):
                     payload = await payload
@@ -137,12 +135,11 @@ class TurnBasedWithContinuousManager(TurnBasedManager):
         logger: logging.Logger,
         continuous_phases: set[int],
         phase_transition_event: str = "phase-transition",
-        phase_transition_event_key: str = "phase",
+        phase_identifier_key: str = "phase",
         min_action_delay: int = 10,
         max_action_delay: int = 20,
         state: Optional[GameState] = None,
         agent: Optional[Agent] = None,
-        llm: ChatOpenAI = ChatOpenAI(),
     ):
         """
         Initialize the TurnAndContinuousPhases manager.
@@ -156,7 +153,6 @@ class TurnBasedWithContinuousManager(TurnBasedManager):
             continuous_phases: Set of phase numbers that should be treated as continuous
             min_action_delay: Minimum delay in seconds between actions in continuous phases
             max_action_delay: Maximum delay in seconds between actions in continuous phases
-            llm: LLM instance to use for the agent
             state: Optional game state object to track game state
             agent: Optional agent instance to handle game phases
         """
@@ -165,11 +161,10 @@ class TurnBasedWithContinuousManager(TurnBasedManager):
             login_payload=login_payload,
             game_id=game_id,
             phase_transition_event=phase_transition_event,
-            phase_transition_event_key=phase_transition_event_key,
+            phase_identifier_key=phase_identifier_key,
             logger=logger,
             state=state,
             agent=agent,
-            llm=llm,
         )
         self.continuous_phases = continuous_phases
         self.min_action_delay = min_action_delay
@@ -184,7 +179,7 @@ class TurnBasedWithContinuousManager(TurnBasedManager):
         When transitioning to a continuous phase, starts a background task to regularly
         prompt the agent for actions. When leaving a continuous phase, cancels that task.
         """
-        new_phase = message.data.get(self.phase_transition_event_key)
+        new_phase = message.data.get(self.phase_identifier_key)
         self.logger.info(f"Transitioning to phase {new_phase}")
 
         if self.in_continuous_phase and new_phase != self.current_phase:

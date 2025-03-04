@@ -34,7 +34,6 @@ class HarbergerAgentManager(TurnBasedWithContinuousManager):
             max_action_delay=10,
             state=HarbergerGameState(game_id=game_id),
             agent=None,
-            llm=ChatOpenAI(),
         )
         self.register_event_handler("assign-name", self._handle_name_assignment)
         self.register_event_handler("assign-role", self._handle_role_assignment)
@@ -48,14 +47,16 @@ class HarbergerAgentManager(TurnBasedWithContinuousManager):
         if self._agent is None:
             if self.role == 1:
                 self._agent = Speculator(
-                    llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=path_prompts
+                    game_id=self.game_id, llm=ChatOpenAI(), logger=self.logger, prompts_path=path_prompts
                 )
             elif self.role == 2:
                 self._agent = Developer(
-                    llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=path_prompts
+                    game_id=self.game_id, llm=ChatOpenAI(), logger=self.logger, prompts_path=path_prompts
                 )
             elif self.role == 3:
-                self._agent = Owner(llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=path_prompts)
+                self._agent = Owner(
+                    game_id=self.game_id, llm=ChatOpenAI(), logger=self.logger, prompts_path=path_prompts
+                )
             else:
                 self.logger.error("Invalid role assigned; cannot initialize agent.")
                 raise ValueError("Invalid role for agent initialization.")

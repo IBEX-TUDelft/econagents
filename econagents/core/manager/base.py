@@ -6,7 +6,6 @@ from typing import Any, Callable, Dict, List, Optional
 import websockets
 
 from econagents.core.events import Message
-from econagents.llm.openai import ChatOpenAI
 
 
 class AgentManager:
@@ -16,9 +15,7 @@ class AgentManager:
         login_payload: dict[str, Any],
         game_id: int,
         logger: logging.Logger,
-        llm: ChatOpenAI = ChatOpenAI(),
     ):
-        self.llm = llm
         self.logger = logger
         self.url = url
         self.ws = None

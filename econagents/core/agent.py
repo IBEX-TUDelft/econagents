@@ -51,7 +51,8 @@ class Agent(ABC, Generic[StateT_contra]):
     # Class attributes
     role: ClassVar[int]
     name: ClassVar[str]
-    task_phases: ClassVar[list[int]]
+    task_phases: ClassVar[list[int]] = []  # Empty list means no specific phases are required
+    task_phases_excluded: ClassVar[list[int]] = []  # Empty list means no phases are excluded
 
     # Regex patterns for method name extraction
     _SYSTEM_PROMPT_PATTERN: ClassVar[Pattern] = re.compile(r"get_phase_(\d+)_system_prompt")
@@ -72,6 +73,13 @@ class Agent(ABC, Generic[StateT_contra]):
         self.game_id = game_id
         self.logger = logger
         self.prompts_path = prompts_path
+
+        # Validate that only one of task_phases or task_phases_excluded is specified
+        if self.task_phases and self.task_phases_excluded:
+            raise ValueError(
+                f"Only one of task_phases or task_phases_excluded should be specified, not both. "
+                f"Got task_phases={self.task_phases} and task_phases_excluded={self.task_phases_excluded}"
+            )
 
         # Handler registries
         self._system_prompt_handlers: Dict[int, SystemPromptHandler] = {}
@@ -275,6 +283,10 @@ class Agent(ABC, Generic[StateT_contra]):
         This method will use a phase-specific handler if registered,
         otherwise it falls back to the default implementation.
 
+        By default, the agent acts in all phases unless:
+        1. task_phases is non-empty and the phase is not in task_phases, or
+        2. phase is explicitly listed in task_phases_excluded
+
         Args:
             phase: Game phase number
             state: Current game state
@@ -282,7 +294,13 @@ class Agent(ABC, Generic[StateT_contra]):
         Returns:
             Phase result dictionary or None if phase is not handled
         """
-        if phase not in self.task_phases:
+        # Skip the phase if it's in the excluded list
+        if phase in self.task_phases_excluded:
+            self.logger.debug(f"Phase {phase} is in excluded phases {self.task_phases_excluded}, skipping")
+            return None
+
+        # Skip the phase if task_phases is non-empty and phase is not in it
+        if self.task_phases and phase not in self.task_phases:
             self.logger.debug(f"Phase {phase} not in task phases {self.task_phases}, skipping")
             return None
 

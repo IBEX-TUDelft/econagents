@@ -4,7 +4,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -16,22 +16,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 
-def load_game_specs(specs_path: Path) -> Dict[str, Any]:
-    """Load game specifications from JSON file."""
-    try:
-        with specs_path.open("r") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to load game specs: {e}")
-        raise
-
-
-def generate_recovery_codes(num_players: int = 2) -> List[str]:
+def generate_recovery_codes(num_players: int = 2) -> list[str]:
     """Generate recovery codes for the specified number of players."""
     return [str(uuid.uuid4()) for _ in range(num_players)]
 
 
-def save_game_data(specs_path: Path, game_id: int, game_name: str, num_players: int, recovery_codes: List[str]) -> Path:
+def save_game_data(specs_path: Path, game_id: int, game_name: str, num_players: int, recovery_codes: list[str]) -> Path:
     """Save game data to a JSON file in the specs/games directory."""
     specs_dir = specs_path.parent / "games"
     specs_dir.mkdir(parents=True, exist_ok=True)

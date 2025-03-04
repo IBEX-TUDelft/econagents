@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from dotenv import load_dotenv
 
@@ -17,7 +17,6 @@ class Prisoner(Agent):
 
     role = 1
     name = "Prisoner"
-    task_phases = [1, 2, 3, 4, 5]
 
 
 class PrisonersDilemmaManager(TurnBasedManager):
@@ -28,24 +27,22 @@ class PrisonersDilemmaManager(TurnBasedManager):
 
     name: Optional[str] = None
 
-    def __init__(self, url: str, login_payload: Dict[str, Any], game_id: int, logger: logging.Logger):
+    def __init__(self, url: str, login_payload: dict[str, Any], game_id: int, logger: logging.Logger):
         super().__init__(
             url=url,
             login_payload=login_payload,
             game_id=game_id,
             phase_transition_event="round-started",
-            phase_transition_event_key="round",
+            phase_identifier_key="round",
             logger=logger,
             state=PDGameState(game_id=game_id),
-            agent=None,
-            llm=ChatOpenAI(),
+            agent=Prisoner(
+                game_id=game_id, llm=ChatOpenAI(), logger=logger, prompts_path=Path(__file__).parent / "prompts"
+            ),
         )
         self.register_event_handler("assign-name", self._handle_name_assignment)
 
     async def _handle_name_assignment(self, message: Message) -> None:
         """Handle the name assignment event."""
         ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
-        path_prompts = Path(__file__).parent / "prompts"
-        if self._agent is None:
-            self._agent = Prisoner(llm=self.llm, game_id=self.game_id, logger=self.logger, prompts_path=path_prompts)
         await self.send_message(json.dumps(ready_msg))
