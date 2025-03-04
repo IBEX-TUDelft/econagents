@@ -253,6 +253,7 @@ poetry.toml
 experimental/harberger/specs/games/
 examples/harberger/specs/games/*
 examples/*/*/games/
+examples/server/*/*/games/
 server_docs/
 .cursorrules
 .vscode/launch.json

@@ -1,0 +1,14 @@
+{
+  "title": "Prisoner's Dilemma Experiment",
+  "rounds": 5,
+  "payoffs": {
+    "both_cooperate": [3, 3],
+    "both_defect": [1, 1],
+    "cooperate_defect": [0, 5],
+    "defect_cooperate": [5, 0]
+  },
+  "timing": {
+    "round_duration": 30,
+    "result_display": 10
+  }
+}

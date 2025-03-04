@@ -163,7 +163,7 @@ class GameState(BaseModel):
             if exclude_from_mapping:
                 continue
 
-            # Get event key from event_key if provided, otherwise convert to camelCase
+            # Get event key from event_key if provided, otherwise use field name
             event_key = None
             if hasattr(field_info, "json_schema_extra") and "event_metadata" in field_info.json_schema_extra:
                 event_key = field_info.json_schema_extra["event_metadata"]["event_key"]
@@ -171,9 +171,7 @@ class GameState(BaseModel):
                 event_key = field_info.event_key
 
             if event_key is None:
-                # Convert snake_case to camelCase
-                parts = field_name.split("_")
-                event_key = parts[0] + "".join(x.title() for x in parts[1:])
+                event_key = field_name
 
             # Get events and exclude_events if provided
             events = None

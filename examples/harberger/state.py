@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from pydantic import Field
+from pydantic import Field, computed_field
 
 from econagents.core.state.fields import EventField
 from econagents.core.state.game import EventHandler, GameState, MetaInformation, PrivateInformation, PublicInformation
@@ -39,9 +39,9 @@ class HarbergerPublicInformation(PublicInformation):
     # Winning condition
     winning_condition: int = EventField(default=0, event_key="winningCondition")
 
-    @property
+    @computed_field
     def winning_condition_description(self) -> dict[str, Any]:
-        return self.conditions[self.winning_condition]
+        return self.conditions[self.winning_condition] if self.conditions else {}
 
 
 class HarbergerGameState(GameState):
