@@ -126,6 +126,12 @@ class Agent(ABC, Generic[StateT_contra]):
 
         Raises:
             FileNotFoundError: If no matching prompt template is found
+
+        Template resolution order:
+        1. Agent-specific phase prompt (e.g., "agent_name_system_phase_1.jinja2")
+        2. Agent-specific general prompt (e.g., "agent_name_system.jinja2")
+        3. All-role phase prompt (e.g., "all_system_phase_1.jinja2")
+        4. All-role general prompt (e.g., "all_system.jinja2")
         """
         # Try role-specific prompt first, then fall back to 'all'
         for role in [self.name, "all"]:
