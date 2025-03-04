@@ -43,7 +43,7 @@ class HarbergerPublicInformation(PublicInformation):
     conditions: list[dict[str, Any]] = EventField(default_factory=list)
 
     # Market
-    value_signals: list[float] = EventField(default_factory=list)
+    value_signals: list[float] = EventField(default_factory=list, event_key="signals")
     market_state: MarketState = EventField(default_factory=MarketState)
     public_signal: list[float] = EventField(default_factory=list, event_key="publicSignal")
 
@@ -52,7 +52,7 @@ class HarbergerPublicInformation(PublicInformation):
 
     @computed_field
     def winning_condition_description(self) -> dict[str, Any]:
-        return self.conditions[self.winning_condition]
+        return self.conditions[self.winning_condition] if self.conditions else {}
 
 
 class HarbergerGameState(GameState):

@@ -1,5 +1,6 @@
 import json
 import logging
+import traceback
 from typing import Any, Callable, Dict, List, Optional
 
 import websockets
@@ -104,7 +105,12 @@ class AgentManager:
             try:
                 await self._call_handler(hook, message)
             except Exception as e:
-                self.logger.error(f"Error in {hook_type} hook: {e}")
+                self.logger.error(
+                    f"Error in {hook_type} ({hook.__name__}) hook: {e}, message: {message.model_dump()}",
+                    extra={
+                        "traceback": traceback.format_exc(),
+                    },
+                )
 
     async def _call_handler(self, handler: Callable, message: Message):
         """Helper method to call a handler with proper async support"""
@@ -277,7 +283,6 @@ class AgentManager:
             self.ws = await websockets.connect(self.url, ping_interval=30, ping_timeout=10)
             self.logger.info("WebSocket connection opened.")
             initial_message = json.dumps(self.login_payload)
-            self.logger.debug(f"Sending initial message: {initial_message}")
             await self.send_message(initial_message)
         except Exception:
             self.logger.exception("Connection error", exc_info=True)
