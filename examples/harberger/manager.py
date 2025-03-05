@@ -5,7 +5,8 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-from econagents import Agent, Message, TurnBasedWithContinuousManager
+from econagents import Agent, Message
+from econagents.core.manager.phase import HybridPhaseManager
 from econagents.llm.openai import ChatOpenAI
 from examples.harberger.agents import Developer, Owner, Speculator
 from examples.harberger.state import HarbergerGameState
@@ -13,7 +14,7 @@ from examples.harberger.state import HarbergerGameState
 load_dotenv()
 
 
-class HarbergerAgentManager(TurnBasedWithContinuousManager):
+class HarbergerAgentManager(HybridPhaseManager):
     name: Optional[str] = None
     role: Optional[str] = None
 

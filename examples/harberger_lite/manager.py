@@ -5,7 +5,8 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-from econagents import Agent, Message, TurnBasedWithContinuousManager
+from econagents import Agent, Message
+from econagents.core.manager.phase import HybridPhaseManager
 from econagents.llm.openai import ChatOpenAI
 from examples.harberger_lite.agents import Developer, Owner, Speculator
 from examples.harberger_lite.state import HarbergerGameState
@@ -18,7 +19,7 @@ load_dotenv()
 # It can be initialized with or without a role. In this case, it uses custom logic to get the role from the server.
 
 
-class HarbergerAgentManager(TurnBasedWithContinuousManager):
+class HarbergerAgentManager(HybridPhaseManager):
     name: Optional[str] = None
     role: Optional[str] = None
 

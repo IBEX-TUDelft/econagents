@@ -5,7 +5,8 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-from econagents import Agent, Message, TurnBasedManager
+from econagents import Agent, Message
+from econagents.core.manager.phase import DiscretePhaseManager
 from econagents.llm.openai import ChatOpenAI
 from examples.prisoner.state import PDGameState
 
@@ -19,7 +20,7 @@ class Prisoner(Agent):
     name = "Prisoner"
 
 
-class PrisonersDilemmaManager(TurnBasedManager):
+class PrisonersDilemmaManager(DiscretePhaseManager):
     """
     Manager for the Prisoner's Dilemma game.
     Manages interactions between the server and agents.
