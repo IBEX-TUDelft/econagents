@@ -17,10 +17,6 @@ econagents is a Python library for creating and running economic experiments.
 
 # Installation
 
-We're still in the early stages of development, so the library is not yet available on PyPI, and it doesn't really work as a library yet.
-
-For now, there's a single experiment available in the `experimental` directory. This is a Proof of Concept for a Harberger Tax game.
-
 Follow these steps to get started:
 
 1. Create a virtual environment and install the dependencies using poetry:
@@ -31,45 +27,36 @@ poetry install
 
 2. Copy the `.env.example` file to `.env` and fill in the values.
 
-## Creating a new game
+## Using the example experiments
 
-You can create new game programmatically by running the `create_game.py` script:
+There are currently three example experiments you can use to get started:
 
-```shell
-cd experimental/harberger
-python create_game.py
-```
+1. `prisoner`: A simple experiment of an iterated Prisoner's Dilemma of 5 rounds using 2 LLM agents.
+2. `harberger`: A heavily customized experiment of a Harberger Tax game played by LLM agents.
+3. `harberge_lite`: A simplified version of the Harberger Tax game.
 
-This will create a new game and save the game specifications to the `specs` directory. It will use the parameters from the `harberger.json` file in the `experimental/harberger/specs/example` directory. If you'd like to use different parameters, you can create a new JSON file in the `specs` directory and change the `specs_path` argument in the `create_game.py` script.
+The example experiments are located in the `examples` directory.
 
-## Running the game
+The server to run the `prisoner` experiment is located in the `server` directory. For the `harberger` and `harberge_lite` experiments, the server implementation is not provided yet.
 
-You can run the game in two ways:
+## Running the experiments
 
-1. Create and run a new game:
+To run the `prisoner` experiment, use the following command:
 
-```bash
-cd experimental/harberger
-python run_game.py
-```
-
-This will create a new game using the default parameters from `specs/example/harberger.json` and start running it immediately.
-
-2. Run an existing game:
+For `prisoner` you first must run the server and then run the experiment:
 
 ```shell
-cd experimental/harberger
-python run_game.py --game-id YOUR_GAME_ID
+# Run the server
+python examples/server/prisoner/server.py
+
+# Run the experiment (on a separate terminal)
+python examples/prisoner/run_game.py
 ```
 
-Replace `YOUR_GAME_ID` with the ID of the game you want to run.
-
-The game will create the following directory structure for logs:
+For the `harberger` experiment, you can run the experiment by executing the `run_game.py` script in the respective experiment directory.
 
 ```shell
-experimental/harberger/logs/
-├── agents/     # Individual agent logs
-└── game/       # Game-wide logs
+python examples/harberger/run_game.py
 ```
 
-These logs can be useful for debugging and analyzing the game's progress.
+For the `harberger_lite` experiment, you can use the notebook `examples/harberger_lite/run_game.ipynb`.

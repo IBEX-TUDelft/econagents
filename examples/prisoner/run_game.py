@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -20,8 +19,8 @@ async def main():
     load_dotenv()
 
     # Load environment variables
-    hostname = os.getenv("HOSTNAME", "localhost")
-    port = os.getenv("PORT", "3000")
+    hostname = "localhost"
+    port = 3000
 
     # Setup paths
     base_dir = Path(__file__).parent
