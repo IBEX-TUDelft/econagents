@@ -438,8 +438,8 @@ class PrisonersDilemmaServer:
 
 
 if __name__ == "__main__":
-    host = os.getenv("HOST", "localhost")
-    port = int(os.getenv("PORT", "8765"))
+    host = "localhost"
+    port = 8765
 
     logger.info(f"Starting Prisoner's Dilemma WebSocket server on {host}:{port}")
 

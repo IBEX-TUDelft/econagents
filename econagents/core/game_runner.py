@@ -2,16 +2,16 @@ import asyncio
 import json
 import logging
 import os
+import queue
 from contextvars import ContextVar
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type, Union
-import queue
 from logging.handlers import QueueHandler, QueueListener
+from pathlib import Path
+from typing import Any, Callable, Optional, Type
 
 import requests
 
-from econagents import AgentManager
+from econagents.core.manager.base import AgentManager
 
 # Context variable for agent_id
 ctx_agent_id: ContextVar[str] = ContextVar("agent_id", default="N/A")
@@ -84,8 +84,8 @@ class GameRunner:
         """
         self.config = config
         self.agent_manager_class = agent_manager_class
-        self.game_log_queues: Dict[int, queue.Queue] = {}
-        self.game_log_listeners: Dict[int, QueueListener] = {}
+        self.game_log_queues: dict[int, queue.Queue] = {}
+        self.game_log_listeners: dict[int, QueueListener] = {}
 
         # Create log directories if they don't exist
         if self.config.log_path:
@@ -278,7 +278,9 @@ class GameRunner:
         except requests.RequestException as e:
             raise RecoveryCodeError(f"Request error while getting recovery code: {e}")
 
-    async def spawn_agent(self, ws_url: str, login_payload: Dict[str, Any], game_id: int, agent_id: int) -> None:
+    async def spawn_agent(
+        self, ws_url: str, auth_mechanism_kwargs: dict[str, Any], game_id: int, agent_id: int
+    ) -> None:
         """
         Spawn an agent and connect it to the game.
 
@@ -294,14 +296,14 @@ class GameRunner:
         try:
             agent_logger.info(f"Connecting to WebSocket URL: {ws_url}")
             game = self.agent_manager_class(
-                url=ws_url, login_payload=login_payload, game_id=game_id, logger=agent_logger
+                url=ws_url, game_id=game_id, logger=agent_logger, auth_mechanism_kwargs=auth_mechanism_kwargs
             )
             await game.start()
         except Exception:
             agent_logger.exception(f"Error in simulation for Agent {agent_id}")
             raise
 
-    def save_game_config(self, game_config: Dict[str, Any]) -> None:
+    def save_game_config(self, game_config: dict[str, Any]) -> None:
         """
         Save game configuration to a file.
 
@@ -315,7 +317,7 @@ class GameRunner:
         with config_path.open("w") as f:
             json.dump(game_config, f, indent=4)
 
-    def load_game_config(self, game_id: int) -> Dict[str, Any]:
+    def load_game_config(self, game_id: int) -> dict[str, Any]:
         """
         Load game configuration from a file.
 
@@ -332,7 +334,7 @@ class GameRunner:
         with config_path.open("r") as f:
             return json.load(f)
 
-    def get_game_config(self, game_id: int, agents: int, game_type: str, use_config: str = "auto") -> Dict[str, Any]:
+    def get_game_config(self, game_id: int, agents: int, game_type: str, use_config: str = "auto") -> dict[str, Any]:
         """
         Get game configuration, either from file or create a new one.
 
@@ -368,7 +370,7 @@ class GameRunner:
 
         return game_config
 
-    def load_game_spec(self, game_id: int) -> Dict[str, Any]:
+    def load_game_spec(self, game_id: int) -> dict[str, Any]:
         """
         Load a game specification from the games directory.
 
@@ -412,7 +414,11 @@ class GameRunner:
                     "type": "join",
                     "recovery": recovery_code,
                 }
-                tasks.append(self.spawn_agent(ws_url, login_payload, game_id, idx + 1))
+                tasks.append(
+                    self.spawn_agent(
+                        ws_url=ws_url, auth_mechanism_kwargs=login_payload, game_id=game_id, agent_id=idx + 1
+                    )
+                )
             await asyncio.gather(*tasks)
 
         except Exception:

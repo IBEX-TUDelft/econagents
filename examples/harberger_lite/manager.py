@@ -22,13 +22,14 @@ class HarbergerAgentManager(TurnBasedWithContinuousManager):
     name: Optional[str] = None
     role: Optional[str] = None
 
-    def __init__(self, url: str, login_payload: dict[str, Any], game_id: int, logger: logging.Logger):
+    def __init__(self, url: str, game_id: int, logger: logging.Logger, auth_mechanism_kwargs: dict[str, Any]):
         super().__init__(
             url=url,
-            login_payload=login_payload,
             game_id=game_id,
             phase_transition_event="phase-transition",
+            phase_identifier_key="phase",
             logger=logger,
+            auth_mechanism_kwargs=auth_mechanism_kwargs,
             continuous_phases={6},
             min_action_delay=5,
             max_action_delay=10,

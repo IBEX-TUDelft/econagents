@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from econagents.core.game_runner import GameRunner, GameRunnerConfig
-from examples.server.create_game import create_game_from_specs
+from examples.server.harberger.create_game import create_game_from_specs
 from examples.harberger.manager import HarbergerAgentManager
 
 load_dotenv()

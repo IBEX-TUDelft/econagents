@@ -1,139 +1,113 @@
-import asyncio
 import json
 import logging
-import random
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional, Set
 
 from econagents.core.agent import Agent
-from econagents.core.events import Message
-from econagents.core.manager.base import AgentManager
+from econagents.core.manager.phase import PhaseManager
 from econagents.core.state.game import GameState
+from econagents.core.transport import AuthenticationMechanism, SimpleLoginPayloadAuth
 
 
-class TurnBasedManager(AgentManager):
+class TurnBasedManager(PhaseManager):
     """
-    A generic manager for turn-based games that handles phase transitions.
+    A manager for turn-based games that handles phase transitions.
 
-    This manager provides a foundation for implementing turn-based game agents.
+    This manager inherits from PhaseManager and provides a concrete implementation
+    for executing actions in each phase.
     """
 
     def __init__(
         self,
         url: str,
-        login_payload: dict[str, Any],
         game_id: int,
         logger: logging.Logger,
         phase_transition_event: str = "phase-transition",
         phase_identifier_key: str = "phase",
+        auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
+        auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
         state: Optional[GameState] = None,
         agent: Optional[Agent] = None,
     ):
         """
-        Initialize the TurnWithStateManager.
+        Initialize the TurnBasedManager.
 
         Args:
             url: WebSocket server URL
-            login_payload: Authentication payload for the WebSocket
-            phase_transition_event: Event name for phase transitions
             game_id: Identifier for the current game
             logger: Logger instance for tracking events
+            phase_transition_event: Event name for phase transitions
+            phase_identifier_key: Key in the event data that identifies the phase
+            auth_mechanism: Authentication mechanism to use
+            auth_mechanism_kwargs: Keyword arguments for the authentication mechanism
             state: Optional game state object to track game state
             agent: Optional agent instance to handle game phases
         """
-        super().__init__(url, login_payload, game_id, logger)
-        self.game_id = game_id
-        self._agent = agent
-        self.state = state
-        self.current_phase = None
-        self.phase_transition_event = phase_transition_event
-        self.phase_identifier_key = phase_identifier_key
+        super().__init__(
+            url=url,
+            game_id=game_id,
+            logger=logger,
+            phase_transition_event=phase_transition_event,
+            phase_identifier_key=phase_identifier_key,
+            auth_mechanism=auth_mechanism,
+            auth_mechanism_kwargs=auth_mechanism_kwargs,
+            continuous_phases=set(),  # No continuous phases
+            state=state,
+            agent=agent,
+        )
+        # Register phase handlers
+        self._phase_handlers: Dict[int, Callable[[int, Any], Any]] = {}
 
-        # Register the phase transition handler
-        self.register_event_handler(self.phase_transition_event, self._handle_phase_transition)
-
-        # Set up global pre-event hook for state updates if state is provided
-        if self.state:
-            self.register_global_pre_event_hook(self._update_state)
-
-    @property
-    def agent(self) -> Optional[Agent]:
-        """Get the current agent instance."""
-        return self._agent
-
-    @agent.setter
-    def agent(self, agent: Agent):
-        """Set the agent instance."""
-        self._agent = agent
-
-    async def _update_state(self, message: Message):
-        """Update the game state when an event is received."""
-        if self.state:
-            self.state.update(message)
-            self.logger.debug(f"Updated state: {self.state}")
-
-    async def _handle_phase_transition(self, message: Message):
-        """Handle phase transition events."""
-        new_phase = message.data.get(self.phase_identifier_key)
-        self.logger.info(f"Transitioning to phase {new_phase}")
-
-        self.current_phase = new_phase
-
-        if new_phase is not None:
-            await self._handle_phase(new_phase)
-
-    async def _handle_phase(self, phase: int):
+    async def execute_phase_action(self, phase: int):
         """
-        Handle phase transitions by delegating to the agent.
+        Execute an action for the given phase by delegating to the agent.
 
-        Subclasses can override this method to implement custom phase handling.
-        The default implementation delegates to the agent if one exists.
+        Args:
+            phase: The phase number
         """
         if not self.agent:
             self.logger.warning("No agent set, cannot handle phase")
             return
 
-        payload = await self.agent.handle_phase(phase, self.state)
+        # Check if there's a specific handler for this phase
+        if phase in self._phase_handlers:
+            handler = self._phase_handlers[phase]
+            payload = await handler(phase, self.state)
+        else:
+            # Otherwise, use the agent's handle_phase method
+            payload = await self.agent.handle_phase(phase, self.state)
+
         if payload:
             await self.send_message(json.dumps(payload))
             self.logger.info(f"Phase {phase}, sent payload: {payload}")
 
     def register_phase_handler(self, phase: int, handler: Callable[[int, Any], Any]):
         """
-        Register a custom handler for a specific game phase.
+        Register a custom handler for a specific phase.
 
         Args:
-            phase: The phase number to handle
-            handler: A function that takes the phase number and state, and returns a payload
+            phase: The phase number
+            handler: The function to call when this phase is active
         """
-
-        # This method provides a convenient API for registering custom phase handlers
-        async def phase_handler(message: Message):
-            if message.data.get(self.phase_identifier_key) == phase:
-                payload = handler(phase, self.state)
-                if hasattr(payload, "__await__"):
-                    payload = await payload
-                if payload:
-                    await self.send_message(json.dumps(payload))
-
-        self.register_event_handler(self.phase_transition_event, phase_handler)
-        return self
+        self._phase_handlers[phase] = handler
+        self.logger.debug(f"Registered handler for phase {phase}")
 
 
-class TurnBasedWithContinuousManager(TurnBasedManager):
+class TurnBasedWithContinuousManager(PhaseManager):
     """
     A manager for games that combine turn-based and continuous action phases.
 
-    This manager extends TurnBasedManager by adding support for continuous phases
-    where the agent will regularly take actions at configurable intervals.
+    This manager extends PhaseManager and configures it with specific phases
+    that should be treated as continuous.
     """
 
     def __init__(
         self,
         url: str,
-        login_payload: dict[str, Any],
         game_id: int,
         logger: logging.Logger,
-        continuous_phases: set[int],
+        continuous_phases: Set[int],
+        auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
+        auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
         phase_transition_event: str = "phase-transition",
         phase_identifier_key: str = "phase",
         min_action_delay: int = 10,
@@ -142,15 +116,17 @@ class TurnBasedWithContinuousManager(TurnBasedManager):
         agent: Optional[Agent] = None,
     ):
         """
-        Initialize the TurnAndContinuousPhases manager.
+        Initialize the TurnBasedWithContinuousManager.
 
         Args:
             url: WebSocket server URL
-            login_payload: Authentication payload for the WebSocket
             game_id: Identifier for the current game
-            phase_transition_event: Event name for phase transitions
             logger: Logger instance for tracking events
             continuous_phases: Set of phase numbers that should be treated as continuous
+            auth_mechanism: Authentication mechanism to use
+            auth_mechanism_kwargs: Keyword arguments for the authentication mechanism
+            phase_transition_event: Event name for phase transitions
+            phase_identifier_key: Key in the event data that identifies the phase
             min_action_delay: Minimum delay in seconds between actions in continuous phases
             max_action_delay: Maximum delay in seconds between actions in continuous phases
             state: Optional game state object to track game state
@@ -158,105 +134,52 @@ class TurnBasedWithContinuousManager(TurnBasedManager):
         """
         super().__init__(
             url=url,
-            login_payload=login_payload,
             game_id=game_id,
+            logger=logger,
             phase_transition_event=phase_transition_event,
             phase_identifier_key=phase_identifier_key,
-            logger=logger,
+            auth_mechanism=auth_mechanism,
+            auth_mechanism_kwargs=auth_mechanism_kwargs,
+            continuous_phases=continuous_phases,
+            min_action_delay=min_action_delay,
+            max_action_delay=max_action_delay,
             state=state,
             agent=agent,
         )
-        self.continuous_phases = continuous_phases
-        self.min_action_delay = min_action_delay
-        self.max_action_delay = max_action_delay
-        self.in_continuous_phase = False
-        self.continuous_phase_task: Optional[asyncio.Task] = None
+        # Register phase handlers
+        self._phase_handlers: Dict[int, Callable[[int, Any], Any]] = {}
 
-    async def _handle_phase_transition(self, message: Message):
+    async def execute_phase_action(self, phase: int):
         """
-        Handle phase transition events, with special handling for continuous phases.
+        Execute an action for the given phase by delegating to the agent.
 
-        When transitioning to a continuous phase, starts a background task to regularly
-        prompt the agent for actions. When leaving a continuous phase, cancels that task.
-        """
-        new_phase = message.data.get(self.phase_identifier_key)
-        self.logger.info(f"Transitioning to phase {new_phase}")
-
-        if self.in_continuous_phase and new_phase != self.current_phase:
-            self.logger.info(f"Stopping continuous phase {self.current_phase}")
-            self.in_continuous_phase = False
-            if self.continuous_phase_task:
-                self.continuous_phase_task.cancel()
-                self.continuous_phase_task = None
-
-        self.current_phase = new_phase
-
-        if new_phase is not None:
-            await self._handle_phase(new_phase)
-
-    async def _handle_phase(self, phase: int):
-        """
-        Handle phase transitions with special handling for continuous phases.
-
-        For continuous phases, starts a background task that regularly prompts the
-        agent for actions. For turn-based phases, delegates to the parent class.
+        Args:
+            phase: The phase number
         """
         if not self.agent:
             self.logger.warning("No agent set, cannot handle phase")
             return
 
-        if phase in self.continuous_phases:
-            self.logger.info(f"Entering continuous phase {phase}")
-            self.in_continuous_phase = True
-
-            # Cancel existing task if there is one
-            if self.continuous_phase_task and not self.continuous_phase_task.done():
-                self.continuous_phase_task.cancel()
-
-            # Start a new continuous phase task
-            self.continuous_phase_task = asyncio.create_task(self._continuous_phase_loop(phase))
-
-            # Also send an initial action
-            payload = await self.agent.handle_phase(phase, self.state)
-            if payload:
-                await self.send_message(json.dumps(payload))
-                self.logger.info(f"Phase {phase} (continuous), sent initial payload: {payload}")
+        # Check if there's a specific handler for this phase
+        if phase in self._phase_handlers:
+            handler = self._phase_handlers[phase]
+            payload = await handler(phase, self.state)
         else:
-            # For non-continuous phases, use the parent class implementation
-            await super()._handle_phase(phase)
+            # Otherwise, use the agent's handle_phase method
+            payload = await self.agent.handle_phase(phase, self.state)
 
-    async def _continuous_phase_loop(self, phase: int):
+        if payload:
+            await self.send_message(json.dumps(payload))
+            log_method = self.logger.debug if self.in_continuous_phase else self.logger.info
+            log_method(f"Phase {phase}{' (continuous)' if self.in_continuous_phase else ''}, sent payload: {payload}")
+
+    def register_phase_handler(self, phase: int, handler: Callable[[int, Any], Any]):
         """
-        Run a loop while in a continuous phase, regularly prompting the agent for actions.
+        Register a custom handler for a specific phase.
 
         Args:
-            phase: The phase number of the continuous phase
+            phase: The phase number
+            handler: The function to call when this phase is active
         """
-        if not self.agent:
-            return
-
-        try:
-            while self.in_continuous_phase:
-                delay = random.randint(self.min_action_delay, self.max_action_delay)
-                self.logger.debug(f"Waiting {delay} seconds before next action in phase {phase}")
-                await asyncio.sleep(delay)
-
-                if not self.in_continuous_phase or self.current_phase != phase:
-                    break
-
-                payload = await self.agent.handle_phase(phase, self.state)
-                if payload:
-                    await self.send_message(json.dumps(payload))
-                    self.logger.debug(f"Phase {phase} (continuous), sent payload: {payload}")
-        except asyncio.CancelledError:
-            self.logger.info(f"Continuous phase {phase} loop cancelled")
-        except Exception as e:
-            self.logger.exception(f"Error in continuous phase {phase} loop: {e}")
-
-    async def stop(self):
-        """Stop the manager and cancel any continuous phase tasks."""
-        self.in_continuous_phase = False
-        if self.continuous_phase_task:
-            self.continuous_phase_task.cancel()
-            self.continuous_phase_task = None
-        await super().stop()
+        self._phase_handlers[phase] = handler
+        self.logger.debug(f"Registered handler for phase {phase}")

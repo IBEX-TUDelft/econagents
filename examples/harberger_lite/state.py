@@ -6,7 +6,6 @@ from econagents.core.state.fields import EventField
 from econagents.core.state.game import EventHandler, GameState, MetaInformation, PrivateInformation, PublicInformation
 from econagents.core.state.market import MarketState
 
-
 # EventField lets you specify the event key of the event data in the message
 # event_key is the key of the event data in the message. If not specified, the event key is the field name.
 # exclude_from_mapping is used to exclude the field from the mapping of the event data, so it is not updated when an event is processed

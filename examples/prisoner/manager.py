@@ -27,13 +27,13 @@ class PrisonersDilemmaManager(TurnBasedManager):
 
     name: Optional[str] = None
 
-    def __init__(self, url: str, login_payload: dict[str, Any], game_id: int, logger: logging.Logger):
+    def __init__(self, url: str, game_id: int, logger: logging.Logger, auth_mechanism_kwargs: dict[str, Any]):
         super().__init__(
             url=url,
-            login_payload=login_payload,
             game_id=game_id,
             phase_transition_event="round-started",
             phase_identifier_key="round",
+            auth_mechanism_kwargs=auth_mechanism_kwargs,
             logger=logger,
             state=PDGameState(game_id=game_id),
             agent=Prisoner(

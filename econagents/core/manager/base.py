@@ -1,28 +1,44 @@
+import asyncio
 import json
 import logging
 import traceback
 from typing import Any, Callable, Dict, List, Optional
 
-import websockets
-
 from econagents.core.events import Message
+from econagents.core.transport import WebSocketTransport, AuthenticationMechanism, SimpleLoginPayloadAuth
 
 
 class AgentManager:
     def __init__(
         self,
         url: str,
-        login_payload: dict[str, Any],
         game_id: int,
         logger: logging.Logger,
+        auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
+        auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
     ):
+        """
+        Initialize the AgentManager.
+
+        Args:
+            url: WebSocket URL to connect to
+            game_id: Game ID
+            logger: Logger instance
+            auth_mechanism: Optional authentication mechanism
+            auth_mechanism_kwargs: Keyword arguments to pass to auth_mechanism
+        """
         self.logger = logger
-        self.url = url
-        self.ws = None
-        self.task = None
-        self.running = False
-        self.login_payload = login_payload
         self.game_id = game_id
+
+        self.transport = WebSocketTransport(
+            url=url,
+            logger=logger,
+            on_message_callback=self._raw_message_received,
+            auth_mechanism=auth_mechanism,
+            auth_mechanism_kwargs=auth_mechanism_kwargs,
+        )
+        self.running = False
+
         # Dictionary to store event handlers: {event_type: handler_function}
         self._event_handlers: Dict[str, List[Callable[[Message], Any]]] = {}
         # Handler for all events (will be called for every event)
@@ -36,16 +52,23 @@ class AgentManager:
         self._global_pre_event_hooks: List[Callable[[Message], Any]] = []
         self._global_post_event_hooks: List[Callable[[Message], Any]] = []
 
+    def _raw_message_received(self, raw_message: str):
+        """Process raw message from the transport layer"""
+        msg = self._extract_message_data(raw_message)
+        if msg:
+            asyncio.create_task(self.on_message(msg))
+        return None
+
     def _extract_message_data(self, message: str) -> Optional[Message]:
         try:
             msg = json.loads(message)
-            msg_type = msg.get("type", "")
+            message_type = msg.get("type", "")
             event_type = msg.get("eventType", "")
             data = msg.get("data", {})
         except json.JSONDecodeError:
             self.logger.error("Invalid JSON received.")
             return None
-        return Message(msg_type=msg_type, event_type=event_type, data=data)
+        return Message(message_type=message_type, event_type=event_type, data=data)
 
     async def on_message(self, message: Message):
         """
@@ -55,8 +78,27 @@ class AgentManager:
         Subclasses can override this method for custom handling.
         """
         self.logger.debug(f"<-- Received message: {message}")
-        if message.msg_type == "event":
+        if message.message_type == "event":
             await self.on_event(message)
+
+    async def send_message(self, message: str):
+        """Send a message through the transport layer."""
+        await self.transport.send(message)
+
+    async def start(self):
+        """Start the agent manager and connect to the server."""
+        self.running = True
+        connected = await self.transport.connect()
+        if connected:
+            self.logger.info("Connected to WebSocket server. Receiving messages...")
+            await self.transport.start_listening()
+        else:
+            self.logger.error("Failed to connect to WebSocket server")
+
+    async def stop(self):
+        """Stop the agent manager and close the connection."""
+        self.running = False
+        await self.transport.stop()
 
     async def on_event(self, message: Message):
         """
@@ -274,52 +316,3 @@ class AgentManager:
         else:
             self._global_post_event_hooks = [h for h in self._global_post_event_hooks if h != hook]
         return self
-
-    async def connect(self):
-        try:
-            self.ws = await websockets.connect(self.url, ping_interval=30, ping_timeout=10)
-            self.logger.info("WebSocket connection opened.")
-            initial_message = json.dumps(self.login_payload)
-            await self.send_message(initial_message)
-        except Exception:
-            self.logger.exception("Connection error", exc_info=True)
-            return False
-        else:
-            return True
-
-    async def send_message(self, message):
-        try:
-            self.logger.debug(f"--> Sending: {message}")
-            await self.ws.send(message)
-        except Exception:
-            self.logger.exception("Error sending message", exc_info=True)
-
-    async def receive_messages(self):
-        while True:
-            try:
-                message = await self.ws.recv()
-                msg = self._extract_message_data(message)
-                if msg:
-                    await self.on_message(msg)
-            except websockets.exceptions.ConnectionClosed:
-                self.logger.info("WebSocket connection closed")
-                break
-            except Exception:
-                self.logger.exception("Error in receive loop", exc_info=True)
-                break
-
-    async def start(self):
-        self.running = True
-        if await self.connect():
-            self.logger.info("Connected to WebSocket server. Receiving messages...")
-            await self.receive_messages()
-        else:
-            self.logger.exception("Failed to connect to WebSocket server", exc_info=True)
-
-    async def stop(self):
-        self.running = False
-        if self.task:
-            self.task.cancel()
-        if self.ws:
-            await self.ws.close()
-            self.logger.info("WebSocket client stopped.")

@@ -140,7 +140,9 @@ class TestGameState:
 
         # Create an event message with the correct msg_type field
         event = Message(
-            msg_type="test", event_type="update_phase", data={"phase": 3, "game_id": 456, "player_name": "test_player"}
+            message_type="test",
+            event_type="update_phase",
+            data={"phase": 3, "game_id": 456, "player_name": "test_player"},
         )
 
         # Update the state with the event
@@ -156,7 +158,7 @@ class TestGameState:
         state = CustomGameState()
 
         # Create an event that should trigger the custom handler
-        event = Message(msg_type="test", event_type="custom_event", data={"game_id": 789})
+        event = Message(message_type="test", event_type="custom_event", data={"game_id": 789})
 
         # Update the state with the event
         state.update(event)
@@ -174,7 +176,7 @@ class TestGameState:
 
         # Create an event with missing keys
         event = Message(
-            msg_type="test",
+            message_type="test",
             event_type="update_phase",
             data={"some_other_key": "value"},  # Missing "phase" key
         )
@@ -195,10 +197,10 @@ class TestGameState:
         state = FilteredGameState()
 
         # Event that should be filtered out
-        event1 = Message(msg_type="test", event_type="wrong_event", data={"value": "updated"})
+        event1 = Message(message_type="test", event_type="wrong_event", data={"value": "updated"})
 
         # Event that should be applied
-        event2 = Message(msg_type="test", event_type="specific_event", data={"value": "updated"})
+        event2 = Message(message_type="test", event_type="specific_event", data={"value": "updated"})
 
         # First update should be filtered out
         state.update(event1)
