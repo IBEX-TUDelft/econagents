@@ -41,8 +41,6 @@ The server to run the `prisoner` experiment is located in the `server` directory
 
 ## Running the experiments
 
-To run the `prisoner` experiment, use the following command:
-
 For `prisoner` you first must run the server and then run the experiment:
 
 ```shell
