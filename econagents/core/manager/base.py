@@ -77,7 +77,7 @@ class AgentManager:
         For event-type messages, routes them to on_event.
         Subclasses can override this method for custom handling.
         """
-        self.logger.debug(f"<-- Received message: {message}")
+        self.logger.debug(f"<-- AgentManager received message: {message}")
         if message.message_type == "event":
             await self.on_event(message)
 

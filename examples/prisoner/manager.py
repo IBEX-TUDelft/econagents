@@ -20,7 +20,7 @@ class Prisoner(Agent):
     name = "Prisoner"
 
 
-class PrisonersDilemmaManager(DiscretePhaseManager):
+class PDManager(DiscretePhaseManager):
     """
     Manager for the Prisoner's Dilemma game.
     Manages interactions between the server and agents.
