@@ -1,11 +1,14 @@
 import json
 from typing import Any, cast
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
+from econagents.llm.openai import ChatOpenAI
 from examples.harberger.state import HarbergerGameState
 
 
-class HarbergerAgent(Agent):
+class HarbergerAgent(AgentRole):
+    llm = ChatOpenAI()
+
     def get_phase_6_user_prompt(self, state: HarbergerGameState):
         """Build the user prompt for the market phase."""
 

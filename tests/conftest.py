@@ -7,7 +7,7 @@ from typing import ClassVar, Dict, Optional
 import nest_asyncio
 from pytest_mock import MockFixture
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.state.game import GameState, GameStateProtocol
 from econagents.llm.openai import ChatOpenAI
 
@@ -19,7 +19,7 @@ class SimpleGameState(GameState):
     """Simple game state for testing."""
 
 
-class MockAgent(Agent[GameStateProtocol]):
+class MockAgent(AgentRole[GameStateProtocol]):
     """Mock Agent implementation for testing."""
 
     role: ClassVar[int] = 1

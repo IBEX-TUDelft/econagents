@@ -28,10 +28,10 @@ ResponseParser = Callable[[str, StateT_contra], dict]
 PhaseHandler = Callable[[int, StateT_contra], Any]
 
 
-class Agent(ABC, Generic[StateT_contra]):
-    """Base agent class with common attributes and turn-based functionality.
+class AgentRole(ABC, Generic[StateT_contra]):
+    """Base agent role class with common attributes and phase handling.
 
-    This class provides a flexible framework for handling different phases in a turn-based game.
+    This class provides a flexible framework for handling different phases in a game.
     It allows for:
     1. Default behavior for all phases
     2. Custom handlers for specific phases
@@ -51,6 +51,7 @@ class Agent(ABC, Generic[StateT_contra]):
     # Class attributes
     role: ClassVar[int]
     name: ClassVar[str]
+    llm: ChatOpenAI
     task_phases: ClassVar[list[int]] = []  # Empty list means no specific phases are required
     task_phases_excluded: ClassVar[list[int]] = []  # Empty list means no phases are excluded
 
@@ -60,7 +61,7 @@ class Agent(ABC, Generic[StateT_contra]):
     _RESPONSE_PARSER_PATTERN: ClassVar[Pattern] = re.compile(r"parse_phase_(\d+)_llm_response")
     _PHASE_HANDLER_PATTERN: ClassVar[Pattern] = re.compile(r"handle_phase_(\d+)$")
 
-    def __init__(self, logger: logging.Logger, llm: ChatOpenAI, game_id: int, prompts_path: Path):
+    def __init__(self, logger: logging.Logger, game_id: int, prompts_path: Path):
         """Initialize the agent.
 
         Args:
@@ -69,7 +70,6 @@ class Agent(ABC, Generic[StateT_contra]):
             game_id: ID of the current game
             prompts_path: Path to prompt templates
         """
-        self.llm = llm
         self.game_id = game_id
         self.logger = logger
         self.prompts_path = prompts_path

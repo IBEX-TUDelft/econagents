@@ -5,17 +5,17 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-from econagents import Agent, Message
+from econagents import AgentRole
+from econagents.core.events import Message
 from econagents.core.manager.phase import HybridPhaseManager
 from econagents.llm.openai import ChatOpenAI
-from examples.harberger.agents import Developer, Owner, Speculator
+from examples.harberger.roles import Developer, Owner, Speculator
 from examples.harberger.state import HarbergerGameState
 
 load_dotenv()
 
 
 class HarbergerAgentManager(HybridPhaseManager):
-    name: Optional[str] = None
     role: Optional[str] = None
 
     def __init__(self, url: str, game_id: int, logger: logging.Logger, auth_mechanism_kwargs: dict[str, Any]):
@@ -34,24 +34,18 @@ class HarbergerAgentManager(HybridPhaseManager):
         self.register_event_handler("assign-name", self._handle_name_assignment)
         self.register_event_handler("assign-role", self._handle_role_assignment)
 
-    def _initialize_agent(self) -> Agent:
+    def _initialize_agent(self) -> AgentRole:
         """
         Create and cache the agent instance based on the assigned role.
         """
         path_prompts = Path(__file__).parent / "prompts"
         if self._agent is None:
             if self.role == 1:
-                self._agent = Speculator(
-                    game_id=self.game_id, llm=ChatOpenAI(), logger=self.logger, prompts_path=path_prompts
-                )
+                self._agent = Speculator(game_id=self.game_id, logger=self.logger, prompts_path=path_prompts)
             elif self.role == 2:
-                self._agent = Developer(
-                    game_id=self.game_id, llm=ChatOpenAI(), logger=self.logger, prompts_path=path_prompts
-                )
+                self._agent = Developer(game_id=self.game_id, logger=self.logger, prompts_path=path_prompts)
             elif self.role == 3:
-                self._agent = Owner(
-                    game_id=self.game_id, llm=ChatOpenAI(), logger=self.logger, prompts_path=path_prompts
-                )
+                self._agent = Owner(game_id=self.game_id, logger=self.logger, prompts_path=path_prompts)
             else:
                 self.logger.error("Invalid role assigned; cannot initialize agent.")
                 raise ValueError("Invalid role for agent initialization.")

@@ -3,7 +3,7 @@ from typing import ClassVar
 
 import pytest
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.state.game import GameStateProtocol
 
 
@@ -21,7 +21,7 @@ class TestAgentInitialization:
     def test_initialization_with_both_phase_lists(self, logger, mock_llm, prompts_path):
         """Test that initializing with both task_phases and task_phases_excluded raises an error."""
 
-        class ConflictingAgent(Agent):
+        class ConflictingAgent(AgentRole):
             role = 1
             name = "test_agent"
             task_phases = [1, 2]
@@ -209,7 +209,7 @@ class TestPhaseSpecificMethods:
     def test_auto_register_methods(self, logger, mock_llm, prompts_path):
         """Test that phase-specific methods are automatically registered."""
 
-        class SpecializedAgent(Agent[GameStateProtocol]):
+        class SpecializedAgent(AgentRole[GameStateProtocol]):
             role: ClassVar[int] = 1
             name: ClassVar[str] = "specialized_agent"
 

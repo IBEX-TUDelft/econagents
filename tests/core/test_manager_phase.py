@@ -5,9 +5,9 @@ import pytest
 import random
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.events import Message
-from econagents.core.manager.phase import PhaseManager, DiscretePhaseManager, HybridPhaseManager
+from econagents.core.manager.phase import PhaseManager, TurnBasedPhaseManager, HybridPhaseManager
 from econagents.core.state.game import GameState
 from econagents.core.transport import WebSocketTransport, SimpleLoginPayloadAuth
 
@@ -42,7 +42,7 @@ def game_state():
 @pytest.fixture
 def mock_agent():
     """Provide a mock agent for testing."""
-    agent = MagicMock(spec=Agent)
+    agent = MagicMock(spec=AgentRole)
     agent.handle_phase = AsyncMock(return_value={"message": "agent_response"})
     return agent
 
@@ -79,7 +79,7 @@ def phase_manager(logger, game_state, mock_agent):
 def discrete_phase_manager(logger, game_state, mock_agent):
     """Create a discrete phase manager for testing."""
     with patch.object(WebSocketTransport, "__init__", return_value=None):
-        manager = DiscretePhaseManager(
+        manager = TurnBasedPhaseManager(
             url="ws://test-server.com/socket", game_id=123, logger=logger, state=game_state, agent=mock_agent
         )
         # Patch the transport to avoid actual connections

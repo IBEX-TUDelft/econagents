@@ -2,7 +2,8 @@ import asyncio
 import json
 import logging
 import traceback
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
+
 
 from econagents.core.events import Message
 from econagents.core.transport import WebSocketTransport, AuthenticationMechanism, SimpleLoginPayloadAuth
@@ -40,17 +41,17 @@ class AgentManager:
         self.running = False
 
         # Dictionary to store event handlers: {event_type: handler_function}
-        self._event_handlers: Dict[str, List[Callable[[Message], Any]]] = {}
+        self._event_handlers: dict[str, list[Callable[[Message], Any]]] = {}
         # Handler for all events (will be called for every event)
-        self._global_event_handlers: List[Callable[[Message], Any]] = []
+        self._global_event_handlers: list[Callable[[Message], Any]] = []
 
         # Pre and post event hooks
         # For specific events: {event_type: [hook_functions]}
-        self._pre_event_hooks: Dict[str, List[Callable[[Message], Any]]] = {}
-        self._post_event_hooks: Dict[str, List[Callable[[Message], Any]]] = {}
+        self._pre_event_hooks: dict[str, list[Callable[[Message], Any]]] = {}
+        self._post_event_hooks: dict[str, list[Callable[[Message], Any]]] = {}
         # For all events
-        self._global_pre_event_hooks: List[Callable[[Message], Any]] = []
-        self._global_post_event_hooks: List[Callable[[Message], Any]] = []
+        self._global_pre_event_hooks: list[Callable[[Message], Any]] = []
+        self._global_post_event_hooks: list[Callable[[Message], Any]] = []
 
     def _raw_message_received(self, raw_message: str):
         """Process raw message from the transport layer"""
@@ -138,7 +139,7 @@ class AgentManager:
         # Execute global post-event hooks
         await self._execute_hooks(self._global_post_event_hooks, message, "global post-event")
 
-    async def _execute_hooks(self, hooks: List[Callable], message: Message, hook_type: str) -> None:
+    async def _execute_hooks(self, hooks: list[Callable], message: Message, hook_type: str) -> None:
         """Execute a list of hooks/handlers with proper error handling."""
         for hook in hooks:
             try:

@@ -5,22 +5,24 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-from econagents import Agent, Message
-from econagents.core.manager.phase import DiscretePhaseManager
+from econagents import AgentRole
+from econagents.core.events import Message
+from econagents.core.manager.phase import TurnBasedPhaseManager
 from econagents.llm.openai import ChatOpenAI
 from examples.prisoner.state import PDGameState
 
 load_dotenv()
 
 
-class Prisoner(Agent):
+class Prisoner(AgentRole):
     """Base class for prisoner agents in the Prisoner's Dilemma game."""
 
     role = 1
     name = "Prisoner"
+    llm = ChatOpenAI()
 
 
-class PDManager(DiscretePhaseManager):
+class PDManager(TurnBasedPhaseManager):
     """
     Manager for the Prisoner's Dilemma game.
     Manages interactions between the server and agents.
@@ -37,9 +39,7 @@ class PDManager(DiscretePhaseManager):
             auth_mechanism_kwargs=auth_mechanism_kwargs,
             logger=logger,
             state=PDGameState(game_id=game_id),
-            agent=Prisoner(
-                game_id=game_id, llm=ChatOpenAI(), logger=logger, prompts_path=Path(__file__).parent / "prompts"
-            ),
+            agent=Prisoner(game_id=game_id, logger=logger, prompts_path=Path(__file__).parent / "prompts"),
         )
         self.register_event_handler("assign-name", self._handle_name_assignment)
 

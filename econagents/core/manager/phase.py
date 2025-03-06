@@ -5,7 +5,7 @@ import random
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.events import Message
 from econagents.core.manager.base import AgentManager
 from econagents.core.state.game import GameState
@@ -38,7 +38,7 @@ class PhaseManager(AgentManager, ABC):
         auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
         auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
         state: Optional[GameState] = None,
-        agent: Optional[Agent] = None,
+        agent: Optional[AgentRole] = None,
     ):
         """
         Initialize the PhaseManager.
@@ -83,12 +83,12 @@ class PhaseManager(AgentManager, ABC):
             self.register_global_pre_event_hook(self._update_state)
 
     @property
-    def agent(self) -> Optional[Agent]:
+    def agent(self) -> Optional[AgentRole]:
         """Get the current agent instance."""
         return self._agent
 
     @agent.setter
-    def agent(self, agent: Agent):
+    def agent(self, agent: AgentRole):
         """set the agent instance."""
         self._agent = agent
 
@@ -224,7 +224,7 @@ class PhaseManager(AgentManager, ABC):
         await super().stop()
 
 
-class DiscretePhaseManager(PhaseManager):
+class TurnBasedPhaseManager(PhaseManager):
     """
     A manager for turn-based games that handles phase transitions.
 
@@ -242,7 +242,7 @@ class DiscretePhaseManager(PhaseManager):
         auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
         auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
         state: Optional[GameState] = None,
-        agent: Optional[Agent] = None,
+        agent: Optional[AgentRole] = None,
     ):
         """
         Initialize the TurnBasedManager.
@@ -329,7 +329,7 @@ class HybridPhaseManager(PhaseManager):
         min_action_delay: int = 10,
         max_action_delay: int = 20,
         state: Optional[GameState] = None,
-        agent: Optional[Agent] = None,
+        agent: Optional[AgentRole] = None,
     ):
         """
         Initialize the TurnBasedWithContinuousManager.

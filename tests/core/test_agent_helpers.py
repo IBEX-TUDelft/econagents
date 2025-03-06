@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.state.game import GameStateProtocol
 
 
@@ -48,7 +48,7 @@ class TestHelperMethods:
         """Test the automatic registration of phase-specific methods during initialization."""
 
         # Define a class with various phase-specific methods
-        class PhaseSpecificAgent(Agent[GameStateProtocol]):
+        class PhaseSpecificAgent(AgentRole[GameStateProtocol]):
             """Agent with phase-specific methods."""
 
             role = 1
