@@ -5,7 +5,8 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-from econagents import Agent, Message, TurnBasedManager
+from econagents import Agent, Message
+from econagents.core.manager.phase import DiscretePhaseManager
 from econagents.llm.openai import ChatOpenAI
 from examples.prisoner.state import PDGameState
 
@@ -19,7 +20,7 @@ class Prisoner(Agent):
     name = "Prisoner"
 
 
-class PrisonersDilemmaManager(TurnBasedManager):
+class PDManager(DiscretePhaseManager):
     """
     Manager for the Prisoner's Dilemma game.
     Manages interactions between the server and agents.
@@ -27,13 +28,13 @@ class PrisonersDilemmaManager(TurnBasedManager):
 
     name: Optional[str] = None
 
-    def __init__(self, url: str, login_payload: dict[str, Any], game_id: int, logger: logging.Logger):
+    def __init__(self, url: str, game_id: int, logger: logging.Logger, auth_mechanism_kwargs: dict[str, Any]):
         super().__init__(
             url=url,
-            login_payload=login_payload,
             game_id=game_id,
             phase_transition_event="round-started",
             phase_identifier_key="round",
+            auth_mechanism_kwargs=auth_mechanism_kwargs,
             logger=logger,
             state=PDGameState(game_id=game_id),
             agent=Prisoner(

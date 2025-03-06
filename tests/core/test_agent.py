@@ -22,10 +22,10 @@ class TestAgentInitialization:
         """Test that initializing with both task_phases and task_phases_excluded raises an error."""
 
         class ConflictingAgent(Agent):
-            role: ClassVar[int] = 1
-            name: ClassVar[str] = "test_agent"
-            task_phases: ClassVar[list[int]] = [1, 2]
-            task_phases_excluded: ClassVar[list[int]] = [3, 4]
+            role = 1
+            name = "test_agent"
+            task_phases = [1, 2]
+            task_phases_excluded = [3, 4]
 
         with pytest.raises(ValueError) as exc_info:
             ConflictingAgent(logger=logger, llm=mock_llm, game_id=123, prompts_path=prompts_path)

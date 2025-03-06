@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from econagents.core.game_runner import GameRunner, GameRunnerConfig
-from examples.prisoner.manager import PrisonersDilemmaManager
+from examples.prisoner.manager import PDManager
 from examples.server.prisoner.create_game import create_game_from_specs
 
 logger = logging.getLogger("prisoners_dilemma")
@@ -20,7 +20,7 @@ async def main():
 
     # Load environment variables
     hostname = "localhost"
-    port = 3000
+    port = 8765
 
     # Setup paths
     base_dir = Path(__file__).parent
@@ -34,8 +34,7 @@ async def main():
 
     # Create config and runner
     config = GameRunnerConfig(hostname=hostname, port=port, log_path=log_path, games_path=games_path)
-
-    runner = GameRunner(config=config, agent_manager_class=PrisonersDilemmaManager)
+    runner = GameRunner(config=config, agent_manager_class=PDManager)
 
     # Create game name with timestamp
     game_name = f"prisoners_dilemma_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
