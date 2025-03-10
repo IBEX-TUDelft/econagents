@@ -41,6 +41,7 @@ def create_game(base_url: str, username: str, password: str, game_params: dict[s
     endpoint = f"{base_url}/api/v1/games/create-for-llm"
 
     payload = {"username": username, "password": password, "gameParameters": game_params}
+    logger.info(f"Creating game with payload: {payload}")
 
     headers = {"Content-Type": "application/json"}
 
@@ -83,9 +84,22 @@ def save_game_data(specs_path: Path, game_id: int, game_name: str, num_agents: i
         raise
 
 
-def create_game_from_specs(specs_path: Path, base_url: str, game_name: str) -> int:
-    username = os.getenv("GAME_USERNAME")
-    password = os.getenv("GAME_PASSWORD")
+def create_game_from_specs(
+    specs_path: Path, base_url: str, game_name: str, credentials: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Create a new game from specs and return game ID and login payloads.
+
+    Args:
+        specs_path: Path to game specification file
+        base_url: Base URL of the game server
+        game_name: Name for the game
+
+    Returns:
+        Dictionary containing game_id, num_agents, and login_payloads
+    """
+    username = credentials["username"]
+    password = credentials["password"]
 
     if not username or not password:
         logger.error("Missing credentials. Please set GAME_USERNAME and GAME_PASSWORD environment variables.")
@@ -110,16 +124,18 @@ def create_game_from_specs(specs_path: Path, base_url: str, game_name: str) -> i
             logger.info("Getting recovery codes for all agents...")
             recovery_codes = [get_recovery_code(base_url, game_id) for _ in range(num_agents)]
 
-            # Save game data
-            save_game_data(
-                specs_path=specs_path,
-                game_id=game_id,
-                game_name=game_name,
-                num_agents=num_agents,
-                recovery_codes=recovery_codes,
-            )
+            # Create login payloads for each agent
+            login_payloads = []
+            for recovery_code in recovery_codes:
+                login_payloads.append(
+                    {
+                        "gameId": game_id,
+                        "type": "join",
+                        "recovery": recovery_code,
+                    }
+                )
 
-            return game_id
+            return {"game_id": game_id, "num_agents": num_agents, "login_payloads": login_payloads}
         else:
             error_msg = result.get("message", "Unknown error")
             logger.error(f"Failed to create game: {error_msg}")
@@ -134,9 +150,16 @@ if __name__ == "__main__":
     GAME_SERVER_URL = f"http://{HOSTNAME}"
     SPECS_PATH = Path(__file__).parent / "specs/example/harberger.json"  # Updated default path
     GAME_NAME = f"harberger {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    USERNAME = os.getenv("GAME_USERNAME")
+    PASSWORD = os.getenv("GAME_PASSWORD")
 
     if not SPECS_PATH.exists():
         logger.error(f"Game specs file not found at {SPECS_PATH}")
         exit(1)
 
-    create_game_from_specs(specs_path=SPECS_PATH, base_url=GAME_SERVER_URL, game_name=GAME_NAME)
+    create_game_from_specs(
+        specs_path=SPECS_PATH,
+        base_url=GAME_SERVER_URL,
+        game_name=GAME_NAME,
+        credentials={"username": USERNAME, "password": PASSWORD},
+    )

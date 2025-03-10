@@ -1,9 +1,6 @@
-from typing import Any, Callable, Optional, Type, TypeVar, Union, get_args, get_origin
+from typing import Any, Callable, Optional
 
-from pydantic import Field as PydanticField
-from pydantic.fields import FieldInfo
-
-T = TypeVar("T")
+from pydantic import Field
 
 
 def EventField(
@@ -47,8 +44,8 @@ def EventField(
 
     # Create the field with Pydantic's Field
     if default is not ...:
-        return PydanticField(default=default, **kwargs)
+        return Field(default=default, **kwargs)
     elif default_factory is not None:
-        return PydanticField(default_factory=default_factory, **kwargs)
+        return Field(default_factory=default_factory, **kwargs)
     else:
-        return PydanticField(**kwargs)
+        return Field(**kwargs)

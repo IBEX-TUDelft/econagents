@@ -7,7 +7,7 @@ from typing import ClassVar, Dict, Optional
 import nest_asyncio
 from pytest_mock import MockFixture
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.state.game import GameState, GameStateProtocol
 from econagents.llm.openai import ChatOpenAI
 
@@ -19,9 +19,21 @@ class SimpleGameState(GameState):
     """Simple game state for testing."""
 
 
-class MockAgent(Agent[GameStateProtocol]):
-    """Mock Agent implementation for testing."""
+class MockLLM(ChatOpenAI):
+    """Mock LLM implementation for testing."""
 
+    async def get_response(self, *args, **kwargs):
+        return json.dumps({"message": "test_response"})
+
+    def build_messages(self, *args, **kwargs):
+        return [
+            {"role": "system", "content": "system_prompt"},
+            {"role": "user", "content": "user_prompt"},
+        ]
+
+
+class MockAgentRole(AgentRole[GameStateProtocol]):
+    llm = MockLLM()
     role: ClassVar[int] = 1
     name: ClassVar[str] = "test_agent"
     task_phases: ClassVar[list[int]] = []
@@ -36,23 +48,6 @@ class MockAgent(Agent[GameStateProtocol]):
 def logger():
     """Provide a logger for tests."""
     return logging.getLogger("test_logger")
-
-
-@pytest.fixture
-def mock_llm(mocker: MockFixture):
-    """Provide a mocked LLM client."""
-    mock = mocker.MagicMock(spec=ChatOpenAI)
-
-    # Setup for async get_response method
-    async def mock_get_response(*args, **kwargs):
-        return json.dumps({"message": "test_response"})
-
-    mock.get_response.side_effect = mock_get_response
-    mock.build_messages.return_value = [
-        {"role": "system", "content": "system_prompt"},
-        {"role": "user", "content": "user_prompt"},
-    ]
-    return mock
 
 
 @pytest.fixture
@@ -83,9 +78,9 @@ def prompts_path(tmp_path):
 
 
 @pytest.fixture
-def mock_agent(logger, mock_llm, prompts_path):
+def mock_agent_role(logger):
     """Provide a mock agent instance."""
-    return MockAgent(logger=logger, llm=mock_llm, game_id=123, prompts_path=prompts_path)
+    return MockAgentRole(logger=logger)
 
 
 @pytest.fixture

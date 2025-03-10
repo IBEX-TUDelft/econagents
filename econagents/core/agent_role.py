@@ -7,6 +7,7 @@ from typing import Any, Callable, ClassVar, Dict, Generic, Optional, Pattern, Pr
 
 from jinja2.sandbox import SandboxedEnvironment
 
+from econagents.core.logging_mixin import LoggerMixin
 from econagents.core.state.game import GameStateProtocol
 from econagents.llm.openai import ChatOpenAI
 
@@ -28,10 +29,10 @@ ResponseParser = Callable[[str, StateT_contra], dict]
 PhaseHandler = Callable[[int, StateT_contra], Any]
 
 
-class Agent(ABC, Generic[StateT_contra]):
-    """Base agent class with common attributes and turn-based functionality.
+class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
+    """Base agent role class with common attributes and phase handling.
 
-    This class provides a flexible framework for handling different phases in a turn-based game.
+    This class provides a flexible framework for handling different phases in a game.
     It allows for:
     1. Default behavior for all phases
     2. Custom handlers for specific phases
@@ -51,6 +52,7 @@ class Agent(ABC, Generic[StateT_contra]):
     # Class attributes
     role: ClassVar[int]
     name: ClassVar[str]
+    llm: ChatOpenAI
     task_phases: ClassVar[list[int]] = []  # Empty list means no specific phases are required
     task_phases_excluded: ClassVar[list[int]] = []  # Empty list means no phases are excluded
 
@@ -60,19 +62,11 @@ class Agent(ABC, Generic[StateT_contra]):
     _RESPONSE_PARSER_PATTERN: ClassVar[Pattern] = re.compile(r"parse_phase_(\d+)_llm_response")
     _PHASE_HANDLER_PATTERN: ClassVar[Pattern] = re.compile(r"handle_phase_(\d+)$")
 
-    def __init__(self, logger: logging.Logger, llm: ChatOpenAI, game_id: int, prompts_path: Path):
-        """Initialize the agent.
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        """Initialize the agent role."""
 
-        Args:
-            logger: Logger instance for this agent
-            llm: Language model client
-            game_id: ID of the current game
-            prompts_path: Path to prompt templates
-        """
-        self.llm = llm
-        self.game_id = game_id
-        self.logger = logger
-        self.prompts_path = prompts_path
+        if logger:
+            self.logger = logger
 
         # Validate that only one of task_phases or task_phases_excluded is specified
         if self.task_phases and self.task_phases_excluded:
@@ -90,7 +84,7 @@ class Agent(ABC, Generic[StateT_contra]):
         # Auto-register phase-specific methods if they exist
         self._register_phase_specific_methods()
 
-    def _resolve_prompt_file(self, prompt_type: str, phase: int, role: str) -> Optional[Path]:
+    def _resolve_prompt_file(self, prompt_type: str, phase: int, role: str, prompts_path: Path) -> Optional[Path]:
         """Resolve the prompt file path for the given parameters.
 
         Args:
@@ -102,24 +96,25 @@ class Agent(ABC, Generic[StateT_contra]):
             Path to the prompt file if found, None otherwise
         """
         # Try phase-specific prompt first
-        phase_file = self.prompts_path / f"{role.lower()}_{prompt_type}_phase_{phase}.jinja2"
+        phase_file = prompts_path / f"{role.lower()}_{prompt_type}_phase_{phase}.jinja2"
         if phase_file.exists():
             return phase_file
 
         # Fall back to general prompt
-        general_file = self.prompts_path / f"{role.lower()}_{prompt_type}.jinja2"
+        general_file = prompts_path / f"{role.lower()}_{prompt_type}.jinja2"
         if general_file.exists():
             return general_file
 
         return None
 
-    def render_prompt(self, context: dict, prompt_type: str, phase: int) -> str:
+    def render_prompt(self, context: dict, prompt_type: str, phase: int, prompts_path: Path) -> str:
         """Render a prompt template with the given context.
 
         Args:
             context: Template context variables
             prompt_type: Type of prompt (system, user)
             phase: Game phase number
+            prompts_path: Path to prompt templates
 
         Returns:
             Rendered prompt string
@@ -135,14 +130,14 @@ class Agent(ABC, Generic[StateT_contra]):
         """
         # Try role-specific prompt first, then fall back to 'all'
         for role in [self.name, "all"]:
-            if prompt_file := self._resolve_prompt_file(prompt_type, phase, role):
+            if prompt_file := self._resolve_prompt_file(prompt_type, phase, role, prompts_path):
                 with prompt_file.open() as f:
                     template = SandboxedEnvironment().from_string(f.read())
                 return template.render(**context)
 
         raise FileNotFoundError(
             f"No prompt template found for type={prompt_type}, phase={phase}, "
-            f"roles=[{self.name}, all] in {self.prompts_path}"
+            f"roles=[{self.name}, all] in {prompts_path}"
         )
 
     def _extract_phase_from_pattern(self, attr_name: str, pattern: Pattern) -> Optional[int]:
@@ -225,7 +220,7 @@ class Agent(ABC, Generic[StateT_contra]):
         self._phase_handlers[phase] = handler
         self.logger.debug(f"Registered phase handler for phase {phase}")
 
-    def get_phase_system_prompt(self, state: StateT_contra) -> str:
+    def get_phase_system_prompt(self, state: StateT_contra, prompts_path: Path) -> str:
         """Get the system prompt for the current phase.
 
         This method will use a phase-specific handler if registered,
@@ -233,6 +228,7 @@ class Agent(ABC, Generic[StateT_contra]):
 
         Args:
             state: Current game state
+            prompts_path: Path to prompt templates
 
         Returns:
             System prompt string
@@ -240,9 +236,11 @@ class Agent(ABC, Generic[StateT_contra]):
         phase = state.meta.phase
         if phase in self._system_prompt_handlers:
             return self._system_prompt_handlers[phase](state)
-        return self.render_prompt(context=state.model_dump(), prompt_type="system", phase=phase)
+        return self.render_prompt(
+            context=state.model_dump(), prompt_type="system", phase=phase, prompts_path=prompts_path
+        )
 
-    def get_phase_user_prompt(self, state: StateT_contra) -> str:
+    def get_phase_user_prompt(self, state: StateT_contra, prompts_path: Path) -> str:
         """Get the user prompt for the current phase.
 
         This method will use a phase-specific handler if registered,
@@ -250,6 +248,7 @@ class Agent(ABC, Generic[StateT_contra]):
 
         Args:
             state: Current game state
+            prompts_path: Path to prompt templates
 
         Returns:
             User prompt string
@@ -257,7 +256,9 @@ class Agent(ABC, Generic[StateT_contra]):
         phase = state.meta.phase
         if phase in self._user_prompt_handlers:
             return self._user_prompt_handlers[phase](state)
-        return self.render_prompt(context=state.model_dump(), prompt_type="user", phase=phase)
+        return self.render_prompt(
+            context=state.model_dump(), prompt_type="user", phase=phase, prompts_path=prompts_path
+        )
 
     def parse_phase_llm_response(self, response: str, state: StateT_contra) -> dict:
         """Parse the LLM response for the current phase.
@@ -268,6 +269,7 @@ class Agent(ABC, Generic[StateT_contra]):
         Args:
             response: Raw LLM response string
             state: Current game state
+            prompts_path: Path to prompt templates
 
         Returns:
             Parsed response as a dictionary
@@ -283,7 +285,7 @@ class Agent(ABC, Generic[StateT_contra]):
             self.logger.debug(f"Raw response: {response}")
             return {"error": "Failed to parse response", "raw_response": response}
 
-    async def handle_phase(self, phase: int, state: StateT_contra) -> Optional[dict]:
+    async def handle_phase(self, phase: int, state: StateT_contra, prompts_path: Path) -> Optional[dict]:
         """Handle the phase.
 
         This method will use a phase-specific handler if registered,
@@ -296,6 +298,7 @@ class Agent(ABC, Generic[StateT_contra]):
         Args:
             phase: Game phase number
             state: Current game state
+            prompts_path: Path to prompt templates
 
         Returns:
             Phase result dictionary or None if phase is not handled
@@ -315,9 +318,9 @@ class Agent(ABC, Generic[StateT_contra]):
             return await self._phase_handlers[phase](phase, state)
 
         self.logger.debug(f"Using default LLM handler for phase {phase}")
-        return await self.handle_phase_with_llm(phase, state)
+        return await self.handle_phase_with_llm(phase, state, prompts_path=prompts_path)
 
-    async def handle_phase_with_llm(self, phase: int, state: StateT_contra) -> Optional[dict]:
+    async def handle_phase_with_llm(self, phase: int, state: StateT_contra, prompts_path: Path) -> Optional[dict]:
         """Handle the phase with LLM.
 
         This is the default implementation that uses the LLM to handle the phase.
@@ -325,12 +328,16 @@ class Agent(ABC, Generic[StateT_contra]):
         Args:
             phase: Game phase number
             state: Current game state
+            prompts_path: Path to prompt templates
 
         Returns:
             Phase result dictionary
         """
-        system_prompt = self.get_phase_system_prompt(state)
-        user_prompt = self.get_phase_user_prompt(state)
+        system_prompt = self.get_phase_system_prompt(state, prompts_path=prompts_path)
+        user_prompt = self.get_phase_user_prompt(state, prompts_path=prompts_path)
+
+        self.logger.debug("\n+-----SYSTEM PROMPT----+\n" + f"{system_prompt}\n+------------------+")
+        self.logger.debug("\n+-----USER PROMPT----+\n" + f"{user_prompt}\n+------------------+")
 
         messages = self.llm.build_messages(system_prompt, user_prompt)
 
@@ -338,7 +345,6 @@ class Agent(ABC, Generic[StateT_contra]):
             response = await self.llm.get_response(
                 messages=messages,
                 tracing_extra={
-                    "game_id": self.game_id,
                     "state": state.model_dump(),
                 },
             )

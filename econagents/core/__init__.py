@@ -1,6 +1,7 @@
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.events import Message
+from econagents.core.logging_mixin import LoggerMixin
 from econagents.core.manager import AgentManager
-from econagents.core.manager.phase import DiscretePhaseManager, HybridPhaseManager
+from econagents.core.manager.phase import TurnBasedPhaseManager, HybridPhaseManager
 
-__all__ = ["Agent", "AgentManager", "DiscretePhaseManager", "HybridPhaseManager", "Message"]
+__all__ = ["AgentRole", "AgentManager", "TurnBasedPhaseManager", "HybridPhaseManager", "Message", "LoggerMixin"]

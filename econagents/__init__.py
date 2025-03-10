@@ -2,10 +2,10 @@
 econagents: A Python library for setting up and running economic experiments with LLMs or human subjects.
 """
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.manager import AgentManager
 from econagents.core.events import Message
-from econagents.core.manager.phase import DiscretePhaseManager, HybridPhaseManager
+from econagents.core.manager.phase import TurnBasedPhaseManager, HybridPhaseManager
 from econagents.core.state.game import GameState
 from econagents.core.state.market import MarketState
 
@@ -13,9 +13,9 @@ from econagents.core.state.market import MarketState
 __version__ = "0.1.0"
 
 __all__: list[str] = [
-    "Agent",
+    "AgentRole",
     "AgentManager",
-    "DiscretePhaseManager",
+    "TurnBasedPhaseManager",
     "HybridPhaseManager",
     "Message",
     "GameState",

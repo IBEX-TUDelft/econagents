@@ -4,8 +4,9 @@ import logging
 import random
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
+from pathlib import Path
 
-from econagents.core.agent import Agent
+from econagents.core.agent_role import AgentRole
 from econagents.core.events import Message
 from econagents.core.manager.base import AgentManager
 from econagents.core.state.game import GameState
@@ -23,80 +24,176 @@ class PhaseManager(AgentManager, ABC):
     1. Standardized interface for starting a phase
     2. Optional continuous "tick loop" for phases
     3. Hooks for "on phase start," "on phase end," and "on phase transition event"
+
+    All configuration parameters can be:
+    1. Provided at initialization time
+    2. Injected later using property setters
     """
 
     def __init__(
         self,
-        url: str,
-        game_id: int,
-        logger: logging.Logger,
-        phase_transition_event: str = "phase-transition",
-        phase_identifier_key: str = "phase",
+        url: Optional[str] = None,
+        phase_transition_event: Optional[str] = None,
+        phase_identifier_key: Optional[str] = None,
         continuous_phases: Optional[set[int]] = None,
-        min_action_delay: int = 10,
-        max_action_delay: int = 20,
-        auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
-        auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
+        min_action_delay: Optional[int] = None,
+        max_action_delay: Optional[int] = None,
         state: Optional[GameState] = None,
-        agent: Optional[Agent] = None,
+        agent_role: Optional[AgentRole] = None,
+        auth_mechanism: Optional[AuthenticationMechanism] = None,
+        auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
+        logger: Optional[logging.Logger] = None,
+        prompts_dir: Optional[Path] = None,
     ):
         """
         Initialize the PhaseManager.
 
         Args:
-            url: WebSocket server URL
-            game_id: Identifier for the current game
-            logger: Logger instance for tracking events
-            phase_transition_event: Event name for phase transitions
-            phase_identifier_key: Key in the event data that identifies the phase
-            continuous_phases: set of phase numbers that should be treated as continuous
-            min_action_delay: Minimum delay in seconds between actions in continuous phases
-            max_action_delay: Maximum delay in seconds between actions in continuous phases
-            auth_mechanism: Authentication mechanism to use
-            auth_mechanism_kwargs: Keyword arguments for the authentication mechanism
-            state: Optional game state object to track game state
-            agent: Optional agent instance to handle game phases
+            url: (Optional) WebSocket server URL
+            phase_transition_event: (Optional) Event name for phase transitions
+            phase_identifier_key: (Optional) Key in the event data that identifies the phase
+            continuous_phases: (Optional) set of phase numbers that should be treated as continuous
+            min_action_delay: (Optional) Minimum delay in seconds between actions in continuous phases
+            max_action_delay: (Optional) Maximum delay in seconds between actions in continuous phases
+            state: (Optional) Game state object to track game state
+            agent_role: (Optional) Agent role instance to handle game phases
+            auth_mechanism: (Optional) Authentication mechanism to use
+            auth_mechanism_kwargs: (Optional) Keyword arguments for the authentication mechanism
+            logger: (Optional) Logger instance for tracking events
+            prompts_dir: (Optional) Directory containing the prompt templates
         """
         super().__init__(
             url=url,
-            game_id=game_id,
             logger=logger,
             auth_mechanism=auth_mechanism,
             auth_mechanism_kwargs=auth_mechanism_kwargs,
         )
-        self._agent = agent
-        self.state = state
+        self._agent_role = agent_role
+        self._state = state
         self.current_phase: Optional[int] = None
-        self.phase_transition_event = phase_transition_event
-        self.phase_identifier_key = phase_identifier_key
-        self.continuous_phases = continuous_phases or set()
-        self.min_action_delay = min_action_delay
-        self.max_action_delay = max_action_delay
+        self._phase_transition_event = phase_transition_event
+        self._phase_identifier_key = phase_identifier_key
+        self._continuous_phases = continuous_phases
+        self._min_action_delay = min_action_delay
+        self._max_action_delay = max_action_delay
+        self._prompts_dir = prompts_dir
         self._continuous_task: Optional[asyncio.Task] = None
         self.in_continuous_phase = False
 
-        # Register the phase transition handler
-        self.register_event_handler(self.phase_transition_event, self._on_phase_transition_event)
+        # Register the phase transition handler if we have an event name
+        if self._phase_transition_event:
+            self.register_event_handler(self._phase_transition_event, self._on_phase_transition_event)
 
         # set up global pre-event hook for state updates if state is provided
-        if self.state:
+        if self._state:
             self.register_global_pre_event_hook(self._update_state)
 
     @property
-    def agent(self) -> Optional[Agent]:
-        """Get the current agent instance."""
-        return self._agent
+    def agent_role(self) -> Optional[AgentRole]:
+        """Get the current agent role instance."""
+        return self._agent_role
 
-    @agent.setter
-    def agent(self, agent: Agent):
-        """set the agent instance."""
-        self._agent = agent
+    @agent_role.setter
+    def agent_role(self, value: AgentRole):
+        """Set the agent role instance."""
+        self._agent_role = value
+        if self._agent_role:
+            self._agent_role.logger = self.logger
+
+    @property
+    def state(self) -> GameState:
+        """Get the current game state."""
+        return self._state  # type: ignore
+
+    @state.setter
+    def state(self, value: Optional[GameState]):
+        """Set the game state."""
+        old_state = self._state
+        self._state = value
+
+        # If we didn't have a state before but now we do, set up the state update hook
+        if not old_state and self._state:
+            self.register_global_pre_event_hook(self._update_state)
+
+    @property
+    def phase_transition_event(self) -> str:
+        """Get the phase transition event name."""
+        return self._phase_transition_event  # type: ignore
+
+    @phase_transition_event.setter
+    def phase_transition_event(self, value: str):
+        """Set the phase transition event name."""
+        old_event = self._phase_transition_event
+        self._phase_transition_event = value
+
+        # Update the event handler if the event name changed
+        if old_event != self._phase_transition_event:
+            if old_event:
+                self.unregister_event_handler(old_event)
+            self.register_event_handler(self._phase_transition_event, self._on_phase_transition_event)
+
+    @property
+    def phase_identifier_key(self) -> str:
+        """Get the phase identifier key."""
+        return self._phase_identifier_key  # type: ignore
+
+    @phase_identifier_key.setter
+    def phase_identifier_key(self, value: str):
+        """Set the phase identifier key."""
+        self._phase_identifier_key = value
+
+    @property
+    def continuous_phases(self) -> set[int]:
+        """Get the set of continuous phases."""
+        return self._continuous_phases  # type: ignore
+
+    @continuous_phases.setter
+    def continuous_phases(self, value: set[int]):
+        """Set the continuous phases."""
+        self._continuous_phases = value
+
+    @property
+    def min_action_delay(self) -> int:
+        """Get the minimum action delay."""
+        return self._min_action_delay  # type: ignore
+
+    @min_action_delay.setter
+    def min_action_delay(self, value: int):
+        """Set the minimum action delay."""
+        self._min_action_delay = value
+
+    @property
+    def max_action_delay(self) -> int:
+        """Get the maximum action delay."""
+        return self._max_action_delay  # type: ignore
+
+    @max_action_delay.setter
+    def max_action_delay(self, value: int):
+        """Set the maximum action delay."""
+        self._max_action_delay = value
+
+    @property
+    def prompts_dir(self) -> Path:
+        """Get the prompts directory."""
+        return self._prompts_dir  # type: ignore
+
+    @prompts_dir.setter
+    def prompts_dir(self, value: Path):
+        """Set the prompts directory."""
+        self._prompts_dir = value
+
+    async def start(self):
+        """Start the manager."""
+        # TODO: is there a better place to do this?
+        if self._agent_role:
+            self._agent_role.logger = self.logger
+        await super().start()
 
     async def _update_state(self, message: Message):
         """Update the game state when an event is received."""
-        if self.state:
-            self.state.update(message)
-            self.logger.debug(f"Updated state: {self.state}")
+        if self._state:
+            self._state.update(message)
+            self.logger.debug(f"Updated state: {self._state}")
 
     async def _on_phase_transition_event(self, message: Message):
         """
@@ -104,6 +201,9 @@ class PhaseManager(AgentManager, ABC):
 
         Extracts the new phase from the message and calls handle_phase_transition.
         """
+        if not self.phase_identifier_key:
+            raise ValueError("Phase identifier key is not set")
+
         new_phase = message.data.get(self.phase_identifier_key)
         await self.handle_phase_transition(new_phase)
 
@@ -145,7 +245,7 @@ class PhaseManager(AgentManager, ABC):
             await self.on_phase_start(new_phase)
 
             # If the new phase is continuous, start a continuous task
-            if new_phase in self.continuous_phases:
+            if self.continuous_phases and new_phase in self.continuous_phases:
                 self.in_continuous_phase = True
                 self._continuous_task = asyncio.create_task(self._continuous_phase_loop(new_phase))
 
@@ -224,7 +324,7 @@ class PhaseManager(AgentManager, ABC):
         await super().stop()
 
 
-class DiscretePhaseManager(PhaseManager):
+class TurnBasedPhaseManager(PhaseManager):
     """
     A manager for turn-based games that handles phase transitions.
 
@@ -234,67 +334,65 @@ class DiscretePhaseManager(PhaseManager):
 
     def __init__(
         self,
-        url: str,
-        game_id: int,
-        logger: logging.Logger,
-        phase_transition_event: str = "phase-transition",
-        phase_identifier_key: str = "phase",
-        auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
+        url: Optional[str] = None,
+        phase_transition_event: Optional[str] = None,
+        phase_identifier_key: Optional[str] = None,
+        auth_mechanism: Optional[AuthenticationMechanism] = None,
         auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
         state: Optional[GameState] = None,
-        agent: Optional[Agent] = None,
+        agent_role: Optional[AgentRole] = None,
+        logger: Optional[logging.Logger] = None,
+        prompts_dir: Optional[Path] = None,
     ):
         """
         Initialize the TurnBasedManager.
 
         Args:
-            url: WebSocket server URL
-            game_id: Identifier for the current game
-            logger: Logger instance for tracking events
-            phase_transition_event: Event name for phase transitions
-            phase_identifier_key: Key in the event data that identifies the phase
-            auth_mechanism: Authentication mechanism to use
-            auth_mechanism_kwargs: Keyword arguments for the authentication mechanism
-            state: Optional game state object to track game state
-            agent: Optional agent instance to handle game phases
+            url: (Optional) WebSocket server URL
+            phase_transition_event: (Optional) Event name for phase transitions
+            phase_identifier_key: (Optional) Key in the event data that identifies the phase
+            auth_mechanism: (Optional) Authentication mechanism to use
+            auth_mechanism_kwargs: (Optional) Keyword arguments for the authentication mechanism
+            state: (Optional) Game state object to track game state
+            agent_role: (Optional) Agent role instance to handle game phases
+            logger: (Optional) Logger instance for tracking events
+            prompts_dir: (Optional) Directory containing the prompt templates
         """
         super().__init__(
             url=url,
-            game_id=game_id,
-            logger=logger,
             phase_transition_event=phase_transition_event,
             phase_identifier_key=phase_identifier_key,
             auth_mechanism=auth_mechanism,
             auth_mechanism_kwargs=auth_mechanism_kwargs,
-            continuous_phases=set(),  # No continuous phases
+            continuous_phases=set(),
             state=state,
-            agent=agent,
+            agent_role=agent_role,
+            logger=logger,
+            prompts_dir=prompts_dir,
         )
         # Register phase handlers
         self._phase_handlers: dict[int, Callable[[int, Any], Any]] = {}
 
     async def execute_phase_action(self, phase: int):
         """
-        Execute an action for the given phase by delegating to the agent.
+        Execute an action for the given phase by delegating to the registered handler or agent.
 
         Args:
             phase: The phase number
         """
-        if not self.agent:
-            self.logger.warning("No agent set, cannot handle phase")
-            return
+        payload = None
 
-        # Check if there's a specific handler for this phase
         if phase in self._phase_handlers:
-            handler = self._phase_handlers[phase]
-            payload = await handler(phase, self.state)
-        else:
-            # Otherwise, use the agent's handle_phase method
-            payload = await self.agent.handle_phase(phase, self.state)
+            # If we have a registered handler for this phase, use it
+            self.logger.debug(f"Using registered handler for phase {phase}")
+            payload = await self._phase_handlers[phase](phase, self.state)
+        elif self.agent_role:
+            # If we don't have a registered handler but we have an agent, use the agent
+            self.logger.debug(f"Using agent {self.agent_role.name} handle_phase for phase {phase}")
+            payload = await self.agent_role.handle_phase(phase, self.state, self.prompts_dir)
 
         if payload:
             await self.send_message(json.dumps(payload))
-            self.logger.info(f"Phase {phase}, sent payload: {payload}")
 
     def register_phase_handler(self, phase: int, handler: Callable[[int, Any], Any]):
         """
@@ -318,40 +416,38 @@ class HybridPhaseManager(PhaseManager):
 
     def __init__(
         self,
-        url: str,
-        game_id: int,
-        logger: logging.Logger,
-        continuous_phases: set[int],
-        auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
+        continuous_phases: Optional[set[int]] = None,
+        url: Optional[str] = None,
+        auth_mechanism: Optional[AuthenticationMechanism] = None,
         auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
-        phase_transition_event: str = "phase-transition",
-        phase_identifier_key: str = "phase",
-        min_action_delay: int = 10,
-        max_action_delay: int = 20,
+        phase_transition_event: Optional[str] = None,
+        phase_identifier_key: Optional[str] = None,
+        min_action_delay: Optional[int] = None,
+        max_action_delay: Optional[int] = None,
         state: Optional[GameState] = None,
-        agent: Optional[Agent] = None,
+        agent_role: Optional[AgentRole] = None,
+        logger: Optional[logging.Logger] = None,
+        prompts_dir: Optional[Path] = None,
     ):
         """
-        Initialize the TurnBasedWithContinuousManager.
+        Initialize the HybridPhaseManager.
 
         Args:
-            url: WebSocket server URL
-            game_id: Identifier for the current game
-            logger: Logger instance for tracking events
-            continuous_phases: set of phase numbers that should be treated as continuous
-            auth_mechanism: Authentication mechanism to use
-            auth_mechanism_kwargs: Keyword arguments for the authentication mechanism
-            phase_transition_event: Event name for phase transitions
-            phase_identifier_key: Key in the event data that identifies the phase
-            min_action_delay: Minimum delay in seconds between actions in continuous phases
-            max_action_delay: Maximum delay in seconds between actions in continuous phases
-            state: Optional game state object to track game state
-            agent: Optional agent instance to handle game phases
+            continuous_phases: (Optional) Set of phase numbers that should be treated as continuous
+            url: (Optional) WebSocket server URL
+            auth_mechanism: (Optional) Authentication mechanism to use
+            auth_mechanism_kwargs: (Optional) Keyword arguments for the authentication mechanism
+            phase_transition_event: (Optional) Event name for phase transitions
+            phase_identifier_key: (Optional) Key in the event data that identifies the phase
+            min_action_delay: (Optional) Minimum delay in seconds between actions in continuous phases
+            max_action_delay: (Optional) Maximum delay in seconds between actions in continuous phases
+            state: (Optional) Game state object to track game state
+            agent_role: (Optional) Agent role instance to handle game phases
+            logger: (Optional) Logger instance for tracking events
+            prompts_dir: (Optional) Directory containing the prompt templates
         """
         super().__init__(
             url=url,
-            game_id=game_id,
-            logger=logger,
             phase_transition_event=phase_transition_event,
             phase_identifier_key=phase_identifier_key,
             auth_mechanism=auth_mechanism,
@@ -360,34 +456,33 @@ class HybridPhaseManager(PhaseManager):
             min_action_delay=min_action_delay,
             max_action_delay=max_action_delay,
             state=state,
-            agent=agent,
+            agent_role=agent_role,
+            logger=logger,
+            prompts_dir=prompts_dir,
         )
         # Register phase handlers
         self._phase_handlers: dict[int, Callable[[int, Any], Any]] = {}
 
     async def execute_phase_action(self, phase: int):
         """
-        Execute an action for the given phase by delegating to the agent.
+        Execute an action for the given phase by delegating to the registered handler or agent.
 
         Args:
             phase: The phase number
         """
-        if not self.agent:
-            self.logger.warning("No agent set, cannot handle phase")
-            return
+        payload = None
 
-        # Check if there's a specific handler for this phase
         if phase in self._phase_handlers:
-            handler = self._phase_handlers[phase]
-            payload = await handler(phase, self.state)
-        else:
-            # Otherwise, use the agent's handle_phase method
-            payload = await self.agent.handle_phase(phase, self.state)
+            # If we have a registered handler for this phase, use it
+            self.logger.debug(f"Using registered handler for phase {phase}")
+            payload = await self._phase_handlers[phase](phase, self.state)
+        elif self.agent_role:
+            # If we don't have a registered handler but we have an agent, use the agent
+            self.logger.debug(f"Using agent {self.agent_role.name} handle_phase for phase {phase}")
+            payload = await self.agent_role.handle_phase(phase, self.state, self.prompts_dir)
 
         if payload:
             await self.send_message(json.dumps(payload))
-            log_method = self.logger.debug if self.in_continuous_phase else self.logger.info
-            log_method(f"Phase {phase}{' (continuous)' if self.in_continuous_phase else ''}, sent payload: {payload}")
 
     def register_phase_handler(self, phase: int, handler: Callable[[int, Any], Any]):
         """

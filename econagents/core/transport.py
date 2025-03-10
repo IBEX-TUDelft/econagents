@@ -8,6 +8,8 @@ import websockets
 from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
+from econagents.core.logging_mixin import LoggerMixin
+
 
 class AuthenticationMechanism(ABC):
     """Abstract base class for authentication mechanisms."""
@@ -16,6 +18,12 @@ class AuthenticationMechanism(ABC):
     async def authenticate(self, transport: "WebSocketTransport", **kwargs) -> bool:
         """Authenticate the transport."""
         pass
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, _source_type, _handler):
+        from pydantic_core import core_schema
+
+        return core_schema.is_instance_schema(AuthenticationMechanism)
 
 
 class SimpleLoginPayloadAuth(AuthenticationMechanism):
@@ -28,7 +36,7 @@ class SimpleLoginPayloadAuth(AuthenticationMechanism):
         return True
 
 
-class WebSocketTransport:
+class WebSocketTransport(LoggerMixin):
     """
     Responsible for connecting to a WebSocket, sending/receiving messages,
     and reporting received messages to a callback function.
@@ -37,7 +45,7 @@ class WebSocketTransport:
     def __init__(
         self,
         url: str,
-        logger: logging.Logger,
+        logger: Optional[logging.Logger] = None,
         auth_mechanism: Optional[AuthenticationMechanism] = None,
         auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
         on_message_callback: Optional[Callable[[str], Any]] = None,
@@ -47,7 +55,7 @@ class WebSocketTransport:
 
         Args:
             url: WebSocket server URL
-            logger: Logger instance
+            logger: (Optional) Logger instance
             auth_mechanism: (Optional) Authentication mechanism
             auth_mechanism_kwargs: (Optional) Keyword arguments to pass to auth_mechanism during authentication
             on_message_callback: Callback function that receives raw message strings.
@@ -56,7 +64,8 @@ class WebSocketTransport:
         self.url = url
         self.auth_mechanism = auth_mechanism
         self.auth_mechanism_kwargs = auth_mechanism_kwargs
-        self.logger = logger
+        if logger:
+            self.logger = logger
         self.on_message_callback = on_message_callback
         self.ws: Optional[ClientConnection] = None
         self._running = False

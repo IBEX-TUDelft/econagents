@@ -46,28 +46,20 @@ def save_game_data(specs_path: Path, game_id: int, game_name: str, num_players: 
     return output_file
 
 
-def create_game_from_specs(specs_path: Path, game_name: Optional[str] = None, base_url: Optional[str] = None) -> int:
+def create_game_from_specs() -> dict:
     """Create a new Prisoner's Dilemma game from specs."""
     try:
         # Generate a game ID (timestamp-based for simplicity)
         game_id = int(datetime.now().timestamp())
 
         # Use provided game name or generate one
-        if not game_name:
-            game_name = f"Prisoner's Dilemma {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        game_name = f"Prisoner's Dilemma {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
         # Generate recovery codes for 2 players
         recovery_codes = generate_recovery_codes(num_players=2)
 
-        # Save game data
-        output_file_client = save_game_data(
-            specs_path=specs_path,
-            game_id=game_id,
-            game_name=game_name,
-            num_players=2,
-            recovery_codes=recovery_codes,
-        )
-        output_file_server = save_game_data(
+        # Save game specs (on server)
+        save_game_data(
             specs_path=Path(__file__).parent / "specs" / "games",
             game_id=game_id,
             game_name=game_name,
@@ -75,12 +67,14 @@ def create_game_from_specs(specs_path: Path, game_name: Optional[str] = None, ba
             recovery_codes=recovery_codes,
         )
 
-        logger.info(f"Created new game '{game_name}' with ID {game_id}")
-        logger.info(f"Recovery codes: {recovery_codes}")
-        logger.info(f"Game data saved to {output_file_client}")
-        logger.info(f"Game data saved to {output_file_server}")
+        return {
+            "game_id": game_id,
+            "game_name": game_name,
+            "num_players": 2,
+            "recovery_codes": recovery_codes,
+            "created_at": datetime.now().isoformat(),
+        }
 
-        return game_id
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         raise
@@ -93,7 +87,7 @@ if __name__ == "__main__":
         logger.error(f"Game specs file not found at {SPECS_PATH}")
         exit(1)
 
-    game_id = create_game_from_specs(specs_path=SPECS_PATH)
+    game_id = create_game_from_specs()
 
     # Print instructions for running the server and connecting clients
     logger.info("\nTo start the WebSocket server:")
