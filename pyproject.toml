@@ -29,7 +29,7 @@ generate-setup-file = false
 python = ">=3.10,<3.13"
 typing-extensions = "^4.12.2"
 openai = "^1.65.2"
-langsmith = "^0.3.10"
+langsmith = "^0.3.13"
 numpy = "^2.2.3"
 websockets = "^15.0"
 pydantic = "^2.10.6"
