@@ -24,7 +24,7 @@ def agent_manager(logger):
     """Create a basic agent manager for testing."""
     # Use a non-existent URL since we'll patch the transport
     with patch.object(WebSocketTransport, "__init__", return_value=None):
-        manager = AgentManager(url="ws://test-server.com/socket", game_id=123, logger=logger)
+        manager = AgentManager(url="ws://test-server.com/socket", auth_mechanism_kwargs={"game_id": 123}, logger=logger)
         # Patch the transport to avoid actual connections
         manager.transport = MagicMock()
         manager.transport.send = AsyncMock()
@@ -53,21 +53,34 @@ class TestMessageHandling:
         assert message is None
 
     @pytest.mark.asyncio
+    async def test_send_message(self, agent_manager):
+        """Test that send_message correctly sends data through the transport."""
+        test_message = '{"type": "command", "action": "test-action", "data": {"key": "value"}}'
+
+        # Call send_message
+        await agent_manager.send_message(test_message)
+
+        # Verify the transport's send method was called with the message
+        agent_manager.transport.send.assert_called_once_with(test_message)
+
+    @pytest.mark.asyncio
     async def test_raw_message_received(self, agent_manager, monkeypatch):
         """Test that _raw_message_received processes messages correctly."""
         # Mock the _extract_message_data method
         mock_message = Message(message_type="event", event_type="test-event", data={})
         monkeypatch.setattr(agent_manager, "_extract_message_data", lambda _: mock_message)
 
-        # Mock the on_message method and create_task
+        # Mock the on_message method
         mock_on_message = AsyncMock()
         monkeypatch.setattr(agent_manager, "on_message", mock_on_message)
 
-        # Mock asyncio.create_task to directly await the coroutine
-        original_create_task = asyncio.create_task
+        async def mock_create_task_awaiter(coro, **kwargs):
+            await coro
+            return MagicMock()
 
-        def mock_create_task(coro, **kwargs):
-            asyncio.get_event_loop().create_task(coro)
+        async def mock_create_task(coro, **kwargs):
+            # Immediately schedule and await the coroutine
+            asyncio.get_event_loop().create_task(mock_create_task_awaiter(coro))
             return MagicMock()
 
         monkeypatch.setattr(asyncio, "create_task", mock_create_task)
@@ -75,14 +88,11 @@ class TestMessageHandling:
         # Call _raw_message_received
         agent_manager._raw_message_received("test message")
 
-        # Wait a short time for the task to be processed
+        # Wait a short time for the task to complete
         await asyncio.sleep(0.1)
 
         # Check that on_message was called with the message
         mock_on_message.assert_called_once_with(mock_message)
-
-        # Restore original create_task
-        monkeypatch.setattr(asyncio, "create_task", original_create_task)
 
     @pytest.mark.asyncio
     async def test_on_message(self, agent_manager, monkeypatch):
@@ -91,19 +101,23 @@ class TestMessageHandling:
         mock_on_event = AsyncMock()
         monkeypatch.setattr(agent_manager, "on_event", mock_on_event)
 
-        # Create a test message
-        message = Message(message_type="event", event_type="test-event", data={})
-        await agent_manager.on_message(message)
+        # Test with an event message
+        event_message = Message(message_type="event", event_type="test-event", data={"test": "data"})
+        await agent_manager.on_message(event_message)
 
-        # Check that on_event was called with the message
-        mock_on_event.assert_called_once_with(message)
+        # Check that on_event was called with the event message
+        mock_on_event.assert_called_once_with(event_message)
+        mock_on_event.reset_mock()
 
-        # Create a non-event message
-        message = Message(message_type="not-event", event_type="test-event", data={})
-        await agent_manager.on_message(message)
+        # Test with various non-event messages
+        non_event_types = ["response", "notification", "command", "error"]
 
-        # Check that on_event was not called again
-        mock_on_event.assert_called_once()
+        for msg_type in non_event_types:
+            non_event_message = Message(message_type=msg_type, event_type="test-event", data={"test": "data"})
+            await agent_manager.on_message(non_event_message)
+
+            # Verify on_event is not called for non-event message types
+            mock_on_event.assert_not_called(), f"on_event was called for message type: {msg_type}"
 
 
 @pytest.mark.asyncio
@@ -258,13 +272,21 @@ class TestEventHandling:
         # Register the handler
         agent_manager.register_event_handler("test-event", error_handler)
 
-        # Create a test message
-        message = Message(message_type="event", event_type="test-event", data={})
+        # Add a spy to the logger to check that errors are logged
+        with patch.object(logger, "error") as mock_error_log:
+            # Create a test message
+            message = Message(message_type="event", event_type="test-event", data={})
 
-        # Call on_event (should not raise an exception)
-        await agent_manager.on_event(message)
+            # Call on_event (should not raise an exception)
+            await agent_manager.on_event(message)
 
-        # No assertions needed, test passes if no exception is raised
+            # Verify the error was logged
+            mock_error_log.assert_called_once()
+
+            # Check that the error log contains the error message and handler name
+            log_args = mock_error_log.call_args[0][0]
+            assert "error_handler" in log_args.lower(), "Handler name not in error log"
+            assert "test error" in log_args.lower(), "Error message not in log"
 
 
 @pytest.mark.asyncio
@@ -424,23 +446,29 @@ class TestHookExecution:
         # Create hooks and handlers that append to execution_order
         async def global_pre_hook(message):
             execution_order.append("global_pre")
+            return message
 
         async def specific_pre_hook(message):
             execution_order.append("specific_pre")
+            return message
 
         async def global_handler(message):
             execution_order.append("global_handler")
+            return message
 
         async def specific_handler(message):
             execution_order.append("specific_handler")
+            return message
 
         async def specific_post_hook(message):
             execution_order.append("specific_post")
+            return message
 
         async def global_post_hook(message):
             execution_order.append("global_post")
+            return message
 
-        # Register all hooks and handlers
+        # Register all hooks and handlers with timestamp verification
         agent_manager.register_global_pre_event_hook(global_pre_hook)
         agent_manager.register_pre_event_hook("test-event", specific_pre_hook)
         agent_manager.register_global_event_handler(global_handler)
@@ -463,4 +491,69 @@ class TestHookExecution:
             "specific_post",
             "global_post",
         ]
-        assert execution_order == expected_order
+        # Verify both order and completeness
+        assert execution_order == expected_order, f"Expected: {expected_order}, Got: {execution_order}"
+        assert len(execution_order) == len(expected_order), "Not all hooks/handlers were executed"
+
+
+class TestSimpleTestMessage:
+    """Tests for the SimpleTestMessage class."""
+
+    def test_message_instantiation(self):
+        """Test that SimpleTestMessage can be instantiated correctly."""
+        message = SimpleTestMessage(message_type="test", event_type="simple-test", data={"key": "value"})
+
+        assert message.message_type == "test"
+        assert message.event_type == "simple-test"
+        assert message.data == {"key": "value"}
+
+    def test_message_serialization(self):
+        """Test that SimpleTestMessage can be serialized to JSON."""
+        message = SimpleTestMessage(message_type="test", event_type="simple-test", data={"key": "value"})
+
+        # Use model_dump to serialize
+        serialized = message.model_dump()
+
+        assert serialized["message_type"] == "test"
+        assert serialized["event_type"] == "simple-test"
+        assert serialized["data"] == {"key": "value"}
+
+
+@pytest.mark.asyncio
+class TestConnectionManagement:
+    """Tests for connection management functionality."""
+
+    async def test_start_successful_connection(self, agent_manager):
+        """Test that start method correctly initiates connection."""
+        # Call start
+        await agent_manager.start()
+
+        # Verify connection sequence
+        agent_manager.transport.connect.assert_called_once()
+        agent_manager.transport.start_listening.assert_called_once()
+        assert agent_manager.running is True
+
+    async def test_start_failed_connection(self, agent_manager):
+        """Test start method behavior when connection fails."""
+        # Setup connection to fail
+        agent_manager.transport.connect.return_value = False
+
+        # Call start
+        await agent_manager.start()
+
+        # Verify correct behavior on failure
+        agent_manager.transport.connect.assert_called_once()
+        agent_manager.transport.start_listening.assert_not_called()
+        assert agent_manager.running is True  # running is still set to True
+
+    async def test_stop(self, agent_manager):
+        """Test that stop method correctly terminates connection."""
+        # Set initial state
+        agent_manager.running = True
+
+        # Call stop
+        await agent_manager.stop()
+
+        # Verify connection is terminated
+        agent_manager.transport.stop.assert_called_once()
+        assert agent_manager.running is False

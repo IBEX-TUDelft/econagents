@@ -7,37 +7,50 @@ from typing import Any, Callable, Optional
 
 from econagents.core.events import Message
 from econagents.core.transport import WebSocketTransport, AuthenticationMechanism, SimpleLoginPayloadAuth
+from econagents.core.logging_mixin import LoggerMixin
 
 
-class AgentManager:
+class AgentManager(LoggerMixin):
+    """
+    Agent Manager for handling WebSocket connections, message routing, and event handling.
+
+    The AgentManager provides a high-level interface for connecting to a WebSocket server,
+    sending messages, and routing received messages to appropriate handlers. It also
+    supports pre- and post-event hooks for intercepting and processing messages.
+
+    Connection parameters (URL and authentication mechanism) can be:
+    1. Provided at initialization time
+    2. Injected later using property setters:
+       - manager.url = "wss://example.com/ws"
+       - manager.auth_mechanism = SimpleLoginPayloadAuth()
+       - manager.auth_mechanism_kwargs = {"username": "user", "password": "pass"}
+
+    This delayed injection pattern allows for more flexible configuration and testing.
+    """
+
     def __init__(
         self,
-        url: str,
-        game_id: int,
-        logger: logging.Logger,
-        auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth(),
+        url: Optional[str] = None,
+        auth_mechanism: Optional[AuthenticationMechanism] = None,
         auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
+        logger: Optional[logging.Logger] = None,
     ):
         """
         Initialize the AgentManager.
 
         Args:
-            url: WebSocket URL to connect to
-            game_id: Game ID
-            logger: Logger instance
-            auth_mechanism: Optional authentication mechanism
-            auth_mechanism_kwargs: Keyword arguments to pass to auth_mechanism
+            url: (Optional) WebSocket URL to connect to
+            auth_mechanism: (Optional) Authentication mechanism
+            auth_mechanism_kwargs: (Optional) Keyword arguments to pass to auth_mechanism
+            logger: (Optional) Logger instance
         """
-        self.logger = logger
-        self.game_id = game_id
+        if logger:
+            self.logger = logger
 
-        self.transport = WebSocketTransport(
-            url=url,
-            logger=logger,
-            on_message_callback=self._raw_message_received,
-            auth_mechanism=auth_mechanism,
-            auth_mechanism_kwargs=auth_mechanism_kwargs,
-        )
+        self._url = url
+        self._auth_mechanism = auth_mechanism
+        self._auth_mechanism_kwargs = auth_mechanism_kwargs
+        self.transport = None
         self.running = False
 
         # Dictionary to store event handlers: {event_type: handler_function}
@@ -52,6 +65,76 @@ class AgentManager:
         # For all events
         self._global_pre_event_hooks: list[Callable[[Message], Any]] = []
         self._global_post_event_hooks: list[Callable[[Message], Any]] = []
+
+        # Initialize transport if URL is provided
+        if url:
+            self._initialize_transport()
+
+    @property
+    def url(self) -> Optional[str]:
+        """Get the WebSocket URL."""
+        return self._url
+
+    @url.setter
+    def url(self, value: str):
+        """
+        Set the WebSocket URL.
+
+        Args:
+            value: WebSocket URL to connect to
+        """
+        self._url = value
+        if self.transport is None:
+            self._initialize_transport()
+        else:
+            self.transport.url = value
+
+    @property
+    def auth_mechanism(self) -> Optional[AuthenticationMechanism]:
+        """Get the authentication mechanism."""
+        return self._auth_mechanism
+
+    @auth_mechanism.setter
+    def auth_mechanism(self, value: AuthenticationMechanism):
+        """
+        Set the authentication mechanism.
+
+        Args:
+            value: Authentication mechanism
+        """
+        self._auth_mechanism = value
+        if self.transport is not None:
+            self.transport.auth_mechanism = value
+
+    @property
+    def auth_mechanism_kwargs(self) -> Optional[dict[str, Any]]:
+        """Get the authentication mechanism keyword arguments."""
+        return self._auth_mechanism_kwargs
+
+    @auth_mechanism_kwargs.setter
+    def auth_mechanism_kwargs(self, value: Optional[dict[str, Any]]):
+        """
+        Set the authentication mechanism keyword arguments.
+
+        Args:
+            value: Keyword arguments to pass to auth_mechanism
+        """
+        self._auth_mechanism_kwargs = value
+        if self.transport is not None:
+            self.transport.auth_mechanism_kwargs = value
+
+    def _initialize_transport(self):
+        """Initialize the WebSocketTransport with current configuration."""
+        if not self._url:
+            raise ValueError("URL must be set before initializing transport")
+
+        self.transport = WebSocketTransport(
+            url=self._url,
+            logger=self.logger,
+            on_message_callback=self._raw_message_received,
+            auth_mechanism=self._auth_mechanism,
+            auth_mechanism_kwargs=self._auth_mechanism_kwargs,
+        )
 
     def _raw_message_received(self, raw_message: str):
         """Process raw message from the transport layer"""
@@ -84,10 +167,19 @@ class AgentManager:
 
     async def send_message(self, message: str):
         """Send a message through the transport layer."""
+        if self.transport is None:
+            self.logger.error("Cannot send message: transport not initialized")
+            return
         await self.transport.send(message)
 
     async def start(self):
         """Start the agent manager and connect to the server."""
+        if self.transport is None:
+            if self.url:
+                self._initialize_transport()
+            else:
+                raise ValueError("URL must be set before starting the agent manager")
+
         self.running = True
         connected = await self.transport.connect()
         if connected:
@@ -99,7 +191,8 @@ class AgentManager:
     async def stop(self):
         """Stop the agent manager and close the connection."""
         self.running = False
-        await self.transport.stop()
+        if self.transport:
+            await self.transport.stop()
 
     async def on_event(self, message: Message):
         """

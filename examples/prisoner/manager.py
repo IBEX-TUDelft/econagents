@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Coroutine, Optional
 
 from dotenv import load_dotenv
 
@@ -28,22 +28,18 @@ class PDManager(TurnBasedPhaseManager):
     Manages interactions between the server and agents.
     """
 
-    name: Optional[str] = None
-
-    def __init__(self, url: str, game_id: int, logger: logging.Logger, auth_mechanism_kwargs: dict[str, Any]):
+    def __init__(self, game_id: int, auth_mechanism_kwargs: dict[str, Any]):
         super().__init__(
-            url=url,
-            game_id=game_id,
-            phase_transition_event="round-started",
-            phase_identifier_key="round",
             auth_mechanism_kwargs=auth_mechanism_kwargs,
-            logger=logger,
             state=PDGameState(game_id=game_id),
-            agent=Prisoner(game_id=game_id, logger=logger, prompts_path=Path(__file__).parent / "prompts"),
+            agent_role=Prisoner(),
         )
+        self.game_id = game_id
         self.register_event_handler("assign-name", self._handle_name_assignment)
 
     async def _handle_name_assignment(self, message: Message) -> None:
         """Handle the name assignment event."""
         ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
+        if self.agent_role:
+            self.agent_role.logger = self.logger
         await self.send_message(json.dumps(ready_msg))

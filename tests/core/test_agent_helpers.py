@@ -8,43 +8,60 @@ from econagents.core.state.game import GameStateProtocol
 class TestHelperMethods:
     """Tests for internal helper methods of the Agent class."""
 
-    def test_extract_phase_from_pattern(self, mock_agent):
+    def test_extract_phase_from_pattern(self, mock_agent_role):
         """Test extracting phase numbers from method names using regex patterns."""
         # Valid method names
         assert (
-            mock_agent._extract_phase_from_pattern("get_phase_1_system_prompt", mock_agent._SYSTEM_PROMPT_PATTERN) == 1
+            mock_agent_role._extract_phase_from_pattern(
+                "get_phase_1_system_prompt", mock_agent_role._SYSTEM_PROMPT_PATTERN
+            )
+            == 1
         )
-        assert mock_agent._extract_phase_from_pattern("get_phase_42_user_prompt", mock_agent._USER_PROMPT_PATTERN) == 42
         assert (
-            mock_agent._extract_phase_from_pattern("parse_phase_7_llm_response", mock_agent._RESPONSE_PARSER_PATTERN)
+            mock_agent_role._extract_phase_from_pattern(
+                "get_phase_42_user_prompt", mock_agent_role._USER_PROMPT_PATTERN
+            )
+            == 42
+        )
+        assert (
+            mock_agent_role._extract_phase_from_pattern(
+                "parse_phase_7_llm_response", mock_agent_role._RESPONSE_PARSER_PATTERN
+            )
             == 7
         )
-        assert mock_agent._extract_phase_from_pattern("handle_phase_15", mock_agent._PHASE_HANDLER_PATTERN) == 15
+        assert (
+            mock_agent_role._extract_phase_from_pattern("handle_phase_15", mock_agent_role._PHASE_HANDLER_PATTERN) == 15
+        )
 
         # Invalid method names
-        assert mock_agent._extract_phase_from_pattern("invalid_method_name", mock_agent._SYSTEM_PROMPT_PATTERN) is None
         assert (
-            mock_agent._extract_phase_from_pattern("get_phase_x_system_prompt", mock_agent._SYSTEM_PROMPT_PATTERN)
+            mock_agent_role._extract_phase_from_pattern("invalid_method_name", mock_agent_role._SYSTEM_PROMPT_PATTERN)
+            is None
+        )
+        assert (
+            mock_agent_role._extract_phase_from_pattern(
+                "get_phase_x_system_prompt", mock_agent_role._SYSTEM_PROMPT_PATTERN
+            )
             is None
         )
 
-    def test_resolve_prompt_file(self, mock_agent):
+    def test_resolve_prompt_file(self, mock_agent_role, prompts_path):
         """Test resolving prompt file paths."""
         # Phase-specific prompt should be found
-        phase_file = mock_agent._resolve_prompt_file("system", 1, "test_agent")
+        phase_file = mock_agent_role._resolve_prompt_file("system", 1, "test_agent", prompts_path)
         assert phase_file is not None
         assert phase_file.name == "test_agent_system_phase_1.jinja2"
 
         # General prompt should be found when no phase-specific exists
-        general_file = mock_agent._resolve_prompt_file("system", 2, "test_agent")
+        general_file = mock_agent_role._resolve_prompt_file("system", 2, "test_agent", prompts_path)
         assert general_file is not None
         assert general_file.name == "test_agent_system.jinja2"
 
         # Non-existent prompt should return None
-        nonexistent_file = mock_agent._resolve_prompt_file("nonexistent", 1, "test_agent")
+        nonexistent_file = mock_agent_role._resolve_prompt_file("nonexistent", 1, "test_agent", prompts_path)
         assert nonexistent_file is None
 
-    def test_register_phase_specific_methods(self, logger, mock_llm, prompts_path):
+    def test_register_phase_specific_methods(self, logger, prompts_path):
         """Test the automatic registration of phase-specific methods during initialization."""
 
         # Define a class with various phase-specific methods
@@ -74,7 +91,7 @@ class TestHelperMethods:
             def get_phase_invalid_system_prompt(self, state):
                 return "invalid"
 
-        agent = PhaseSpecificAgent(logger=logger, llm=mock_llm, game_id=123, prompts_path=prompts_path)
+        agent = PhaseSpecificAgent(logger=logger)
 
         # Check correct registration
         assert 1 in agent._system_prompt_handlers

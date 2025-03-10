@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from econagents.core.game_runner import GameRunner, GameRunnerConfig
+from econagents.core.game_runner import GameRunner, TurnBasedGameRunnerConfig
 from examples.prisoner.manager import PDManager
 from examples.server.prisoner.create_game import create_game_from_specs
 
@@ -18,31 +18,37 @@ async def main():
 
     load_dotenv()
 
-    # Load environment variables
-    hostname = "localhost"
-    port = 8765
-
-    # Setup paths
-    base_dir = Path(__file__).parent
-    log_path = base_dir / "logs"
-    games_path = base_dir / "specs" / "games"
-    specs_path = base_dir / "specs" / "prisoner.json"
-
-    # Ensure directories exist
-    log_path.mkdir(exist_ok=True)
-    games_path.mkdir(exist_ok=True, parents=True)
+    game_specs = create_game_from_specs()
+    login_payloads = [
+        {"type": "join", "gameId": game_specs["game_id"], "recovery": code} for code in game_specs["recovery_codes"]
+    ]
 
     # Create config and runner
-    config = GameRunnerConfig(hostname=hostname, port=port, log_path=log_path, games_path=games_path)
-    runner = GameRunner(config=config, agent_manager_class=PDManager)
-
-    # Create game name with timestamp
-    game_name = f"prisoners_dilemma_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    config = TurnBasedGameRunnerConfig(
+        # Game configuration
+        game_id=game_specs["game_id"],
+        logs_dir=Path(__file__).parent / "logs",
+        prompts_dir=Path(__file__).parent / "prompts",
+        log_level=logging.DEBUG,
+        # Server configuration
+        hostname="localhost",
+        port=8765,
+        path="wss",
+        # Phase transition configuration
+        phase_transition_event="round-started",
+        phase_identifier_key="round",
+    )
+    agents = [
+        PDManager(
+            game_id=game_specs["game_id"],
+            auth_mechanism_kwargs=payload,
+        )
+        for payload in login_payloads
+    ]
+    runner = GameRunner(config=config, agents=agents)
 
     # Run the game
-    await runner.create_and_run_game(
-        specs_path=specs_path, game_creator_func=create_game_from_specs, game_name=game_name
-    )
+    await runner.run_game()
 
 
 if __name__ == "__main__":

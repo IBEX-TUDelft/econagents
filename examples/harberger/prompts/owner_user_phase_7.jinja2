@@ -29,13 +29,11 @@ Instructions for this phase:
    - Make your final declaration for the winning scenario
    - Provide the output as a JSON object:
     {
-      "value_no_project": 100,
-      "value_project": 200
+      "gameId": {{ meta.game_id }},
+      "type": "declare",
+      "declaration": [
+          <value_no_project>,
+          <value_project>,
+          0,
+      ],
     }
-
-Remember:
-- This is your FINAL declaration for the winning scenario
-- Under-declaring still risks Speculator purchases and penalties
-- Consider the market signals and trading activity
-- Your tax share value depends on total tax collection
-- The Project's impact on your land value is now fixed

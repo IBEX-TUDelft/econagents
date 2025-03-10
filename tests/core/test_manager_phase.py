@@ -44,6 +44,7 @@ def mock_agent():
     """Provide a mock agent for testing."""
     agent = MagicMock(spec=AgentRole)
     agent.handle_phase = AsyncMock(return_value={"message": "agent_response"})
+    agent.name = "MockAgent"
     return agent
 
 
@@ -53,10 +54,9 @@ def phase_manager(logger, game_state, mock_agent):
     with patch.object(WebSocketTransport, "__init__", return_value=None):
         manager = SimplePhaseManager(
             url="ws://test-server.com/socket",
-            game_id=123,
             logger=logger,
             state=game_state,
-            agent=mock_agent,
+            agent_role=mock_agent,
             phase_transition_event="phase-transition",
             phase_identifier_key="phase",
             continuous_phases={1, 3},
@@ -80,7 +80,7 @@ def discrete_phase_manager(logger, game_state, mock_agent):
     """Create a discrete phase manager for testing."""
     with patch.object(WebSocketTransport, "__init__", return_value=None):
         manager = TurnBasedPhaseManager(
-            url="ws://test-server.com/socket", game_id=123, logger=logger, state=game_state, agent=mock_agent
+            url="ws://test-server.com/socket", logger=logger, state=game_state, agent_role=mock_agent
         )
         # Patch the transport to avoid actual connections
         manager.transport = MagicMock()
@@ -97,10 +97,9 @@ def hybrid_phase_manager(logger, game_state, mock_agent):
     with patch.object(WebSocketTransport, "__init__", return_value=None):
         manager = HybridPhaseManager(
             url="ws://test-server.com/socket",
-            game_id=123,
             logger=logger,
             state=game_state,
-            agent=mock_agent,
+            agent_role=mock_agent,
             continuous_phases={1, 3},
         )
         # Patch the transport to avoid actual connections
@@ -163,6 +162,8 @@ class TestPhaseTransition:
         # Clean up the continuous task to avoid warnings
         if phase_manager._continuous_task and not phase_manager._continuous_task.done():
             phase_manager._continuous_task.cancel()
+            # Add a small sleep to allow task cancellation to process
+            await asyncio.sleep(0.1)
 
     async def test_handle_phase_transition_to_discrete(self, phase_manager, monkeypatch):
         """Test transitioning to a discrete phase."""
@@ -230,26 +231,37 @@ class TestPhaseTransition:
         # Start continuous phase loop
         task = asyncio.create_task(phase_manager._continuous_phase_loop(1))
 
-        # Let it run for a bit (should run at least twice)
-        await asyncio.sleep(2.5)  # Wait for 2.5 seconds (more than 2 iterations with 1-second delay)
+        try:
+            # Let it run for a bit (should run at least twice)
+            await asyncio.sleep(2.5)  # Wait for 2.5 seconds (more than 2 iterations with 1-second delay)
 
-        # Cancel the task
-        phase_manager.in_continuous_phase = False
-        task.cancel()
+            # Cancel the task
+            phase_manager.in_continuous_phase = False
+            task.cancel()
+            await asyncio.sleep(0.1)  # Allow cancellation to process
 
-        # Check that execute_phase_action was called at least twice
-        assert mock_execute.call_count >= 2
+            # Check that execute_phase_action was called at least twice
+            assert mock_execute.call_count >= 2
 
-        # Check that it was called with the correct phase
-        for call in mock_execute.call_args_list:
-            assert call[0][0] == 1
+            # Check that it was called with the correct phase
+            for call in mock_execute.call_args_list:
+                assert call[0][0] == 1
+        finally:
+            # Ensure task cleanup
+            if not task.done():
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=0.5)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
 
     async def test_stop_with_continuous_phase(self, phase_manager):
         """Test stopping a manager with a continuous phase."""
         # Set up for a continuous phase
         phase_manager.current_phase = 1
         phase_manager.in_continuous_phase = True
-        phase_manager._continuous_task = asyncio.create_task(asyncio.sleep(10))  # Long-running task
+        continuous_task = asyncio.create_task(asyncio.sleep(10))  # Long-running task
+        phase_manager._continuous_task = continuous_task
 
         # Stop the manager
         await phase_manager.stop()
@@ -261,6 +273,14 @@ class TestPhaseTransition:
         # Check that transport.stop was called
         phase_manager.transport.stop.assert_called_once()
 
+        # Ensure task cleanup
+        if not continuous_task.done():
+            continuous_task.cancel()
+            try:
+                await asyncio.wait_for(continuous_task, timeout=0.1)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+
 
 class TestDiscretePhaseManager:
     """Tests for DiscretePhaseManager."""
@@ -271,8 +291,10 @@ class TestDiscretePhaseManager:
         # Call execute_phase_action
         await discrete_phase_manager.execute_phase_action(1)
 
-        # Check that agent.handle_phase was called
-        mock_agent.handle_phase.assert_called_once_with(1, discrete_phase_manager.state)
+        # Check that agent.handle_phase was called with correct parameters
+        mock_agent.handle_phase.assert_called_once_with(
+            1, discrete_phase_manager.state, discrete_phase_manager.prompts_dir
+        )
 
         # Check that send_message was called with the agent response
         expected_payload = json.dumps({"message": "agent_response"})
@@ -301,7 +323,7 @@ class TestDiscretePhaseManager:
     async def test_execute_phase_action_no_agent(self, discrete_phase_manager):
         """Test execute_phase_action without an agent."""
         # Set agent to None
-        discrete_phase_manager._agent = None
+        discrete_phase_manager._agent_role = None  # Fixed attribute name from _agent to _agent_role
 
         # Call execute_phase_action
         await discrete_phase_manager.execute_phase_action(1)
@@ -336,8 +358,8 @@ class TestHybridPhaseManager:
         # Call execute_phase_action
         await hybrid_phase_manager.execute_phase_action(1)
 
-        # Check that agent.handle_phase was called
-        mock_agent.handle_phase.assert_called_once_with(1, hybrid_phase_manager.state)
+        # Check that agent.handle_phase was called with correct parameters
+        mock_agent.handle_phase.assert_called_once_with(1, hybrid_phase_manager.state, hybrid_phase_manager.prompts_dir)
 
         # Check that send_message was called with the agent response
         expected_payload = json.dumps({"message": "agent_response"})
@@ -349,8 +371,8 @@ class TestHybridPhaseManager:
         # Call execute_phase_action for a discrete phase
         await hybrid_phase_manager.execute_phase_action(2)
 
-        # Check that agent.handle_phase was called
-        mock_agent.handle_phase.assert_called_once_with(2, hybrid_phase_manager.state)
+        # Check that agent.handle_phase was called with correct parameters
+        mock_agent.handle_phase.assert_called_once_with(2, hybrid_phase_manager.state, hybrid_phase_manager.prompts_dir)
 
         # Check that send_message was called with the agent response
         expected_payload = json.dumps({"message": "agent_response"})
@@ -395,6 +417,7 @@ class TestPhaseLifecycleHooks:
         # Clean up the continuous task to avoid warnings
         if phase_manager._continuous_task and not phase_manager._continuous_task.done():
             phase_manager._continuous_task.cancel()
+            await asyncio.sleep(0.1)  # Allow cancellation to process
 
     async def test_on_phase_end(self, phase_manager, monkeypatch):
         """Test the on_phase_end hook."""
@@ -410,3 +433,8 @@ class TestPhaseLifecycleHooks:
 
         # Check that on_phase_end was called
         mock_hook.assert_called_once_with(1)
+
+        # Clean up any continuous task that might have been created
+        if phase_manager._continuous_task and not phase_manager._continuous_task.done():
+            phase_manager._continuous_task.cancel()
+            await asyncio.sleep(0.1)  # Allow cancellation to process

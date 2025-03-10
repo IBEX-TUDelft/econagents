@@ -27,13 +27,11 @@ Instructions for this phase:
    - Your declaration will affect which scenario is chosen
    - Provide the output as a JSON object:
     {
-      "value_no_project": 100,
-      "value_project": 200
+      "gameId": {{ meta.game_id }},
+      "type": "declare",
+      "declaration": [
+          <value_no_project>,
+          <value_project>,
+          0,
+      ],
     }
-
-Remember:
-- Your declarations affect both your tax payments and the Project decision
-- Under-declaring risks Speculator purchases and penalties
-- Consider the impact on your tax share values
-- The Project may negatively impact your land value
-- Your declaration, combined with others, determines the winning scenario
