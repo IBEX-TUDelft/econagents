@@ -134,13 +134,18 @@ def linkcode_resolve(domain, info):
         return None
     if file is None:
         return None
-    file = Path(file).resolve().relative_to(git_repo.working_dir)
-    if file.parts[0] != "econagents":
-        # e.g. object is a typing.NewType
-        return None
-    start, end = lines[1], lines[1] + len(lines[0]) - 1
 
-    return f"{code_url}/{file}#L{start}-L{end}"
+    try:
+        file = Path(file).resolve().relative_to(git_repo.working_dir)
+        # Only link to files in the econagents package
+        if file.parts[0] != "econagents":
+            # e.g. object is a typing.NewType or from an external package
+            return None
+        start, end = lines[1], lines[1] + len(lines[0]) - 1
+        return f"{code_url}/{file}#L{start}-L{end}"
+    except ValueError:
+        # File is not in the project directory (e.g., from an installed package)
+        return None
 
 
 # -- Options for HTML output -------------------------------------------------
