@@ -12,9 +12,9 @@ Welcome to econagents's documentation!
    Installation
    Overview
    Tutorial
-   Customizing_Agents
-   State_Management
-   Agent_Managers
+   Customizing_Agent_Roles
+   Managing_State
+   Managing_Agents
    api
 
 

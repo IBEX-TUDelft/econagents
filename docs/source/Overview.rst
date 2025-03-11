@@ -119,7 +119,7 @@ For example, in a game where the market phase is the 6th phase, you might have t
 
 The prompts use [Jinja templates](https://jinja.palletsprojects.com/en/stable/). This allows you to use the game state and other information to customize the prompts.
 
-You can learn more about this in the :doc:`Customizing Agents <Customizing_Agents>` section.
+You can learn more about this in the :doc:`Customizing Agent Roles <Customizing_Agent_Roles>` section.
 
 Agent Manager
 ~~~~~~~~~~~~~
@@ -186,7 +186,7 @@ For example, in a Harberger Tax simulation, you might have the following state:
 
 The game state will be available to all agents during the phases. You can use them in prompts or in any custom phase handling logic.
 
-The state is updated automatically using the information received from the game server. You can customize the state update logic using the approaches shown in the :doc:`State Management <State_Management>` section.
+The state is updated automatically using the information received from the game server. You can customize the state update logic using the approaches shown in the :doc:`Managing State <Managing_State>` section.
 
 Game Runner
 -----------
