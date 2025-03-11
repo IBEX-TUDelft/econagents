@@ -12,20 +12,31 @@ from econagents.core.logging_mixin import LoggerMixin
 
 class AgentManager(LoggerMixin):
     """
-    Agent Manager for handling WebSocket connections, message routing, and event handling.
+    Agent Manager for handling connections, message routing, and event handling.
 
-    The AgentManager provides a high-level interface for connecting to a WebSocket server,
+    The AgentManager provides a high-level interface for connecting to a server,
     sending messages, and routing received messages to appropriate handlers. It also
     supports pre- and post-event hooks for intercepting and processing messages.
 
     Connection parameters (URL and authentication mechanism) can be:
+
     1. Provided at initialization time
+
     2. Injected later using property setters:
-       - manager.url = "wss://example.com/ws"
-       - manager.auth_mechanism = SimpleLoginPayloadAuth()
-       - manager.auth_mechanism_kwargs = {"username": "user", "password": "pass"}
+
+        - manager.url = "wss://example.com/ws"
+
+        - manager.auth_mechanism = SimpleLoginPayloadAuth()
+
+        - manager.auth_mechanism_kwargs = {"username": "user", "password": "pass"}
 
     This delayed injection pattern allows for more flexible configuration and testing.
+
+    Args:
+        url (Optional[str]): WebSocket URL to connect to
+        auth_mechanism (Optional[AuthenticationMechanism]): Authentication mechanism
+        auth_mechanism_kwargs (Optional[dict[str, Any]]): Keyword arguments to pass to auth_mechanism
+        logger (Optional[logging.Logger]): Logger instance
     """
 
     def __init__(
@@ -35,15 +46,6 @@ class AgentManager(LoggerMixin):
         auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
         logger: Optional[logging.Logger] = None,
     ):
-        """
-        Initialize the AgentManager.
-
-        Args:
-            url: (Optional) WebSocket URL to connect to
-            auth_mechanism: (Optional) Authentication mechanism
-            auth_mechanism_kwargs: (Optional) Keyword arguments to pass to auth_mechanism
-            logger: (Optional) Logger instance
-        """
         if logger:
             self.logger = logger
 
@@ -81,7 +83,7 @@ class AgentManager(LoggerMixin):
         Set the WebSocket URL.
 
         Args:
-            value: WebSocket URL to connect to
+            value (str): WebSocket URL to connect to
         """
         self._url = value
         if self.transport is None:
@@ -100,7 +102,7 @@ class AgentManager(LoggerMixin):
         Set the authentication mechanism.
 
         Args:
-            value: Authentication mechanism
+            value (AuthenticationMechanism): Authentication mechanism
         """
         self._auth_mechanism = value
         if self.transport is not None:
@@ -117,7 +119,7 @@ class AgentManager(LoggerMixin):
         Set the authentication mechanism keyword arguments.
 
         Args:
-            value: Keyword arguments to pass to auth_mechanism
+            value (Optional[dict[str, Any]]): Keyword arguments to pass to auth_mechanism
         """
         self._auth_mechanism_kwargs = value
         if self.transport is not None:
@@ -143,9 +145,9 @@ class AgentManager(LoggerMixin):
             asyncio.create_task(self.on_message(msg))
         return None
 
-    def _extract_message_data(self, message: str) -> Optional[Message]:
+    def _extract_message_data(self, raw_message: str) -> Optional[Message]:
         try:
-            msg = json.loads(message)
+            msg = json.loads(raw_message)
             message_type = msg.get("type", "")
             event_type = msg.get("eventType", "")
             data = msg.get("data", {})
@@ -160,13 +162,20 @@ class AgentManager(LoggerMixin):
 
         For event-type messages, routes them to on_event.
         Subclasses can override this method for custom handling.
+
+        Args:
+            message (Message): Incoming message from the server
         """
         self.logger.debug(f"<-- AgentManager received message: {message}")
         if message.message_type == "event":
             await self.on_event(message)
 
     async def send_message(self, message: str):
-        """Send a message through the transport layer."""
+        """Send a message through the transport layer.
+
+        Args:
+            message (str): Message to send
+        """
         if self.transport is None:
             self.logger.error("Cannot send message: transport not initialized")
             return
@@ -199,14 +208,23 @@ class AgentManager(LoggerMixin):
         Handle event messages by routing to specific handlers.
 
         The execution flow is:
+
         1. Global pre-event hooks
+
         2. Event-specific pre-event hooks
+
         3. Global event handlers
+
         4. Event-specific handlers
+
         5. Event-specific post-event hooks
+
         6. Global post-event hooks
 
         Subclasses can override this method for custom event handling.
+
+        Args:
+            message (Message): Incoming event message from the server
         """
         event_type = message.event_type
         has_specific_handlers = event_type in self._event_handlers
@@ -258,8 +276,8 @@ class AgentManager(LoggerMixin):
         Register a handler function for a specific event type.
 
         Args:
-            event_type: The type of event to handle
-            handler: Function that takes a Message object and handles the event
+            event_type (str): The type of event to handle
+            handler (Callable[[Message], Any]): Function that takes a Message object and handles the event
         """
         if event_type not in self._event_handlers:
             self._event_handlers[event_type] = []
@@ -271,7 +289,7 @@ class AgentManager(LoggerMixin):
         Register a handler function for all events.
 
         Args:
-            handler: Function that takes a Message object and handles any event
+            handler (Callable[[Message], Any]): Function that takes a Message object and handles any event
         """
         self._global_event_handlers.append(handler)
         return self  # Allow for method chaining
@@ -282,8 +300,8 @@ class AgentManager(LoggerMixin):
         Register a hook to execute before handlers for a specific event type.
 
         Args:
-            event_type: The type of event to hook
-            hook: Function that takes a Message object and runs before handlers
+            event_type (str): The type of event to hook
+            hook (Callable[[Message], Any]): Function that takes a Message object and runs before handlers
         """
         if event_type not in self._pre_event_hooks:
             self._pre_event_hooks[event_type] = []
@@ -295,7 +313,7 @@ class AgentManager(LoggerMixin):
         Register a hook to execute before handlers for all events.
 
         Args:
-            hook: Function that takes a Message object and runs before any handlers
+            hook (Callable[[Message], Any]): Function that takes a Message object and runs before any handlers
         """
         self._global_pre_event_hooks.append(hook)
         return self
@@ -306,8 +324,8 @@ class AgentManager(LoggerMixin):
         Register a hook to execute after handlers for a specific event type.
 
         Args:
-            event_type: The type of event to hook
-            hook: Function that takes a Message object and runs after handlers
+            event_type (str): The type of event to hook
+            hook (Callable[[Message], Any]): Function that takes a Message object and runs after handlers
         """
         if event_type not in self._post_event_hooks:
             self._post_event_hooks[event_type] = []
@@ -319,7 +337,7 @@ class AgentManager(LoggerMixin):
         Register a hook to execute after handlers for all events.
 
         Args:
-            hook: Function that takes a Message object and runs after all handlers
+            hook (Callable[[Message], Any]): Function that takes a Message object and runs after all handlers
         """
         self._global_post_event_hooks.append(hook)
         return self
@@ -330,8 +348,8 @@ class AgentManager(LoggerMixin):
         Unregister handler(s) for a specific event type.
 
         Args:
-            event_type: The type of event
-            handler: Optional handler to remove. If None, removes all handlers for this event type.
+            event_type (str): The type of event
+            handler (Optional[Callable]): Optional handler to remove. If None, removes all handlers for this event type.
         """
         if event_type in self._event_handlers:
             if handler is None:
@@ -345,7 +363,7 @@ class AgentManager(LoggerMixin):
         Unregister global event handler(s).
 
         Args:
-            handler: Optional handler to remove. If None, removes all global handlers.
+            handler (Optional[Callable]): Optional handler to remove. If None, removes all global handlers.
         """
         if handler is None:
             self._global_event_handlers.clear()
@@ -359,8 +377,8 @@ class AgentManager(LoggerMixin):
         Unregister pre-event hook(s) for a specific event type.
 
         Args:
-            event_type: The type of event
-            hook: Optional hook to remove. If None, removes all pre-event hooks for this event type.
+            event_type (str): The type of event
+            hook (Optional[Callable]): Optional hook to remove. If None, removes all pre-event hooks for this event type.
         """
         if event_type in self._pre_event_hooks:
             if hook is None:
@@ -374,7 +392,7 @@ class AgentManager(LoggerMixin):
         Unregister global pre-event hook(s).
 
         Args:
-            hook: Optional hook to remove. If None, removes all global pre-event hooks.
+            hook (Optional[Callable]): Optional hook to remove. If None, removes all global pre-event hooks.
         """
         if hook is None:
             self._global_pre_event_hooks.clear()
@@ -388,8 +406,8 @@ class AgentManager(LoggerMixin):
         Unregister post-event hook(s) for a specific event type.
 
         Args:
-            event_type: The type of event
-            hook: Optional hook to remove. If None, removes all post-event hooks for this event type.
+            event_type (str): The type of event
+            hook (Optional[Callable]): Optional hook to remove. If None, removes all post-event hooks for this event type.
         """
         if event_type in self._post_event_hooks:
             if hook is None:
@@ -403,7 +421,7 @@ class AgentManager(LoggerMixin):
         Unregister global post-event hook(s).
 
         Args:
-            hook: Optional hook to remove. If None, removes all global post-event hooks.
+            hook (Optional[Callable]): Optional hook to remove. If None, removes all global post-event hooks.
         """
         if hook is None:
             self._global_post_event_hooks.clear()

@@ -7,7 +7,7 @@ from openai import AsyncOpenAI
 
 class ChatOpenAI:
     """
-    A simple wrapper for LLM queries, e.g. using OpenAI's API.
+    A simple wrapper for LLM queries, e.g. using OpenAI and LangSmith.
     """
 
     def __init__(
@@ -20,6 +20,15 @@ class ChatOpenAI:
         self.api_key = api_key
 
     def build_messages(self, system_prompt: str, user_prompt: str):
+        """Build messages for the LLM.
+
+        Args:
+            system_prompt (str): The system prompt for the LLM.
+            user_prompt (str): The user prompt for the LLM.
+
+        Returns:
+            list[dict[str, Any]]: The messages for the LLM.
+        """
         return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -32,6 +41,15 @@ class ChatOpenAI:
         tracing_extra: dict[str, Any],
         **kwargs: Any,
     ):
+        """Get a response from the LLM.
+
+        Args:
+            messages (list[dict[str, Any]]): The messages for the LLM.
+            tracing_extra (dict[str, Any]): The extra tracing information.
+
+        Returns:
+            str: The response from the LLM.
+        """
         client = wrap_openai(AsyncOpenAI(api_key=self.api_key))
         response = await client.chat.completions.create(
             messages=messages,  # type: ignore

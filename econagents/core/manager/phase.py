@@ -22,12 +22,30 @@ class PhaseManager(AgentManager, ABC):
 
     Features:
     1. Standardized interface for starting a phase
+
     2. Optional continuous "tick loop" for phases
+
     3. Hooks for "on phase start," "on phase end," and "on phase transition event"
 
     All configuration parameters can be:
+
     1. Provided at initialization time
+
     2. Injected later using property setters
+
+    Args:
+        url (Optional[str]): WebSocket server URL
+        phase_transition_event (Optional[str]): Event name for phase transitions
+        phase_identifier_key (Optional[str]): Key in the event data that identifies the phase
+        continuous_phases (Optional[set[int]]): set of phase numbers that should be treated as continuous
+        min_action_delay (Optional[int]): Minimum delay in seconds between actions in continuous phases
+        max_action_delay (Optional[int]): Maximum delay in seconds between actions in continuous phases
+        state (Optional[GameState]): Game state object to track game state
+        agent_role (Optional[AgentRole]): Agent role instance to handle game phases
+        auth_mechanism (Optional[AuthenticationMechanism]): Authentication mechanism to use
+        auth_mechanism_kwargs (Optional[dict[str, Any]]): Keyword arguments for the authentication mechanism
+        logger (Optional[logging.Logger]): Logger instance for tracking events
+        prompts_dir (Optional[Path]): Directory containing the prompt templates
     """
 
     def __init__(
@@ -45,23 +63,6 @@ class PhaseManager(AgentManager, ABC):
         logger: Optional[logging.Logger] = None,
         prompts_dir: Optional[Path] = None,
     ):
-        """
-        Initialize the PhaseManager.
-
-        Args:
-            url: (Optional) WebSocket server URL
-            phase_transition_event: (Optional) Event name for phase transitions
-            phase_identifier_key: (Optional) Key in the event data that identifies the phase
-            continuous_phases: (Optional) set of phase numbers that should be treated as continuous
-            min_action_delay: (Optional) Minimum delay in seconds between actions in continuous phases
-            max_action_delay: (Optional) Maximum delay in seconds between actions in continuous phases
-            state: (Optional) Game state object to track game state
-            agent_role: (Optional) Agent role instance to handle game phases
-            auth_mechanism: (Optional) Authentication mechanism to use
-            auth_mechanism_kwargs: (Optional) Keyword arguments for the authentication mechanism
-            logger: (Optional) Logger instance for tracking events
-            prompts_dir: (Optional) Directory containing the prompt templates
-        """
         super().__init__(
             url=url,
             logger=logger,
@@ -190,7 +191,11 @@ class PhaseManager(AgentManager, ABC):
         await super().start()
 
     async def _update_state(self, message: Message):
-        """Update the game state when an event is received."""
+        """Update the game state when an event is received.
+
+        Args:
+            message (Message): The message containing the event data
+        """
         if self._state:
             self._state.update(message)
             self.logger.debug(f"Updated state: {self._state}")
@@ -200,6 +205,9 @@ class PhaseManager(AgentManager, ABC):
         Process a phase transition event.
 
         Extracts the new phase from the message and calls handle_phase_transition.
+
+        Args:
+            message (Message): The message containing the event data
         """
         if not self.phase_identifier_key:
             raise ValueError("Phase identifier key is not set")
@@ -220,7 +228,7 @@ class PhaseManager(AgentManager, ABC):
         6. Executes a single action if entering a non-continuous phase
 
         Args:
-            new_phase: The new phase number
+            new_phase (Optional[int]): The new phase number
         """
         self.logger.info(f"Transitioning to phase {new_phase}")
 
@@ -260,7 +268,7 @@ class PhaseManager(AgentManager, ABC):
         Run a loop that periodically executes actions for a continuous phase.
 
         Args:
-            phase: The phase number
+            phase (int): The phase number
         """
         try:
             while self.in_continuous_phase:
@@ -289,7 +297,7 @@ class PhaseManager(AgentManager, ABC):
         how to handle actions for a specific phase.
 
         Args:
-            phase: The phase number
+            phase (int): The phase number
         """
         pass
 
@@ -300,7 +308,7 @@ class PhaseManager(AgentManager, ABC):
         Subclasses can override this to implement custom behavior.
 
         Args:
-            phase: The phase number
+            phase (int): The phase number
         """
         pass
 
@@ -311,7 +319,7 @@ class PhaseManager(AgentManager, ABC):
         Subclasses can override this to implement custom behavior.
 
         Args:
-            phase: The phase number
+            phase (int): The phase number
         """
         pass
 
@@ -330,6 +338,17 @@ class TurnBasedPhaseManager(PhaseManager):
 
     This manager inherits from PhaseManager and provides a concrete implementation
     for executing actions in each phase.
+
+    Args:
+        url (Optional[str]): WebSocket server URL
+        phase_transition_event (Optional[str]): Event name for phase transitions
+        phase_identifier_key (Optional[str]): Key in the event data that identifies the phase
+        auth_mechanism (Optional[AuthenticationMechanism]): Authentication mechanism to use
+        auth_mechanism_kwargs (Optional[dict[str, Any]]): Keyword arguments for the authentication mechanism
+        state (Optional[GameState]): Game state object to track game state
+        agent_role (Optional[AgentRole]): Agent role instance to handle game phases
+        logger (Optional[logging.Logger]): Logger instance for tracking events
+        prompts_dir (Optional[Path]): Directory containing the prompt templates
     """
 
     def __init__(
@@ -344,20 +363,6 @@ class TurnBasedPhaseManager(PhaseManager):
         logger: Optional[logging.Logger] = None,
         prompts_dir: Optional[Path] = None,
     ):
-        """
-        Initialize the TurnBasedManager.
-
-        Args:
-            url: (Optional) WebSocket server URL
-            phase_transition_event: (Optional) Event name for phase transitions
-            phase_identifier_key: (Optional) Key in the event data that identifies the phase
-            auth_mechanism: (Optional) Authentication mechanism to use
-            auth_mechanism_kwargs: (Optional) Keyword arguments for the authentication mechanism
-            state: (Optional) Game state object to track game state
-            agent_role: (Optional) Agent role instance to handle game phases
-            logger: (Optional) Logger instance for tracking events
-            prompts_dir: (Optional) Directory containing the prompt templates
-        """
         super().__init__(
             url=url,
             phase_transition_event=phase_transition_event,
@@ -378,7 +383,7 @@ class TurnBasedPhaseManager(PhaseManager):
         Execute an action for the given phase by delegating to the registered handler or agent.
 
         Args:
-            phase: The phase number
+            phase (int): The phase number
         """
         payload = None
 
@@ -399,8 +404,8 @@ class TurnBasedPhaseManager(PhaseManager):
         Register a custom handler for a specific phase.
 
         Args:
-            phase: The phase number
-            handler: The function to call when this phase is active
+            phase (int): The phase number
+            handler (Callable[[int, Any], Any]): The function to call when this phase is active
         """
         self._phase_handlers[phase] = handler
         self.logger.debug(f"Registered handler for phase {phase}")
@@ -412,6 +417,20 @@ class HybridPhaseManager(PhaseManager):
 
     This manager extends PhaseManager and configures it with specific phases
     that should be treated as continuous.
+
+    Args:
+        continuous_phases (Optional[set[int]]): Set of phase numbers that should be treated as continuous
+        url (Optional[str]): WebSocket server URL
+        auth_mechanism (Optional[AuthenticationMechanism]): Authentication mechanism to use
+        auth_mechanism_kwargs (Optional[dict[str, Any]]): Keyword arguments for the authentication mechanism
+        phase_transition_event (Optional[str]): Event name for phase transitions
+        phase_identifier_key (Optional[str]): Key in the event data that identifies the phase
+        min_action_delay (Optional[int]): Minimum delay in seconds between actions in continuous phases
+        max_action_delay (Optional[int]): Maximum delay in seconds between actions in continuous phases
+        state (Optional[GameState]): Game state object to track game state
+        agent_role (Optional[AgentRole]): Agent role instance to handle game phases
+        logger (Optional[logging.Logger]): Logger instance for tracking events
+        prompts_dir (Optional[Path]): Directory containing the prompt templates
     """
 
     def __init__(
@@ -429,23 +448,6 @@ class HybridPhaseManager(PhaseManager):
         logger: Optional[logging.Logger] = None,
         prompts_dir: Optional[Path] = None,
     ):
-        """
-        Initialize the HybridPhaseManager.
-
-        Args:
-            continuous_phases: (Optional) Set of phase numbers that should be treated as continuous
-            url: (Optional) WebSocket server URL
-            auth_mechanism: (Optional) Authentication mechanism to use
-            auth_mechanism_kwargs: (Optional) Keyword arguments for the authentication mechanism
-            phase_transition_event: (Optional) Event name for phase transitions
-            phase_identifier_key: (Optional) Key in the event data that identifies the phase
-            min_action_delay: (Optional) Minimum delay in seconds between actions in continuous phases
-            max_action_delay: (Optional) Maximum delay in seconds between actions in continuous phases
-            state: (Optional) Game state object to track game state
-            agent_role: (Optional) Agent role instance to handle game phases
-            logger: (Optional) Logger instance for tracking events
-            prompts_dir: (Optional) Directory containing the prompt templates
-        """
         super().__init__(
             url=url,
             phase_transition_event=phase_transition_event,
@@ -468,7 +470,7 @@ class HybridPhaseManager(PhaseManager):
         Execute an action for the given phase by delegating to the registered handler or agent.
 
         Args:
-            phase: The phase number
+            phase (int): The phase number
         """
         payload = None
 
@@ -489,8 +491,8 @@ class HybridPhaseManager(PhaseManager):
         Register a custom handler for a specific phase.
 
         Args:
-            phase: The phase number
-            handler: The function to call when this phase is active
+            phase (int): The phase number
+            handler (Callable[[int, Any], Any]): The function to call when this phase is active
         """
         self._phase_handlers[phase] = handler
         self.logger.debug(f"Registered handler for phase {phase}")

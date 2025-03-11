@@ -8,16 +8,16 @@ econagents requires Python ``>=3.10`` and can be installed from pypi via:
    python -m pip install econagents
 
 
-To install directly from github, you can run:
+To install directly from GitHub, you can run:
 
 .. code-block:: bash
 
-   python -m pip install git+https://github.com/iwanalabs/economic-agents.git
+   python -m pip install git+https://github.com/iwanalabs/econagents.git
 
 For development, its recommended to use Poetry:
 
 .. code-block:: bash
 
-   git clone https://github.com/iwanalabs/economic-agents.git
+   git clone https://github.com/iwanalabs/econagents.git
    cd econagents
    poetry install

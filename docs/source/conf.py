@@ -45,6 +45,8 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.linkcode",
     "sphinx_copybutton",
+    "sphinxcontrib.autodoc_pydantic",
+    "sphinx.ext.intersphinx",
 ]
 with suppress(ImportError):
     import myst_parser  # pyright: ignore[reportMissingImports]
@@ -84,10 +86,14 @@ autodoc_default_options = {
     "undoc-members": True,
     "exclude-members": "__weakref__",
 }
-autoclass_content = "init"
+autoclass_content = "class"
 
 # LinkCode
 code_url = f"https://github.com/iwanalabs/economic-agents/blob/{git_commit}"
+
+# Autodoc Pydantic
+autodoc_pydantic_model_show_json = False
+autodoc_pydantic_settings_show_json = False
 
 
 def linkcode_resolve(domain, info):

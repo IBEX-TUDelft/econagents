@@ -29,25 +29,35 @@ class GameRunnerConfig(BaseModel):
 
     # Server configuration
     protocol: str = "ws"
+    """Protocol to use for the server"""
     hostname: str
+    """Hostname of the server"""
     path: str
+    """Path to the server"""
     port: int
 
     # Game configuration
     game_id: int
+    """ID of the game"""
     logs_dir: Path = Path.cwd() / "logs"
+    """Directory to store logs"""
     log_level: int = logging.INFO
+    """Level of logging to use"""
     prompts_dir: Path = Path.cwd() / "prompts"
 
     # Authentication
     auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth()
+    """Authentication mechanism to use"""
 
     # Phase transition configuration
     phase_transition_event: str = "phase-transition"
+    """Event to use for phase transitions"""
     phase_identifier_key: str = "phase"
+    """Key in data to use for phase identification"""
 
     # State configuration
     state_class: Optional[Type[GameState]] = None
+    """Class to use for the state"""
 
 
 class TurnBasedGameRunnerConfig(GameRunnerConfig):
@@ -63,21 +73,19 @@ class HybridGameRunnerConfig(GameRunnerConfig):
 
 
 class GameRunner:
-    """
-    Generic game runner for managing agent connections to a game server. This can handle both turn-based and continuous games.
-
-    This class handles:
-    - Agent spawning and connection management
-    - Logging setup for game and agents
-    """
-
     def __init__(
         self,
         config: GameRunnerConfig,
         agents: list[PhaseManager],
     ):
         """
-        Initialize the GameRunner.
+        Generic game runner for managing agent connections to a game server. This can handle both turn-based and continuous games.
+
+        This class handles:
+
+        - Agent spawning and connection management
+
+        - Logging setup for game and agents
 
         Args:
             config: GameRunnerConfig instance with server and path settings
@@ -139,11 +147,11 @@ class GameRunner:
         Configure and return a logger for an agent.
 
         Args:
-            agent_id: Agent identifier
-            game_id: Game identifier
+            agent_id (int): Agent identifier
+            game_id (int): Game identifier
 
         Returns:
-            Configured logger instance
+            logging.Logger: Configured logger instance
         """
         if not self.config.logs_dir:
             # Return a default logger if no log path is configured
@@ -204,10 +212,10 @@ class GameRunner:
         Configure and return a logger for a game.
 
         Args:
-            game_id: Game identifier
+            game_id (int): Game identifier
 
         Returns:
-            Configured logger instance
+            logging.Logger: Configured logger instance
         """
         if not self.config.logs_dir:
             # Return a default logger if no log path is configured
@@ -261,6 +269,9 @@ class GameRunner:
     def _inject_default_config(self, agent_manager: PhaseManager) -> None:
         """
         Inject default configuration into an agent manager.
+
+        Args:
+            agent_manager (PhaseManager): Agent manager to inject configuration into
         """
         if not agent_manager.url:
             agent_manager.url = f"{self.config.protocol}://{self.config.hostname}:{self.config.port}/{self.config.path}"
@@ -296,10 +307,17 @@ class GameRunner:
                 f"Injected default continuous phases: {agent_manager.continuous_phases}, min action delay: {agent_manager.min_action_delay}, max action delay: {agent_manager.max_action_delay}"
             )
 
-    def _inject_agent_logger(self, agent_manager: PhaseManager, agent_logger: logging.Logger) -> None:
+    def _inject_agent_logger(self, agent_manager: PhaseManager, agent_id: int) -> None:
         """
         Inject a logger into an agent manager.
+
+        Args:
+            agent_manager (PhaseManager): Agent manager to inject logger into
+            agent_id (int): Agent identifier
         """
+        agent_logger = self.get_agent_logger(agent_id, self.config.game_id)
+        ctx_agent_id.set(str(agent_id))  # Convert int to str for context variable
+
         agent_manager.logger = agent_logger
 
     async def spawn_agent(self, agent_manager: PhaseManager, agent_id: int) -> None:
@@ -307,22 +325,17 @@ class GameRunner:
         Spawn an agent and connect it to the game.
 
         Args:
-            ws_url: WebSocket URL to connect to
-            auth_mechanism_kwargs: Authentication mechanism kwargs for the agent
-            game_id: Game identifier
-            agent_id: Agent identifier
+            agent_manager (PhaseManager): Agent manager to spawn
+            agent_id (int): Agent identifier
         """
-        agent_logger = self.get_agent_logger(agent_id, self.config.game_id)
-        ctx_agent_id.set(str(agent_id))  # Convert int to str for context variable
-
         try:
-            agent_manager.logger = agent_logger
-
+            self._inject_agent_logger(agent_manager, agent_id)
             self._inject_default_config(agent_manager)
-            agent_logger.info(f"Connecting to WebSocket URL: {agent_manager.url}")
+
+            agent_manager.logger.info(f"Connecting to WebSocket URL: {agent_manager.url}")
             await agent_manager.start()
         except Exception:
-            agent_logger.exception(f"Error in simulation for Agent {agent_id}")
+            agent_manager.logger.exception(f"Error in simulation for Agent {agent_id}")
             raise
 
     async def run_game(self) -> None:

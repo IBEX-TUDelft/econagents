@@ -1,7 +1,6 @@
-from abc import abstractmethod
 from typing import Any, Callable, Optional, Protocol, Type, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from econagents.core.events import Message
 from econagents.core.state.fields import EventField
@@ -43,21 +42,32 @@ class PropertyMapping(BaseModel):
 
 
 class PrivateInformation(BaseModel):
+    """Private information for each agent in the game"""
+
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=False)
 
 
 class PublicInformation(BaseModel):
+    """Public information for the game"""
+
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=False)
 
 
 class MetaInformation(BaseModel):
+    """Meta information for the game"""
+
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=False)
 
     game_id: int = EventField(default=0)
+    """ID of the game"""
     player_name: Optional[str] = EventField(default=None)
+    """Name of the player"""
     player_number: Optional[int] = EventField(default=None)
+    """Number of the player"""
     players: list[dict[str, Any]] = EventField(default_factory=list)
+    """List of players in the game"""
     phase: int = EventField(default=0)
+    """Current phase of the game"""
 
 
 class GameStateProtocol(Protocol):
@@ -71,9 +81,14 @@ class GameStateProtocol(Protocol):
 
 
 class GameState(BaseModel):
+    """Game state for a given game"""
+
     meta: MetaInformation = EventField(default_factory=MetaInformation)
+    """Meta information for the game"""
     private_information: PrivateInformation = EventField(default_factory=PrivateInformation)
+    """Private information for each agent in the game"""
     public_information: PublicInformation = EventField(default_factory=PublicInformation)
+    """Public information for the game"""
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -84,7 +99,7 @@ class GameState(BaseModel):
         Generic state update method that handles both property mappings and custom event handlers.
 
         Args:
-            event: The event message containing event_type and data
+            event (Message): The event message containing event_type and data
 
         This method will:
         1. Check for custom event handlers first
@@ -124,7 +139,7 @@ class GameState(BaseModel):
         Default implementation that generates property mappings from EventField metadata.
 
         Returns:
-            List of PropertyMapping objects generated from field metadata.
+            list[PropertyMapping]: List of PropertyMapping objects generated from field metadata.
         """
         mappings = []
 
@@ -144,11 +159,11 @@ class GameState(BaseModel):
         Generate property mappings from a Pydantic model class.
 
         Args:
-            model_class: The Pydantic model class to inspect
-            state_type: The state type ("meta", "private", or "public")
+            model_class (Type): The Pydantic model class to inspect
+            state_type (str): The state type ("meta", "private", or "public")
 
         Returns:
-            List of PropertyMapping objects
+            list[PropertyMapping]: List of PropertyMapping objects
         """
         mappings = []
 
@@ -200,6 +215,8 @@ class GameState(BaseModel):
     def get_custom_handlers(self) -> dict[str, EventHandler]:
         """
         Override this method to provide custom event handlers.
-        Returns a mapping of event types to handler functions.
+
+        Returns:
+            dict[str, EventHandler]: A mapping of event types to handler functions.
         """
         return {}

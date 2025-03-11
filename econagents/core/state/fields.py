@@ -17,16 +17,16 @@ def EventField(
     Create a field with event mapping metadata.
 
     Args:
-        default: Default value for the field
-        default_factory: Factory function to generate default value
-        event_key: The key in event data that maps to this field
-        exclude_from_mapping: Whether to exclude this field from event mapping
-        events: Optional list of events where this mapping should be applied
-        exclude_events: Optional list of events where this mapping should not be applied
+        default (Any): Default value for the field
+        default_factory (Callable[[], Any]): Factory function to generate default value
+        event_key (Optional[str]): The key in event data that maps to this field
+        exclude_from_mapping (bool): Whether to exclude this field from event mapping
+        events (Optional[list[str]]): Optional list of events where this mapping should be applied
+        exclude_events (Optional[list[str]]): Optional list of events where this mapping should not be applied
         **kwargs: Additional arguments to pass to Pydantic's Field
 
     Returns:
-        A Pydantic FieldInfo object with event mapping metadata
+        FieldInfo: A Pydantic FieldInfo object with event mapping metadata
     """
     # Create a dictionary for custom metadata
     event_metadata = {
