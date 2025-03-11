@@ -1,5 +1,5 @@
 Customizing Agent Roles
-=========================
+=======================
 
 This guide explains how to customize agent roles in the econagents framework, leveraging the flexible architecture of the ``AgentRole`` class.
 

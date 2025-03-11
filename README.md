@@ -13,6 +13,8 @@
 
 ---
 
+# econagents
+
 econagents is a Python library that lets you use LLM agents in economic experiments.
 
 ## Using the example experiments
