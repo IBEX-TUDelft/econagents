@@ -7,9 +7,6 @@ This guide provides an overview of the econagents framework.
    :depth: 3
    :local:
 
-Components
-----------
-
 econagents is a framework that lets you use LLM agents into economic experiments. For that, it assumes that you have a game server that can be connected to.
 
 There's a couple of assumptions econagents makes about the game server:
@@ -25,10 +22,7 @@ However, if the server doesn't use that format of messages, you can customize th
 
 Aside from that, the framework only assumes that you have a roles that agents can take, information about the game state, and phases where agents might take actions.
 
-Key Components
--------------------------
-
-econagents have four key components:
+The library has four key components:
 
 1. Agent Roles
 2. Agent Manager
@@ -39,9 +33,17 @@ econagents have four key components:
 Agent Roles
 ~~~~~~~~~~~
 
-Agent roles define the different roles players can take in your experiment:
+Agent roles define the different roles players can take in your experiment. For example, in a Prisoner's Dilemma game, you might have a Prisoner role that can cooperate or defect. In a Harberger Tax simulation, you might have a Developer, Owner, and Speculator role.
 
-For example, in a Harberger game, you might have the following roles:
+When you define an agent role, you need to specify at least the following:
+
+1. The role id
+2. The name of the role
+3. The LLM model to use
+
+You must also specify prompts for the phases where the agent must perform a task.
+
+Here's how this looks in code:
 
 .. code-block:: python
 
@@ -50,31 +52,21 @@ For example, in a Harberger game, you might have the following roles:
     class Speculator(AgentRole):
         role = 1
         name = "Speculator"
-        task_phases = [3, 6, 8]  # Phases where this agent must perform a task
         llm = ChatOpenAI()
 
     class Developer(AgentRole):
         role = 2
         name = "Developer"
-        task_phases = [2, 6, 7]
         llm = ChatOpenAI(model="gpt-4o")
 
     class Owner(AgentRole):
         role = 3
         name = "Owner"
-        task_phases = [2, 6, 7]
         llm = ChatOpenAI(model="gpt-4o-mini")
 
-When you create an agent role, you need to specify the following:
+Given that you want your roles to make actions during the game, you need to specify prompts for the phases where the agent must perform a task.
 
-1. The role id
-2. The name of the role
-3. The task phases where the agent must perform a task
-4. The LLM model to use
-
-You must also specify prompts for the phases where the agent must perform a task.
-
-For example, for a market phase, you might have the following system and user prompts:
+For example, in a game where the market phase is the 6th phase, you might have the following system and user prompts:
 
 .. code-block:: jinja
     :caption: System prompt for market phase (all_system_phase_6.jinja2)
@@ -125,14 +117,18 @@ For example, for a market phase, you might have the following system and user pr
     C. Do nothing:
     {}
 
-The prompts use Jinja templates, so you can use the game information to customize the prompts, and there is a flexible prompt resolution system. You can learn more about it in the :doc:`Customizing Agents <Customizing_Agents>` section.
+The prompts use [Jinja templates](https://jinja.palletsprojects.com/en/stable/). This allows you to use the game state and other information to customize the prompts.
+
+You can learn more about this in the :doc:`Customizing Agents <Customizing_Agents>` section.
 
 Agent Manager
 ~~~~~~~~~~~~~
 
-For each player you want to simulate, you need to create an agent manager. This agent manager takes care of the connection to the game server, the initialization of the agent based on the role, and the handling of the game events.
+For each player you want to simulate using an agent, you need to create an agent manager. The agent manager takes care of the connection to the game server, the initialization of the agent based on the role, and the handling of the game events.
 
 You can also adjust the agent manager to add custom logic, such as assigning roles of agents after the game has started.
+
+Here's an example of an agent manager with custom logic:
 
 .. code-block:: python
 
@@ -166,34 +162,36 @@ You can also adjust the agent manager to add custom logic, such as assigning rol
 Game State
 ~~~~~~~~~~
 
-The state file defines data structures for game state:
+The state file defines data structures for game state.
+
+For example, in a Harberger Tax simulation, you might have the following state:
 
 .. code-block:: python
 
     from econagents import GameState, MetaInformation, PrivateInformation, PublicInformation
 
     class Meta(MetaInformation):
-        another_meta_info_field: str
+        game_name: str
 
     class PrivateInfo(PrivateInformation):
-        private_info_field: str
+        wallet: str
 
     class PublicInfo(PublicInformation):
-        public_info_field: str
+        winning_condition: str
 
     class MyGameState(GameState):
         meta: Meta = Field(default_factory=Meta)
         private_information: PrivateInfo = Field(default_factory=PrivateInfo)
         public_information: PublicInfo = Field(default_factory=PublicInfo)
 
-This state will be available to all agents when handling phases. You can use them in prompts or in any custom phase handling logic.
+The game state will be available to all agents during the phases. You can use them in prompts or in any custom phase handling logic.
 
 The state is updated automatically using the information received from the game server. You can customize the state update logic using the approaches shown in the :doc:`State Management <State_Management>` section.
 
 Game Runner
 -----------
 
-To run an experiment you need to:
+Finally, to run an experiment you need to use the `GameRunner` class. This class is responsible for gluing everything together: agent managers and roles, game state, and the game server.
 
 1. Create a new game on your server
 2. Set up the agent roles, agent managers, and game state
@@ -201,16 +199,28 @@ To run an experiment you need to:
 
 The `GameRunner` is responsible for: connecting to the game server, spawning the agents, and handling the game events.
 
-For example, you could run an experiment on a notebook with the following code:
+Here's an sample of how to run an experiment using the `GameRunner` class:
 
 .. code-block:: python
 
-    from econagents import GameRunner, GameRunnerConfig
+    from econagents import GameRunner, TurnBasedGameRunnerConfig
 
-    config = GameRunnerConfig(
-        game_id=1
+    config = TurnBasedGameRunnerConfig(
+        # Game configuration
+        game_id=1,
+        # Server configuration
+        hostname="localhost",
+        port=8765,
+        path="wss",
     )
-    game_runner = GameRunner(config=config, agents=[HAgentManager(game_id=1), HAgentManager(game_id=1)])
-    await game_runner.run_game()
+    agents = [
+        PDManager(
+            game_id=1
+        ),
+        PDManager(
+            game_id=1
+        ),
+    ]
+    runner = GameRunner(config=config, agents=agents)
 
 This will connect to the game server, spawn the agents, and handle the game events.
