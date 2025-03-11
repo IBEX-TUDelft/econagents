@@ -24,48 +24,45 @@ Key features of the base manager include:
 * **Global Event Handling**: Handlers that process all events regardless of type
 * **Event-specific Handlers**: Custom handlers for specific event types
 
-Example usage:
+However, you'd rarely need to use the ``AgentManager`` class directly. Instead, you'd use one of the specialized manager classes that inherit from it.
 
-.. code-block:: python
+``PhaseManager``
+^^^^^^^^^^^^^^^^
 
-    # Create a basic agent manager
-    manager = AgentManager(
-        url="wss://game-server.example.com",
-        login_payload={"username": "agent1", "password": "secret"},
-        game_id=123,
-        logger=logging.getLogger("agent"),
-    )
+This abstract base class provides the foundation for all phase-based managers:
 
-    # Start the manager
-    await manager.start()
+* **Phase Transition Handling**: Core mechanism for handling phase changes
+* **Continuous Phase Support**: Built-in support for phases requiring periodic actions
+* **Flexible Configuration**: Property setters for dynamic configuration
+* **Lifecycle Hooks**: Customizable hooks for phase start/end events
+* **State Management**: Automatic game state updates via event hooks
 
-Turn-Based Agent Managers
-~~~~~~~~~~~~~~~~~~~~~~~~~
+``TurnBasedPhaseManager``
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The framework provides specialized managers for turn-based games:
+This concrete implementation handles turn-based games:
 
-``TurnBasedManager``
-^^^^^^^^^^^^^^^^^^^^
-
-This manager extends the base ``AgentManager`` to handle phase-based turn games:
-
-* **Phase Transitions**: Automatically detects and handles phase changes
-* **Game State Management**: Updates state (if provided) when events occur
-* **Agent Delegation**: Forwards phase changes to the agent for decision-making
+* **Phase Action Execution**: Delegates phase actions to registered handlers or the agent
+* **Custom Phase Handlers**: Register specialized handlers for specific phases
+* **Agent Integration**: Automatically forwards phase actions to the agent when no handler exists
 
 Example usage:
 
 .. code-block:: python
 
-    # Create a turn-based manager
-    manager = TurnBasedManager(
+    # Create a turn-based phase manager
+    manager = TurnBasedPhaseManager(
         url="wss://game-server.example.com",
-        login_payload={"username": "agent1", "password": "secret"},
-        game_id=123,
         phase_transition_event="phase_change",
-        logger=logging.getLogger("agent"),
+        phase_identifier_key="phase_number",
+        auth_mechanism=SimpleLoginPayloadAuth(),
+        auth_mechanism_kwargs={
+            "login_payload": {"username": "agent1", "password": "secret"},
+        },
         state=game_state,
-        agent=agent,
+        agent_role=agent,
+        logger=logging.getLogger("agent"),
+        prompts_dir=Path("prompts"),
     )
 
     # Register a custom phase handler
@@ -74,32 +71,39 @@ Example usage:
     # Start the manager
     await manager.start()
 
-``TurnBasedWithContinuousManager``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``HybridPhaseManager``
+^^^^^^^^^^^^^^^^^^^^^^
 
-This manager extends ``TurnBasedManager`` to handle games that combine turn-based and continuous action phases:
+This manager handles games that combine turn-based and continuous action phases:
 
-* **Continuous Phase Support**: Regularly prompts the agent for actions during continuous phases
-* **Configurable Action Timing**: Randomized delays between actions to simulate natural behavior
-* **Automatic Task Management**: Handles background tasks for continuous phases
+* **Continuous Phase Configuration**: Define specific phases that should operate continuously
+* **Configurable Action Timing**: Control the frequency of actions in continuous phases
+* **Shared Implementation**: Leverages the same phase action execution mechanism as TurnBasedPhaseManager
 
 Example usage:
 
 .. code-block:: python
 
-    # Create a turn-based manager with continuous phases
-    manager = TurnBasedWithContinuousManager(
+    # Create a hybrid phase manager
+    manager = HybridPhaseManager(
         url="wss://game-server.example.com",
-        login_payload={"username": "agent1", "password": "secret"},
-        game_id=123,
         phase_transition_event="phase_change",
-        logger=logging.getLogger("agent"),
+        phase_identifier_key="phase_number",
         continuous_phases={3, 5},  # Phases 3 and 5 are continuous
         min_action_delay=10,       # Minimum 10 seconds between actions
         max_action_delay=20,       # Maximum 20 seconds between actions
+        auth_mechanism=SimpleLoginPayloadAuth(),
+        auth_mechanism_kwargs={
+            "login_payload": {"username": "agent1", "password": "secret"},
+        },
         state=game_state,
-        agent=agent,
+        agent_role=agent,
+        logger=logging.getLogger("agent"),
+        prompts_dir=Path("prompts"),
     )
+
+    # Register a custom phase handler
+    manager.register_phase_handler(2, handle_bidding_phase)
 
     # Start the manager
     await manager.start()
@@ -117,3 +121,18 @@ The event handling system follows this sequence for each event:
 6. **Global Post-Event Hooks**: Run after all event processing
 
 This architecture allows for a flexible event handling system that can be customized for specific needs.
+
+Phase Transition Process
+------------------------
+
+When using phase-based managers, phase transitions follow this sequence:
+
+1. **Phase Transition Event**: Server sends an event indicating a phase change
+2. **Current Phase Shutdown**: If in a continuous phase, any pending phase actions are cancelled
+3. **Phase End Hook**: The ``on_phase_end`` hook is called for the old phase
+4. **Phase Update**: The current phase is updated to the new phase
+5. **Phase Start Hook**: The ``on_phase_start`` hook is called for the new phase
+6. **Continuous Phase Setup**: If the new phase is continuous, a background task is started
+7. **Initial Action**: An initial action is executed for the new phase
+
+This systematic approach ensures smooth transitions between game phases.
