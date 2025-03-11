@@ -1,12 +1,12 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/iwanalabs/ecoagents/main/assets/logo_200w.png">
+  <img src="https://raw.githubusercontent.com/iwanalabs/econagents/main/assets/logo_200w.png">
 </div>
 
 <div align="center">
 
 ![Python compat](https://img.shields.io/badge/%3E=python-3.10-blue.svg)
-[![PyPi](https://img.shields.io/pypi/v/ecoagents.svg)](https://pypi.python.org/pypi/ecoagents)
-[![GHA Status](https://github.com/iwanalabs/ecoagents/actions/workflows/tests.yaml/badge.svg?branch=main)](https://github.com/iwanalabs/ecoagents/actions?query=workflow%3Atests)
+[![PyPi](https://img.shields.io/pypi/v/econagents.svg)](https://pypi.python.org/pypi/econagents)
+[![GHA Status](https://github.com/iwanalabs/econagents/actions/workflows/tests.yaml/badge.svg?branch=main)](https://github.com/iwanalabs/econagents/actions?query=workflow%3Atests)
 [![Documentation Status](https://readthedocs.org/projects/econagents/badge/?version=latest)](https://econagents.readthedocs.io/en/latest/?badge=latest)
 
 </div>
