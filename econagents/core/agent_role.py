@@ -334,9 +334,9 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
             Phase result dictionary
         """
         system_prompt = self.get_phase_system_prompt(state, prompts_path=prompts_path)
-        user_prompt = self.get_phase_user_prompt(state, prompts_path=prompts_path)
-
         self.logger.debug("\n+-----SYSTEM PROMPT----+\n" + f"{system_prompt}\n+------------------+")
+
+        user_prompt = self.get_phase_user_prompt(state, prompts_path=prompts_path)
         self.logger.debug("\n+-----USER PROMPT----+\n" + f"{user_prompt}\n+------------------+")
 
         messages = self.llm.build_messages(system_prompt, user_prompt)

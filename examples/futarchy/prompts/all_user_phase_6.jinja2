@@ -1,0 +1,55 @@
+Instructions for this phase:
+
+1. **Game Information**:
+   - Phase: Phase {{ meta.phase }}
+   - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+   - Your Wallet:
+     - Tax Shares conditional on project development: {{ private_information.wallet[0].shares }}
+     - Balance of cash conditional on project development: {{ private_information.wallet[0].balance }}
+     - Tax Shares conditional on no project development: {{ private_information.wallet[1].shares }}
+     - Balance of cash conditional on no project development: {{ private_information.wallet[1].balance }}
+
+2. **Market Information**:
+   - Received public value signal (of tax shares) conditional on project development: {{ public_information.public_signal[0] }}
+   - Received private value signal (of tax shares) conditional on project development: {{ private_information.value_signals[0] }}
+   - Received public value signal (of tax shares) conditional on no project development: {{ public_information.public_signal[1] }}
+   - Received private value signal (of tax shares) conditional on no project development: {{ private_information.value_signals[1] }}
+   - Orders: {{ public_information.market_state.order_book }}
+
+
+3. **Your Decision Options**:
+   Provide the output (one of these options) as a JSON object:
+   A. Post a new order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "post-order",
+       "order": {
+           "price": <number>, # if now=true, put 0 (will be ignored)
+           "quantity": 1,
+           "type": <"ask" or "bid">,
+           "now": <true or false>,
+           "condition": <0 or 1>
+       },
+   }
+
+   B. Cancel an existing order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "cancel-order",
+       "order": {
+           "id": <order_id>,
+           "condition": <0 or 1>
+       },
+   }
+
+   C. Do nothing:
+   {}
+
+Remember:
+- You can only trade one share at a time
+- You have limited time to trade
+- Setting "now": true will execute at the best available price
+- Orders can be canceled before they are fulfilled
+- setting the condition to 0 means that the order is for no project development
+- setting the condition to 1 means that the order is for project development
