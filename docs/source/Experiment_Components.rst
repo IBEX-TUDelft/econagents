@@ -172,35 +172,3 @@ To run an experiment you need to:
 2. Connect to an existing game and run it
 
 For example, you could run an experiment on a notebook with the following code:
-
-.. code-block:: python
-    import nest_asyncio
-    nest_asyncio.apply()
-
-    import argparse
-    import asyncio
-    import os
-    from datetime import datetime
-    from pathlib import Path
-
-    from dotenv import load_dotenv
-
-    from econagents.core.game_runner import GameRunner, GameRunnerConfig
-    from examples.server.create_game import create_game_from_specs
-    from your_experiment.manager import YourAgentManager
-
-    load_dotenv()
-
-    # Configure the game runner
-    config = GameRunnerConfig(hostname=HOSTNAME, port=PORT, log_path=LOG_PATH, games_path=GAMES_PATH)
-
-    # Create game runner with your specific agent manager
-    runner = GameRunner(config=config, agent_manager_class=YourAgentManager)
-
-    # Generate a game name with timestamp
-    game_name = f"your_experiment {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
-    # Create and run the game
-    await runner.create_and_run_game(
-        specs_path=specs_path, game_creator_func=create_game_from_specs, game_name=game_name
-    )
