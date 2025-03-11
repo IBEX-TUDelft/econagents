@@ -1,8 +1,5 @@
-Tutorial
---------
-
-Running the Prisoner's Dilemma Experiment
-=========================================
+Tutorial: Running the Prisoner's Dilemma Experiment
+===================================================
 
 This tutorial will guide you through setting up and running the Prisoner's Dilemma experiment included in the ``examples/prisoner`` directory.
 
