@@ -1,5 +1,5 @@
 Customizing Agents
-================
+==================
 
 This guide explains how to customize agent behavior for different phases in the econagents framework, leveraging the flexible architecture of the ``Agent`` class.
 
@@ -35,7 +35,7 @@ Customization Approaches
 ------------------------
 
 Method 1: Phase-Specific Methods
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The simplest approach is to define methods with specific naming patterns in your agent subclass:
 

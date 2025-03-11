@@ -54,7 +54,7 @@ HarbergerMetaInformation
 This class extends the base ``MetaInformation`` class and provides specific event keys for the server's event data that will be used to update the state.
 
 HarbergerPrivateInformation
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -72,7 +72,7 @@ This class manages player-specific information:
 * Property ownership details. This field is not updated on "profit" events.
 
 HarbergerPublicInformation
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -105,7 +105,7 @@ This class manages shared information visible to all players:
 * Winning conditions
 
 HarbergerGameState
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -138,7 +138,7 @@ The main game state class:
 * Provides custom handlers for market events, given that in this case, the order book needs to be updated on the agent's side
 
 Integration with Market State
-----------------------------
+-----------------------------
 
 The Harberger implementation integrates with the ``MarketState`` class to handle market operations:
 
@@ -162,7 +162,7 @@ Market events are processed through the ``process_event`` method, which delegate
 * ``_on_contract_fulfilled``: Records completed trades
 
 Event Processing Flow
--------------------
+---------------------
 
 1. Events are received as ``Message`` objects with ``event_type`` and ``data``
 2. The ``GameState.update`` method processes these events:

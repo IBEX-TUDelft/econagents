@@ -40,7 +40,7 @@ Example usage:
     await manager.start()
 
 Turn-Based Agent Managers
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The framework provides specialized managers for turn-based games:
 
