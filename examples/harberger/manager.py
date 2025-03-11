@@ -1,9 +1,8 @@
 import json
-from typing import Any, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 
-from econagents import AgentRole
 from econagents.core.events import Message
 from econagents.core.manager.phase import HybridPhaseManager
 from examples.harberger.roles import Developer, Owner, Speculator
@@ -59,6 +58,6 @@ class HLAgentManager(HybridPhaseManager):
     # This is required by the server
     async def _handle_role_assignment(self, message: Message):
         """Handle the role assignment event."""
-        role = message.data.get("role")
+        role = message.data.get("role", "")
         self.logger.info(f"Role assigned: {role}")
         self._initialize_agent(role)
