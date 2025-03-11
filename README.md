@@ -13,19 +13,7 @@
 
 ---
 
-econagents is a Python library for creating and running economic experiments.
-
-# Installation
-
-Follow these steps to get started:
-
-1. Create a virtual environment and install the dependencies using poetry:
-
-```shell
-poetry install
-```
-
-2. Copy the `.env.example` file to `.env` and fill in the values.
+econagents is a Python library that lets you use LLM agents in economic experiments.
 
 ## Using the example experiments
 
@@ -33,13 +21,12 @@ There are currently three example experiments you can use to get started:
 
 1. `prisoner`: A simple experiment of an iterated Prisoner's Dilemma of 5 rounds using 2 LLM agents.
 2. `harberger`: A heavily customized experiment of a Harberger Tax game played by LLM agents.
-3. `harberge_lite`: A simplified version of the Harberger Tax game.
 
 The example experiments are located in the `examples` directory.
 
-The server to run the `prisoner` experiment is located in the `server` directory. For the `harberger` and `harberge_lite` experiments, the server implementation is not provided yet.
+The server to run the `prisoner` experiment is located in the `server` directory. For the `harberger` experiment, the server implementation is not provided yet.
 
-## Running the experiments
+### Running the experiments
 
 For `prisoner` you first must run the server and then run the experiment:
 
@@ -57,4 +44,6 @@ For the `harberger` experiment, you can run the experiment by executing the `run
 python examples/harberger/run_game.py
 ```
 
-For the `harberger_lite` experiment, you can use the notebook `examples/harberger_lite/run_game.ipynb`.
+## Documentation
+
+The documentation is available at https://econagents.readthedocs.io/en/latest/.
