@@ -10,8 +10,8 @@ style = "semver"
 [tool.poetry]
 name = "econagents"
 version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
-homepage = "https://github.com/iwanalabs/economic-agents"
-repository = "https://github.com/iwanalabs/economic-agents"
+homepage = "https://github.com/iwanalabs/econagents"
+repository = "https://github.com/iwanalabs/econagents"
 license = "Apache-2.0"
 description = ""
 authors = ["Dylan"]

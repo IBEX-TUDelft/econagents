@@ -89,7 +89,7 @@ autodoc_default_options = {
 autoclass_content = "class"
 
 # LinkCode
-code_url = f"https://github.com/iwanalabs/economic-agents/blob/{git_commit}"
+code_url = f"https://github.com/iwanalabs/econagents/blob/{git_commit}"
 
 # Autodoc Pydantic
 autodoc_pydantic_model_show_json = False
@@ -178,7 +178,7 @@ html_context = {
     # Github options
     "display_github": True,
     "github_user": "iwanalabs",
-    "github_repo": "economic-agents",
+    "github_repo": "econagents",
     "github_version": "main",
     "conf_py_path": "/docs/source/",
 }

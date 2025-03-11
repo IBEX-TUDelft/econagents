@@ -10,7 +10,7 @@ This guide explains how to customize agent behavior for different phases in the 
 Agent Architecture Overview
 ---------------------------
 
-The ``Agent`` class in the economic-agents framework provides a flexible system for handling different phases in turn-based experiments. It allows for:
+The ``Agent`` class in the econagents framework provides a flexible system for handling different phases in turn-based experiments. It allows for:
 
 1. Default behavior for all phases
 2. Custom handlers for specific phases
