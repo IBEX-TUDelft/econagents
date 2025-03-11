@@ -33,10 +33,22 @@ Instructions for this phase:
 
 3. **Your Decision to Make**:
    - Decide which properties to purchase based on their declared values and your assessment of true value
-   - You should provide the id of the player you want to trade with
+   - You can purchase the properties of multiple players under the same condition or different conditions, choose not to buy a property, or purchase the same property under both conditions.
+   - You should make a list of the id of the players whose property you want to purchase under the condition noProject: [<player_id>,<player_id>].
+   - You should make a list of the id of the players whose property you want to purchase under the condition projectA: [<player_id>,<player_id>, <player_id>].
+   - You should combine these two lists in a list of lists: [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]] and place this list of lists in the snipe field.
+
    - Provide the output as a JSON object:
     {
       "gameId": {{ meta.game_id }},
       "type": "done-speculating",
-      "snipe": [<player_id>, <player_id>, <player_id>],
+      "snipe": [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]],
+    }
+
+    Example:
+    If you want to purchase the properties of player 1, 2 and 4 under the condition noProject and purchache the property of player 2 under the condition projectA, you would provide the following JSON object:
+    {
+      "gameId": 1,
+      "type": "done-speculating",
+      "snipe": [[1, 2, 4], [2]],
     }
