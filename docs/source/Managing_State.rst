@@ -1,5 +1,5 @@
-State Management
-================
+Managing State
+==============
 
 Overview
 --------
@@ -38,10 +38,12 @@ EventField System
 Example Implementation
 ----------------------
 
-The following Harberger tax example (``examples/harberger/state.py``) demonstrates how to extend the base state system for a specific experiment.
+The following Harberger tax example demonstrates how to extend the base state system for a specific experiment.
 
 HarbergerMetaInformation
 ~~~~~~~~~~~~~~~~~~~~~~~~
+
+This class extends the base ``MetaInformation`` class and captures meta information about the game, such as the player name, number, and the list of players.
 
 .. code-block:: python
 
@@ -51,10 +53,11 @@ HarbergerMetaInformation
         players: list[dict[str, Any]] = EventField(default_factory=list, event_key="players")
         phase: int = EventField(default=0, event_key="phase")
 
-This class extends the base ``MetaInformation`` class and provides specific event keys for the server's event data that will be used to update the state.
 
 HarbergerPrivateInformation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This class extends the base ``PrivateInformation`` class and captures information that is private to the player, such as the player's wallet and private value signals.
 
 .. code-block:: python
 
@@ -73,6 +76,8 @@ This class manages player-specific information:
 
 HarbergerPublicInformation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This class extends the base ``PublicInformation`` class and captures information that is shared across all players, such as the tax rates, market state, and winning condition.
 
 .. code-block:: python
 
@@ -107,6 +112,8 @@ This class manages shared information visible to all players:
 HarbergerGameState
 ~~~~~~~~~~~~~~~~~~
 
+Finally, you can put everything together in the game state class.
+
 .. code-block:: python
 
     class HarbergerGameState(GameState):
@@ -137,10 +144,21 @@ The main game state class:
 * Composes the specialized information classes
 * Provides custom handlers for market events, given that in this case, the order book needs to be updated on the agent's side
 
+Event Processing Flow
+---------------------
+
+1. Events are received as ``Message`` objects with ``event_type`` and ``data``
+2. The ``GameState.update`` method processes these events:
+
+   * First checks for custom handlers via ``get_custom_handlers()``
+   * Falls back to property mappings if no custom handler exists
+
+If required, you can customize the event processing flow by overriding the ``update`` method.
+
 Integration with Market State
 -----------------------------
 
-The Harberger implementation integrates with the ``MarketState`` class to handle market operations:
+econagents also provides an experimental implementation of a market state class that can be used to keep track of the order book and recent trades, on each player's side.
 
 .. code-block:: python
 
@@ -160,14 +178,3 @@ Market events are processed through the ``process_event`` method, which delegate
 * ``_on_update_order``: Updates existing orders (e.g., after partial fills)
 * ``_on_delete_order``: Removes orders from the book (filled or canceled)
 * ``_on_contract_fulfilled``: Records completed trades
-
-Event Processing Flow
----------------------
-
-1. Events are received as ``Message`` objects with ``event_type`` and ``data``
-2. The ``GameState.update`` method processes these events:
-
-   * First checks for custom handlers via ``get_custom_handlers()``
-   * Falls back to property mappings if no custom handler exists
-
-If required, you can customize the event processing flow by overriding the ``update`` method.

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from econagents.core.game_runner import GameRunner, TurnBasedGameRunnerConfig
 from examples.prisoner.manager import PDManager
-from examples.server.prisoner.create_game import create_game_from_specs
+from examples.prisoner.server.create_game import create_game_from_specs
 
 logger = logging.getLogger("prisoners_dilemma")
 

@@ -60,7 +60,7 @@ def create_game_from_specs() -> dict:
 
         # Save game specs (on server)
         save_game_data(
-            specs_path=Path(__file__).parent / "specs" / "games",
+            specs_path=Path(__file__).parent / "games",
             game_id=game_id,
             game_name=game_name,
             num_players=2,
@@ -78,26 +78,3 @@ def create_game_from_specs() -> dict:
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         raise
-
-
-if __name__ == "__main__":
-    SPECS_PATH = Path(__file__).parent / "specs/prisoner.json"
-
-    if not SPECS_PATH.exists():
-        logger.error(f"Game specs file not found at {SPECS_PATH}")
-        exit(1)
-
-    game_id = create_game_from_specs()
-
-    # Print instructions for running the server and connecting clients
-    logger.info("\nTo start the WebSocket server:")
-    logger.info("python -m examples.server.prisoner.server")
-    logger.info("\nTo connect clients, use the following recovery codes in your client:")
-
-    # Read the game data file to get the recovery codes
-    game_data_path = SPECS_PATH.parent / "games" / f"game_{game_id}.json"
-    with game_data_path.open() as f:
-        game_data = json.load(f)
-
-    for i, code in enumerate(game_data["recovery_codes"]):
-        logger.info(f"Player {i + 1}: {code}")

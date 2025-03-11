@@ -29,7 +29,6 @@ The library has four key components:
 3. Game State
 4. Game Runner
 
-
 Agent Roles
 ~~~~~~~~~~~
 
@@ -189,7 +188,7 @@ The game state will be available to all agents during the phases. You can use th
 The state is updated automatically using the information received from the game server. You can customize the state update logic using the approaches shown in the :doc:`Managing State <Managing_State>` section.
 
 Game Runner
------------
+~~~~~~~~~~~
 
 Finally, to run an experiment you need to use the `GameRunner` class. This class is responsible for gluing everything together: agent managers and roles, game state, and the game server.
 

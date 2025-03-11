@@ -12,11 +12,7 @@ Agent Role Architecture Overview
 
 The ``AgentRole`` class is the main class for defining how an agent will behave in an experiment.
 
-At a minimum, you need to specify the following:
-
-1. A role id
-2. A name
-3. A LLM model
+At a minimum, you need to specify the following: role id, name, and LLM model.
 
 It also lets you define phases where that role needs to perform an action by either specifying them in the ``task_phases`` attribute or by excluding them in the ``excluded_phases`` attribute.
 

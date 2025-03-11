@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 from econagents.core.events import Message
 from econagents.core.manager.phase import HybridPhaseManager
-from examples.futarchy.roles import Developer, Owner, Speculator
-from examples.futarchy.state import FGameState
+from examples.tudeflt.harberger.roles import Developer, Owner, Speculator
+from examples.tudeflt.harberger.state import HLGameState
 
 load_dotenv()
 
@@ -16,14 +16,14 @@ load_dotenv()
 # It can be initialized with or without a role. In this case, it uses custom logic to get the role from the server.
 
 
-class FAgentManager(HybridPhaseManager):
+class HLAgentManager(HybridPhaseManager):
     def __init__(
         self,
         game_id: int,
         auth_mechanism_kwargs: dict[str, Any],
     ):
         super().__init__(
-            state=FGameState(game_id=game_id),
+            state=HLGameState(game_id=game_id),
             auth_mechanism_kwargs=auth_mechanism_kwargs,
         )
         self.game_id = game_id
