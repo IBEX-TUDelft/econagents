@@ -47,7 +47,7 @@ Method 1: Prompt Templates
 
 The default and recommended approach is to define prompt templates in the ``prompts/`` directory (or the directory you specify in the game runner configuration):
 
-.. code-block:: python
+.. code-block:: text
 
     prompts/
     ├── your_agent_system.jinja2                # Default system prompt

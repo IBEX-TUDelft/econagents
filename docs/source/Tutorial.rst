@@ -96,7 +96,7 @@ The Prisoner's Dilemma example uses template-based prompts located in ``examples
 
 1. **System Prompt** (``all_system.jinja2``): Sets up the agent's role and explains the game rules:
 
-   .. code-block:: text
+   .. code-block:: jinja
 
        You are playing the role of a criminal who has been arrested and is being interrogated by the police...
 
@@ -112,7 +112,7 @@ The Prisoner's Dilemma example uses template-based prompts located in ``examples
 
 2. **User Prompt** (``all_user.jinja2``): Provides the current game state and instructions for the current round:
 
-   .. code-block:: text
+   .. code-block:: jinja
 
        # Make Your Choice
 
