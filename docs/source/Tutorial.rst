@@ -121,24 +121,45 @@ The Prisoner's Dilemma example uses template-based prompts located in ``examples
 
    .. code-block:: jinja
 
-       # Make Your Choice
+    # Make Your Choice
 
-       ## Current Game State
-       Round {{ meta.phase }} of {{ meta.total_rounds }} rounds
-       Your current score: {{ private_information.total_score }}
+    ## Current Game State
 
-       ## Your History
-       {% if public_information.history %}
-       Previous rounds:
-       {% for round in public_information.history %}
-       Round {{round.round}}: You chose **{{ round.my_choice}}**, opponent chose **{{ round.opponent_choice }}**...
-       {% endfor %}
-       {% else %}
-       This is the first round.
-       {% endif %}
+    Round {{ meta.phase }} of {{ meta.total_rounds }} rounds
+    Your current score: {{ private_information.total_score }}
 
-       ## Instructions
-       Based on the current game state and your strategy, please choose whether to **cooperate** or **defect**...
+    ## Your History
+
+    {% if public_information.history %}
+    Previous rounds:
+    {% for round in public_information.history %}
+    Round {{round.round}}: You chose **{{ round.my_choice}}**, opponent chose **{{ round.opponent_choice }}**. You earned {{ round.my_payoff }} points.
+    {% endfor %}
+    {% else %}
+    This is the first round.
+    {% endif %}
+
+    ## Instructions
+
+    Based on the current game state and your strategy, please choose whether to **cooperate** or **defect** in this round.
+
+    Respond with only one of the following:
+    1. "COOPERATE" - if you choose to remain silent (cooperate)
+    2. "DEFECT" - if you choose to testify against the other player (defect)
+
+    Provide your choice as a JSON object with the following fields:
+    - `gameId`: The ID of the game
+    - `type`: The type of message, which should be "choice"
+    - `choice`: The choice you made
+
+    Example:
+    ```json
+    {
+        "gameId": {{ meta.game_id }},
+        "type": "choice",
+        "choice": "COOPERATE",
+    }
+    ```
 
 These templates leverage Jinja2 to dynamically insert the current game state. The agent's decision-making process follows the prompt resolution logic described in :doc:`Customizing_Agent_Roles`:
 
