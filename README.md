@@ -15,37 +15,52 @@
 
 # econagents
 
-econagents is a Python library that lets you use LLM agents in economic experiments.
+econagents is a Python library that lets you use LLM agents in economic experiments. The framework connects LLM agents to game servers through WebSockets and provides a flexible architecture for designing, customizing, and running economic simulations.
 
-## Using the example experiments
+## Installation
 
-There are currently three example experiments you can use to get started:
+```shell
+# Install from PyPI
+pip install econagents
 
-1. `prisoner`: A simple experiment of an iterated Prisoner's Dilemma of 5 rounds using 2 LLM agents.
-2. `harberger`: A heavily customized experiment of a Harberger Tax game played by LLM agents.
+# Or install directly from GitHub
+pip install git+https://github.com/iwanalabs/econagents.git
+```
 
-The example experiments are located in the `examples` directory.
+## Framework Components
 
-The server to run the `prisoner` experiment is located in the `server` directory. For the `harberger` experiment, the server implementation is not provided yet.
+econagents consists of four key components:
 
-### Running the experiments
+1. **Agent Roles**: Define player roles with customizable behaviors using a flexible prompt system.
+2. **Game State**: Hierarchical state management with automatic event-driven updates.
+3. **Agent Managers**: Manage agent connections to game servers and handle event processing.
+4. **Game Runner**: Orchestrates experiments by gluing together the other components.
 
-For `prisoner` you first must run the server and then run the experiment:
+## Example Experiments
+
+The repository includes two example experiments:
+
+1. **`prisoner`**: An iterated Prisoner's Dilemma game with 5 rounds and 2 LLM agents.
+2. **`tudeflt/harberger`**: A Harberger Tax simulation with LLM agents.
+3. **`tudeflt/futarchy`**: A Futarchy simulation with LLM agents.
+
+### Running the Prisoner's Dilemma Experiment
 
 ```shell
 # Run the server
 python examples/server/prisoner/server.py
 
-# Run the experiment (on a separate terminal)
+# Run the experiment (in a separate terminal)
 python examples/prisoner/run_game.py
 ```
 
-For the `harberger` experiment, you can run the experiment by executing the `run_game.py` script in the respective experiment directory.
+## Key Features
 
-```shell
-python examples/harberger/run_game.py
-```
+- **Flexible Agent Customization**: Customize agent behavior with Jinja templates or custom Python methods
+- **Event-Driven State Management**: Automatically update game state based on server events
+- **Turn-Based and Continuous Action Support**: Handle both turn-based games and continuous action phases
+- **LangChain Integration**: Built-in support for LangChain's agent capabilities
 
 ## Documentation
 
-The documentation is available at https://econagents.readthedocs.io/en/latest/.
+For detailed guides and API reference, visit [the documentation](https://econagents.readthedocs.io/en/latest/).
