@@ -1,5 +1,5 @@
-Tutorial: Running the Prisoner's Dilemma Experiment
-===================================================
+Tutorial
+========
 
 This tutorial will guide you through setting up and running the Prisoner's Dilemma experiment included in the ``examples/prisoner`` directory.
 
@@ -37,7 +37,7 @@ The experiment consists of:
 How State Management Works
 --------------------------
 
-The Prisoner's Dilemma experiment uses the econagents framework's hierarchical state management system. In ``examples/prisoner/state.py``, the game state is defined with three components:
+The Prisoner's Dilemma experiment uses the econagents framework's hierarchical state management system. In ``examples/prisoner/state.py``, you can find the three components:
 
 .. code-block:: python
 
@@ -61,7 +61,7 @@ The Prisoner's Dilemma experiment uses the econagents framework's hierarchical s
         private_information: PDPrivate = Field(default_factory=PDPrivate)
         public_information: PDPublic = Field(default_factory=PDPublic)
 
-The state is updated automatically through the ``EventField`` system, which maps incoming events from the server to state fields. For example, when a "round-started" event is received, the ``phase`` field in ``PDMeta`` is updated with the current round number.
+The state gets updated automatically through the ``EventField`` system, which maps incoming events from the server to state fields. For example, when a "round-started" event is received, the ``phase`` field in ``PDMeta`` is updated with the current round number. The other fields use their name to map to the event keys in the server's events.
 
 Agent Manager Implementation
 ----------------------------
@@ -87,12 +87,19 @@ The ``PDManager`` class in ``examples/prisoner/manager.py`` extends the ``TurnBa
             self.game_id = game_id
             self.register_event_handler("assign-name", self._handle_name_assignment)
 
+        async def _handle_name_assignment(self, message: Message) -> None:
+            """Handle the name assignment event."""
+            ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
+            await self.send_message(json.dumps(ready_msg))
+
 The manager connects to the game server, maintains the game state, and orchestrates the agent's actions based on server events. When a new round starts, the manager updates the state and prompts the agent to make a decision.
+
+In this example, the server assigns a name to the agent, and then expects the agent to send a ``player-is-ready`` event when it's ready to start the game. This is handled by the ``_handle_name_assignment`` method.
 
 Prompt System and Agent Behavior
 --------------------------------
 
-The Prisoner's Dilemma example uses template-based prompts located in ``examples/prisoner/prompts/``:
+The Prisoner's Dilemma example uses template-based prompts located in ``examples/prisoner/prompts/`` to define the agent's behavior.
 
 1. **System Prompt** (``all_system.jinja2``): Sets up the agent's role and explains the game rules:
 
@@ -138,10 +145,13 @@ These templates leverage Jinja2 to dynamically insert the current game state. Th
 1. The system looks for phase-specific prompts first
 2. If none are found, it falls back to general prompts
 3. The LLM receives both system and user prompts and generates a response
-4. The response is parsed according to the expected format specified in the user prompt
+4. The response is assumed to be a JSON object, which is parsed into a dictionary and sent as is to the server
+
+Running the Experiment
+----------------------
 
 Step 1: Start the Game Server
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 First, you need to start the Prisoner's Dilemma game server. The server creates a game instance and handles the communication between agents.
 
@@ -156,7 +166,7 @@ First, you need to start the Prisoner's Dilemma game server. The server creates 
 This will start a WebSocket server on localhost port 8765. The server will create a new game and generate recovery codes that agents will use to join the game.
 
 Step 2: Run the Prisoner's Dilemma Game
----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once the server is running, you can start the game with AI agents. The game runner will:
 
@@ -186,12 +196,12 @@ Behind the scenes, here's what happens:
 7. This cycle continues until all rounds are completed
 
 Step 3: Analyzing the Results
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After the game completes, you can analyze the results by:
 
 1. Checking the logs in the ``examples/prisoner/logs`` directory
-2. If you've enabled LangSmith tracing, view the full conversation and decision-making processes in your LangSmith dashboard
+2. In LangSmith, you can view the full interaction history and decision-making processes in your LangSmith dashboard
 
 The logs contain detailed information about:
 - Agent decisions in each round
@@ -204,7 +214,7 @@ Customizing the Experiment
 You can customize several aspects of the experiment:
 
 Modifying Agent Prompts
------------------------
+~~~~~~~~~~~~~~~~~~~~~~~
 
 Edit the templates in ``examples/prisoner/prompts/`` to change the agent's behavior:
 
@@ -216,8 +226,9 @@ You can also new agent roles (e.g., ``Cooperator``) and create agent-specific pr
 
 You can also use the methods described in :doc:`Customizing_Agent_Roles` to create more sophisticated agents with phase-specific behaviors.
 
-Further Exploration
--------------------
+
+Modifying Game Rules
+~~~~~~~~~~~~~~~~~~~~
 
 For more advanced usage, you can:
 
