@@ -7,7 +7,7 @@ This guide provides an overview of the econagents framework.
    :depth: 3
    :local:
 
-econagents is a framework that lets you use LLM agents into economic experiments. For that, it assumes that you have a game server that can be connected to.
+econagents is a framework that lets you use LLM agents in economic experiments. It assumes that you have a game server that runs the experiment that you can connect to, as well as api-level access to LLM agents that can be used in the experiment. 
 
 There's a couple of assumptions econagents makes about the game server:
 
@@ -20,7 +20,10 @@ There's a couple of assumptions econagents makes about the game server:
 
 However, if the server doesn't use that format of messages, you can customize the `on_message_callback` of the `WebSocketTransport` to adjust the message parsing, so that it can be used with the rest of the framework.
 
-Aside from that, the framework only assumes that you have a roles that agents can take, information about the game state, and phases where agents might take actions.
+Aside from that, the framework only assumes that you have a description of the game including: 
+   - the roles that agents can take,
+   - the phases the game goes through and actions the agents can take in these phases, and 
+   - a description of the information about the game state that is relevant.
 
 The library has four key components:
 
@@ -32,7 +35,7 @@ The library has four key components:
 Agent Roles
 ~~~~~~~~~~~
 
-Agent roles define the different roles players can take in your experiment. For example, in a Prisoner's Dilemma game, you might have a Prisoner role that can cooperate or defect. In a Harberger Tax simulation, you might have a Developer, Owner, and Speculator role.
+Agent roles define the different roles players can take in your experiment. For example, in a Prisoner's Dilemma game, you would have a Prisoner role that can cooperate or defect. In the Harberger-for-spatial planning problem used in the tudelft/harberger example, you would have a Developer, Owner, and Speculator role.
 
 When you define an agent role, you need to specify at least the following:
 
@@ -63,9 +66,9 @@ Here's how this looks in code:
         name = "Owner"
         llm = ChatOpenAI(model="gpt-4o-mini")
 
-Given that you want your roles to make actions during the game, you need to specify prompts for the phases where the agent must perform a task.
+Given that you want your roles to take actions in specific phases of the game, you need to specify prompts for the phases where the agent must perform a task.
 
-For example, in a game where the market phase is the 6th phase, you might have the following system and user prompts:
+For example, in a game where there is a market phase in the 6th phase, you might have the following system and user prompts:
 
 .. code-block:: jinja
     :caption: System prompt for market phase (all_system_phase_6.jinja2)
@@ -116,7 +119,7 @@ For example, in a game where the market phase is the 6th phase, you might have t
     C. Do nothing:
     {}
 
-The prompts use [Jinja templates](https://jinja.palletsprojects.com/en/stable/). This allows you to use the game state and other information to customize the prompts.
+The prompts use [Jinja templates](https://jinja.palletsprojects.com/en/stable/). This allows you to use variables from the game state and other information to customize the prompts.
 
 You can learn more about this in the :doc:`Customizing Agent Roles <Customizing_Agent_Roles>` section.
 
