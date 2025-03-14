@@ -38,7 +38,7 @@ econagents consists of four key components:
 
 ## Example Experiments
 
-The repository includes two example experiments:
+The repository includes three example experiments:
 
 1. **`prisoner`**: An iterated Prisoner's Dilemma game with 5 rounds and 2 LLM agents.
 2. **`tudeflt/harberger`**: A Harberger Tax simulation with LLM agents.
