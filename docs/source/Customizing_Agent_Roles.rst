@@ -10,7 +10,7 @@ This guide explains how to customize agent roles in the econagents framework, le
 Agent Role Architecture Overview
 --------------------------------
 
-The ``AgentRole`` class is the main class for defining how an agent will behave in an experiment.
+The ``AgentRole`` class is the main class for defining agents and roles (tasks) in an experiment.
 
 At a minimum, you need to specify the following: role id, name, and LLM model.
 
@@ -50,10 +50,10 @@ The default and recommended approach is to define prompt templates in the ``prom
 .. code-block:: text
 
     prompts/
-    ├── your_agent_system.jinja2                # Default system prompt
-    ├── your_agent_system_phase_2.jinja2        # Phase-specific system prompt
-    ├── your_agent_user_phase_6.jinja2          # Phase-specific user prompt
-    └── all_user_phase_8.jinja2                 # Shared prompt for all agents
+    ├── roleName_system.jinja2                # Default system prompt for agents with role roleName
+    ├── roleName_system_phase_2.jinja2        # Phase-specific system prompt for agents with role roleName
+    ├── roleName_user_phase_6.jinja2          # Phase-specific user prompt for agents with role roleName
+    └── all_user_phase_8.jinja2               # Shared prompt for all agents in specific phase
 
 The ``AgentRole`` class will automatically look for these files and use them to generate prompts. By following this naming convention, you can customize the actions of your agent for specific phases.
 
@@ -66,15 +66,15 @@ For both system and user prompts, the resolution order is:
 
 1. **Registered prompt handler**: A handler registered via ``register_system_prompt_handler`` or ``register_user_prompt_handler``
 2. **Phase-specific method**: A method with naming pattern ``get_phase_{phase_number}_system_prompt`` or ``get_phase_{phase_number}_user_prompt``
-3. **Phase-specific agent template**: A template file named ``{agent_name}_{prompt_type}_phase_{phase}.jinja2``
-4. **General agent template**: A template file named ``{agent_name}_{prompt_type}.jinja2``
+3. **Phase-specific agent template**: A template file named ``{role_name}_{prompt_type}_phase_{phase}.jinja2``
+4. **General agent template**: A template file named ``{role_name}_{prompt_type}.jinja2``
 5. **Phase-specific shared template**: A template file named ``all_{prompt_type}_phase_{phase}.jinja2``
 6. **General shared template**: A template file named ``all_{prompt_type}.jinja2``
 7. **Error fallback**: Raise a ``FileNotFoundError`` if no prompt source is found
 
 Examples:
 
-For an agent named "trader" in phase 2, the system prompt resolution would check:
+For an agent with the role "trader" in phase 2, the system prompt resolution would check:
 
 .. code-block:: text
 
@@ -123,7 +123,7 @@ The second approach is to define methods with specific naming patterns in your a
 
 The Agent class automatically detects these methods and registers them for the appropriate phases.
 
-Method 2: Explicit Registration
+Method 3: Explicit Registration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can also explicitly register handlers in your agent's ``__init__`` method:
@@ -156,7 +156,7 @@ You can also explicitly register handlers in your agent's ``__init__`` method:
         async def custom_phase_handler(self, phase, state):
             return result
 
-Handler Resolution Logic
+Phase Handler Resolution Logic
 ------------------------
 
 Method 1 will handle phases for you automatically. In methods 2 or 3, you have more control over the phase handling logic.
@@ -184,6 +184,6 @@ This resolution process applies to all four customizable aspects:
 * **User Prompt Handlers**: Generate user prompts for a phase
 * **Response Parsers**: Parse LLM responses for a phase
 
-Each aspect follows the same pattern: check for a registered handler, then fall back to default behavior.
+Each aspect follows the same pattern: check for a registered handler, if no registered handler is identified fall back to default behavior.
 
 Note that this is different from the prompt resolution logic, which only applies to prompt generation, not the overall phase handling logic.
