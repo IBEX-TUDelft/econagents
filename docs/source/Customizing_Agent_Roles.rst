@@ -157,7 +157,7 @@ You can also explicitly register handlers in your agent's ``__init__`` method:
             return result
 
 Phase Handler Resolution Logic
-------------------------
+------------------------------
 
 Method 1 will handle phases for you automatically. In methods 2 or 3, you have more control over the phase handling logic.
 
