@@ -25,7 +25,7 @@ git_commit = git_repo.head.commit
 # -- Project information -----------------------------------------------------
 
 project = "econagents"
-copyright = f"{date.today().year}, Dylan"
+copyright = f"{date.today().year}, Delft University of Technology"
 author = "Dylan"
 
 # The short X.Y version.
