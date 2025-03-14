@@ -9,7 +9,7 @@ Prerequisites
 Before running an experiment, ensure you have:
 
 1. Python 3.10+ installed
-2. All dependencies installed
+2. All dependencies installed 
 3. Have set up API keys for OpenAI and LangSmith
 
 Create a ``.env`` file in your project root with the following variables:
@@ -26,7 +26,7 @@ Create a ``.env`` file in your project root with the following variables:
 Understanding the Prisoner's Dilemma Experiment
 -----------------------------------------------
 
-The Prisoner's Dilemma is a classic game theory scenario where two players must decide whether to cooperate or defect. The experiment in this repository demonstrates how AI agents can be placed in this scenario to observe their decision-making processes.
+The Prisoner's Dilemma is a classic game theory scenario where two players must decide whether to cooperate or defect simultaneously. The experiment in this repository demonstrates how AI agents can be used in this scenario to observe their decision-making processes.
 
 The experiment consists of:
 
@@ -61,7 +61,7 @@ The Prisoner's Dilemma experiment uses the econagents framework's hierarchical s
         private_information: PDPrivate = Field(default_factory=PDPrivate)
         public_information: PDPublic = Field(default_factory=PDPublic)
 
-The state gets updated automatically through the ``EventField`` system, which maps incoming events from the server to state fields. For example, when a "round-started" event is received, the ``phase`` field in ``PDMeta`` is updated with the current round number. The other fields use their name to map to the event keys in the server's events.
+The state gets updated automatically through the ``EventField`` system, which maps incoming events from the server to state fields. For example, when a "round-started" event is received, the ``phase`` field in ``PDMeta`` is updated with the current round number. The other fields are updated when the even key in the server's events match their name.
 
 Agent Manager Implementation
 ----------------------------
@@ -174,7 +174,7 @@ Running the Experiment
 Step 1: Start the Game Server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-First, you need to start the Prisoner's Dilemma game server. The server creates a game instance and handles the communication between agents.
+First, you need to start the Prisoner's Dilemma game server. The server defines the game logic and handles the communication between agents.
 
 .. code-block:: bash
 
@@ -184,7 +184,7 @@ First, you need to start the Prisoner's Dilemma game server. The server creates 
     # Start the server
     python server.py
 
-This will start a WebSocket server on localhost port 8765. The server will create a new game and generate recovery codes that agents will use to join the game.
+This will start a WebSocket server on localhost port 8765. The server has methods to create a new game and generate recovery codes that agents use to join the game.
 
 Step 2: Run the Prisoner's Dilemma Game
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,7 +239,7 @@ Modifying Agent Prompts
 
 Edit the templates in ``examples/prisoner/prompts/`` to change the agent's behavior:
 
-- Change the payoff matrix in ``all_system.jinja2`` to explore different incentive structures
+- Change the payoff matrix in ``all_system.jinja2`` to explore different incentive structures (don't forget to update the game logic in server.py) 
 - Modify the instructions in ``all_user.jinja2`` to guide the agent toward specific strategies
 - Create phase-specific prompts like ``all_system_phase_3.jinja2`` to change behavior in specific rounds
 

@@ -10,7 +10,7 @@ This guide explains how to customize agent roles in the econagents framework, le
 Agent Role Architecture Overview
 --------------------------------
 
-The ``AgentRole`` class is your main entry point for defining how an agent behaves in an experiment. **At a minimum**, you need to specify:
+The ``AgentRole`` class is your main entry point for defining agents and roles (tasks) in an experiment. **At a minimum**, you need to specify:
 
 - **Role ID**
 - **Agent name**

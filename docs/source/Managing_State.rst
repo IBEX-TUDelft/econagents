@@ -23,7 +23,7 @@ Event-Driven Updates
 
 State updates are driven by events, which are processed through:
 
-* **Property Mappings**: Automatic mapping of event data to state properties
+* **Property Mappings**: Automatic mapping of event data to state properties 
 * **Custom Event Handlers**: Game-specific logic for handling complex events
 
 EventField System
@@ -38,7 +38,7 @@ EventField System
 Example Implementation
 ----------------------
 
-The following Harberger tax example demonstrates how to extend the base state system for a specific experiment.
+The following TUDelft-IBEX/harberger example demonstrates how to extend the base state system for a specific experiment.
 
 HarbergerMetaInformation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -105,9 +105,9 @@ This class extends the base ``PublicInformation`` class and captures information
 This class manages shared information visible to all players:
 
 * Tax rates (current, initial, and final)
-* Game boundaries and conditions
-* Market state and signals
-* Winning conditions
+* Value boundaries (max, min) for each possible development Condition
+* Market state and Public value signals about values
+* Winning Condition, the development Condition actually selected
 
 HarbergerGameState
 ~~~~~~~~~~~~~~~~~~
@@ -142,7 +142,7 @@ Finally, you can put everything together in the game state class.
 The main game state class:
 
 * Composes the specialized information classes
-* Provides custom handlers for market events, given that in this case, the order book needs to be updated on the agent's side
+* Provides custom handlers for market events; given that in this example, the order book needs to be updated on the agent's side
 
 Event Processing Flow
 ---------------------
@@ -151,7 +151,7 @@ Event Processing Flow
 2. The ``GameState.update`` method processes these events:
 
    * First checks for custom handlers via ``get_custom_handlers()``
-   * Falls back to property mappings if no custom handler exists
+   * Falls back to property mappings via keys and names if no custom handler exists
 
 If required, you can customize the event processing flow by overriding the ``update`` method.
 
