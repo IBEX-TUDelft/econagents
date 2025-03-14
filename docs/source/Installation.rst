@@ -21,3 +21,18 @@ For development, its recommended to use Poetry:
    git clone https://github.com/iwanalabs/econagents.git
    cd econagents
    poetry install
+
+Note that [Poetry](https://python-poetry.org/) is used to create and manage the virtual environment for the project development. If you are not planning to contribute to the project, you can install the dependencies using your preferred package manager.
+
+Dependencies
+------------
+
+The project depends on the following packages:
+
+- ``openai``: For LLM interactions
+- ``langsmith``: For tracing and monitoring
+- ``websockets``: For WebSocket connections
+- ``pydantic``: For data validation and parsing
+- ``requests``: For HTTP requests
+
+For now, we require ``openai`` and ``langsmith`` to be installed. We plan to add more model providers and monitoring tools in the future. Users will be able to choose their preferred provider and monitoring tool, and the framework will be designed to be compatible with most popular LLM providers.
