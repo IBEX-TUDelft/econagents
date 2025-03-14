@@ -41,10 +41,11 @@ econagents consists of four key components:
 The repository includes three example games:
 
 1. **`prisoner`**: An iterated Prisoner's Dilemma game with 5 rounds and 2 LLM agents.
-2. **`tudeflt/harberger`**: A Harberger Tax simulation with LLM agents.
-3. **`tudeflt/futarchy`**: A Futarchy simulation with LLM agents.
+2. **`ibex_tudelft/harberger`**: A Harberger Tax simulation with LLM agents.
+3. **`ibex_tudelft/futarchy`**: A Futarchy simulation with LLM agents.
 
 ### Running the Prisoner's Dilemma game
+
 The simplest game to run is a version of the repeated prisoner's dilemma game that runs on your local machine.
 
 ```shell
@@ -54,7 +55,8 @@ python examples/server/prisoner/server.py
 # Run the experiment (in a separate terminal)
 python examples/prisoner/run_game.py
 ```
-note: you still have to set up the connection to the agents.
+
+Note: you still have to set up the connection to the agents.
 
 ## Key Features
 
