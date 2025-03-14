@@ -9,10 +9,10 @@ This guide provides an overview of the econagents framework.
 
 econagents is a framework that lets you use LLM agents in economic experiments. It assumes that you have a game server that runs the experiment that you can connect to, as well as api-level access to LLM agents that can be used in the experiment. 
 
-There's a couple of assumptions econagents makes about the game server:
+There's a couple of default assumptions econagents makes about the game server:
 
 1. The server uses WebSockets to send messages to the client
-2. The server sends messages in the following format:
+2. The server sends messages in the following JSON format:
 
 .. code-block:: text
 
@@ -35,15 +35,13 @@ The library has four key components:
 Agent Roles
 ~~~~~~~~~~~
 
-Agent roles define the different roles players can take in your experiment. For example, in a Prisoner's Dilemma game, you would have a Prisoner role that can cooperate or defect. In the Harberger-for-spatial planning problem used in the tudelft/harberger example, you would have a Developer, Owner, and Speculator role.
+Agent roles define the different roles players can take in your experiment. For example, in a Prisoner's Dilemma game, you would have a Prisoner role that can cooperate or defect. In the Harberger-for-spatial-planning problem used in the TUDelft-IBEX/harberger example, you would have the roles Developer, Owner, and Speculator each with their own tasks spread over the phases of the experiment.
 
 When you define an agent role, you need to specify at least the following:
 
 1. The role id
 2. The name of the role
 3. The LLM model to use
-
-You must also specify prompts for the phases where the agent must perform a task.
 
 Here's how this looks in code:
 
@@ -67,8 +65,9 @@ Here's how this looks in code:
         llm = ChatOpenAI(model="gpt-4o-mini")
 
 Given that you want your roles to take actions in specific phases of the game, you need to specify prompts for the phases where the agent must perform a task.
+Promts are separated into system prompts and user promtps, each can be altered per role and phase, or made persistent as required. 
 
-For example, in a game where there is a market phase in the 6th phase, you might have the following system and user prompts:
+For example, in a game where there is a market where tax shares are traded in the 6th phase of the game, you might have the following system and user prompts:
 
 .. code-block:: jinja
     :caption: System prompt for market phase (all_system_phase_6.jinja2)
@@ -126,11 +125,11 @@ You can learn more about this in the :doc:`Customizing Agent Roles <Customizing_
 Agent Manager
 ~~~~~~~~~~~~~
 
-For each player you want to simulate using an agent, you need to create an agent manager. The agent manager takes care of the connection to the game server, the initialization of the agent based on the role, and the handling of the game events.
+For each player you want to simulate using an agent, you need to create an agent manager. The agent manager takes care of the connection to the game server, the initialization of the agent based on the role and model used, and the handling of the game events.
 
-You can also adjust the agent manager to add custom logic, such as assigning roles of agents after the game has started.
+You can adjust the agent manager to add custom logic, such as assigning roles of agents after the game has started instead of before the game starts.
 
-Here's an example of an agent manager with custom logic:
+Here's an example of an agent manager with custom logic that assigns names and roles after the relevant events have been received from the server:
 
 .. code-block:: python
 
@@ -164,9 +163,9 @@ Here's an example of an agent manager with custom logic:
 Game State
 ~~~~~~~~~~
 
-The state file defines data structures for game state.
+The state file of a game defines the data structures for the game state. 
 
-For example, in a Harberger Tax simulation, you might have the following state:
+For example, in the Harberger-for-spatial-planning problem used in the TUDelft-IBEX/harberger example, you might have the following state:
 
 .. code-block:: python
 
@@ -187,21 +186,24 @@ For example, in a Harberger Tax simulation, you might have the following state:
         public_information: PublicInfo = Field(default_factory=PublicInfo)
 
 The game state will be available to all agents during the phases. You can use them in prompts or in any custom phase handling logic.
+The game state can be split into different parts with different properties, as you can see in this example the game state contains meta information that is used for the administration of the game (e.g. ID of agent, phase, etc.), private information that is specific to the agent (e.g. remaining resources, private signals), and public information (e.g. offers currently available on the market, public signals)
 
 The state is updated automatically using the information received from the game server. You can customize the state update logic using the approaches shown in the :doc:`Managing State <Managing_State>` section.
 
 Game Runner
 ~~~~~~~~~~~
 
-Finally, to run an experiment you need to use the `GameRunner` class. This class is responsible for gluing everything together: agent managers and roles, game state, and the game server.
+Finally, to run a game you need to use the `GameRunner` class. This class is responsible for gluing everything together: agent managers and roles, game state, and the game server.
+
+The steps to running a game with the GameRunner are: 
 
 1. Create a new game on your server
 2. Set up the agent roles, agent managers, and game state
-3. Use the `GameRunner` to run the experiment
+3. Use the `GameRunner` to run the game
 
 The `GameRunner` is responsible for: connecting to the game server, spawning the agents, and handling the game events.
 
-Here's an sample of how to run an experiment using the `GameRunner` class:
+Here's an sample of how to run a game using the `GameRunner` class:
 
 .. code-block:: python
 
