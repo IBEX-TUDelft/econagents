@@ -10,42 +10,70 @@ This guide explains how to customize agent roles in the econagents framework, le
 Agent Role Architecture Overview
 --------------------------------
 
-The ``AgentRole`` class is the main class for defining how an agent will behave in an experiment.
+The ``AgentRole`` class is your main entry point for defining how an agent behaves in an experiment. **At a minimum**, you need to specify:
 
-At a minimum, you need to specify the following: role id, name, and LLM model.
+- **Role ID**
+- **Agent name**
+- **LLM model**
 
-It also lets you define phases where that role needs to perform an action by either specifying them in the ``task_phases`` attribute or by excluding them in the ``excluded_phases`` attribute.
+You can also control in which phases the agent will act by listing them in the ``task_phases`` attribute (or excluding them via ``excluded_phases``).
 
-For handling different phases, the ``AgentRole`` class provides a flexible system that lets you:
+When a phase begins, the agent checks:
 
-1. Define default behavior for all phases
-2. Customize handlers for specific phases
-3. Customize prompt generators for specific phases
-4. Customize response parsers for specific phases
+1. **Phase eligibility** (based on the above lists).
+2. **Which handlers or prompts** to use for that phase.
 
-This architecture makes it easy to create agents with phase-specific behaviors while maintaining a clean and organized codebase.
+The system is designed so that you can provide both general default behaviors and more targeted, phase-specific custom logic.
 
-Phase-Specific Customization Methods
-------------------------------------
+How Phase Handling Works (High-Level Flow)
+------------------------------------------
 
-There are four main aspects of agent behavior that can be customized per phase:
+A common source of confusion is how the agent decides *what to do* in a phase (the “handler”) vs. *what to say* to the LLM (the “prompt”). Here’s the high-level flow:
 
-1. **System Prompts**: Define the agent's role and general instructions
-2. **User Prompts**: Provide phase-specific instructions and context
-3. **Response Parsers**: Process the LLM's response for a specific phase
-4. **Phase Handlers**: Implement custom logic for handling a phase
+1. **Check Phase Eligibility**
+   If a phase is in the agent’s ``task_phases`` (or not in ``excluded_phases``), the agent will attempt to handle it.
 
-For each of these aspects, you have multiple ways to implement customization.
+2. **Resolve a Phase Handler**
+   The agent looks for a **custom handler** for that phase (either via explicitly registered handlers or naming conventions). If one is found, it executes that handler.
+   - If **no custom handler** is found, it falls back to the **default LLM-based handler** (``handle_phase_with_llm``).
+
+3. **(Default Handler Only) Prompt Resolution**
+   If using the default LLM handler, the agent automatically generates a **system prompt** and a **user prompt** for that phase. These prompts are resolved according to the **prompt resolution logic** described below (either from files, methods, or handlers).
+
+4. **Send Prompts to LLM**
+   The default handler then calls the LLM with the resolved prompts.
+
+5. **Response Parsing**
+   The agent uses the **response parser resolution** to process the LLM output (either via explicit registration, naming convention, or a default parser).
+
+6. **Return Phase Result**
+   The custom or default handler returns the final result for that phase.
+
+Phase-Specific Customization Points
+-----------------------------------
+
+When you decide to customize the agent’s behavior for specific phases, you can change up to four components:
+
+1. **System Prompt** – a role-defining, scenario-framing prompt.
+2. **User Prompt** – instructions or context for the specific phase.
+3. **Response Parser** – logic to interpret the LLM’s response.
+4. **Phase Handler** – overarching logic for that phase (which may not even call the LLM).
+
+You can customize these components by combining any of the following three approaches:
+
+1. **Prompt Templates** (Method 1)
+2. **Phase-Specific Methods** (Method 2)
+3. **Explicit Registration** (Method 3)
+
+The sections below describe each approach in detail, followed by deeper dives into prompt resolution and handler resolution logic.
 
 Customization Approaches
 ------------------------
 
-There are three main approaches to customize the behavior of your agent for specific phases:
-
 Method 1: Prompt Templates
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The default and recommended approach is to define prompt templates in the ``prompts/`` directory (or the directory you specify in the game runner configuration):
+The **default and recommended** approach is to define prompt templates in the ``prompts/`` directory (or whichever directory is specified in your game runner configuration):
 
 .. code-block:: text
 
@@ -55,45 +83,14 @@ The default and recommended approach is to define prompt templates in the ``prom
     ├── your_agent_user_phase_6.jinja2          # Phase-specific user prompt
     └── all_user_phase_8.jinja2                 # Shared prompt for all agents
 
-The ``AgentRole`` class will automatically look for these files and use them to generate prompts. By following this naming convention, you can customize the actions of your agent for specific phases.
+The ``AgentRole`` class automatically discovers these templates and uses them to generate prompts according to a strict **naming convention** (explained in “Prompt Resolution Logic” below).
 
-Prompt Resolution Logic
-^^^^^^^^^^^^^^^^^^^^^^^
-
-When generating system or user prompts for a phase, the ``AgentRole`` class follows a specific cascading resolution order. This applies only to prompt generation, not the overall phase handling logic.
-
-For both system and user prompts, the resolution order is:
-
-1. **Registered prompt handler**: A handler registered via ``register_system_prompt_handler`` or ``register_user_prompt_handler``
-2. **Phase-specific method**: A method with naming pattern ``get_phase_{phase_number}_system_prompt`` or ``get_phase_{phase_number}_user_prompt``
-3. **Phase-specific agent template**: A template file named ``{agent_name}_{prompt_type}_phase_{phase}.jinja2``
-4. **General agent template**: A template file named ``{agent_name}_{prompt_type}.jinja2``
-5. **Phase-specific shared template**: A template file named ``all_{prompt_type}_phase_{phase}.jinja2``
-6. **General shared template**: A template file named ``all_{prompt_type}.jinja2``
-7. **Error fallback**: Raise a ``FileNotFoundError`` if no prompt source is found
-
-Examples:
-
-For an agent named "trader" in phase 2, the system prompt resolution would check:
-
-.. code-block:: text
-
-    1. Is there a registered system prompt handler for phase 2?
-    2. Does the agent have a method called get_phase_2_system_prompt?
-    3. Does prompts/trader_system_phase_2.jinja2 exist?
-    4. Does prompts/trader_system.jinja2 exist?
-    5. Does prompts/all_system_phase_2.jinja2 exist?
-    6. Does prompts/all_system.jinja2 exist?
-    7. Raise error if none found
-
-
-This approach lets you provide general prompts that work for most phases and override them for specific phases as needed.
-
+**Note:** Prompt templates *only* control what text is sent to the LLM. If you want to customize the overall phase logic (e.g., do multiple calls to the LLM or skip the LLM entirely), you need to register or define a **custom handler** (see below).
 
 Method 2: Phase-Specific Methods
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The second approach is to define methods with specific naming patterns in your agent subclass:
+Another way to customize prompts, parsers, or even the entire phase logic is by adding methods that follow a **phase-based naming pattern** in your agent subclass:
 
 .. code-block:: python
 
@@ -103,30 +100,29 @@ The second approach is to define methods with specific naming patterns in your a
         task_phases = [2, 6, 8]
         llm = ChatOpenAI()
 
+        # -- Custom system/user prompts --
         def get_phase_2_system_prompt(self, state):
-            """Custom system prompt for phase 2."""
             return "You are an economic agent in phase 2..."
 
         def get_phase_6_user_prompt(self, state):
-            """Custom user prompt for phase 6."""
-            return f"Current market state: {state.public_information.market_state}..."
+            return "Current market state: ..."
 
+        # -- Custom response parser --
         def parse_phase_8_llm_response(self, response, state):
-            """Custom response parser for phase 8."""
-            # Custom parsing logic
+            # parse the response
             return parsed_data
 
+        # -- Custom phase handler --
         def handle_phase_3(self, phase, state):
-            """Custom handler for phase 3."""
-            # Custom phase handling logic
-            return result
+            # bypass the LLM entirely if you want
+            return {"custom": "logic for phase 3"}
 
-The Agent class automatically detects these methods and registers them for the appropriate phases.
+Any method that matches these naming conventions is automatically detected and used in place of the default behavior. For example, if you define ``handle_phase_3(...)``, the agent will use that method to handle phase 3 instead of the default LLM approach.
 
-Method 2: Explicit Registration
+Method 3: Explicit Registration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can also explicitly register handlers in your agent's ``__init__`` method:
+Finally, you can manually register handlers in your agent’s ``__init__`` method:
 
 .. code-block:: python
 
@@ -151,39 +147,88 @@ You can also explicitly register handlers in your agent's ``__init__`` method:
             return "Custom user prompt for phase 6..."
 
         def custom_response_parser(self, response, state):
-            return parsed_data
+            return {"parsed": "data"}
 
         async def custom_phase_handler(self, phase, state):
-            return result
+            # entire custom logic for phase 2
+            return {"result": "from custom phase handler"}
+
+Either approach—naming conventions or explicit registration—lets you override the default prompts, parsers, or phase handling.
+
+Prompt Resolution Logic
+-----------------------
+
+**Prompt resolution** applies only when the agent uses the **default LLM handler** (i.e., no custom phase handler is overriding the process). When the default LLM handler runs, it needs to generate:
+
+1. A **system prompt**
+2. A **user prompt**
+
+To do this, it follows a **cascading resolution order** for each prompt type (system vs. user). Below is the resolution order for system prompts, with user prompts following the same pattern:
+
+1. **Registered prompt handler**
+   A handler registered via ``register_system_prompt_handler`` (or ``register_user_prompt_handler``).
+
+2. **Phase-specific method**
+   A method with a matching pattern:
+   - ``get_phase_{phase_number}_system_prompt(...)``
+   - ``get_phase_{phase_number}_user_prompt(...)``
+
+3. **Phase-specific agent template**
+   A file named ``{agent_name}_system_phase_{phase}.jinja2`` (or ``{agent_name}_user_phase_{phase}.jinja2``).
+
+4. **General agent template**
+   A file named ``{agent_name}_system.jinja2`` (or ``{agent_name}_user.jinja2``).
+
+5. **Phase-specific shared template**
+   A file named ``all_system_phase_{phase}.jinja2`` (or ``all_user_phase_{phase}.jinja2``).
+
+6. **General shared template**
+   A file named ``all_system.jinja2`` (or ``all_user.jinja2``).
+
+7. **Error Fallback**
+   If none of the above exist, a ``FileNotFoundError`` is raised.
+
+Example (System Prompt, Phase 2)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For an agent named “trader” handling **phase 2**, the agent checks for a system prompt in this order:
+
+.. code-block:: text
+
+    1. Registered system prompt handler for phase 2?
+    2. get_phase_2_system_prompt(...) method?
+    3. prompts/trader_system_phase_2.jinja2 ?
+    4. prompts/trader_system.jinja2 ?
+    5. prompts/all_system_phase_2.jinja2 ?
+    6. prompts/all_system.jinja2 ?
+    7. FileNotFoundError if none are found.
+
+This mechanism ensures you can define broad, reusable prompts while still allowing tailored prompts for specific phases.
 
 Handler Resolution Logic
 ------------------------
 
-Method 1 will handle phases for you automatically. In methods 2 or 3, you have more control over the phase handling logic.
+**Handler resolution** determines the *overall logic* used to handle a given phase. It is independent from (but often used alongside) prompt resolution.
 
-It's important to understand how the phase handling logic works:
+1. **Phase Eligibility Check**
+   - If neither ``task_phases`` nor ``excluded_task_phases`` is set, the agent attempts to handle *all* phases.
+   - If ``task_phases`` is set, only those listed phases are handled.
+   - If ``excluded_task_phases`` is set, all phases *except* those in the list are handled.
 
-1. **Phase Eligibility Check**:
-    - If ``task_phases`` and ``excluded_task_phases`` are not set, the agent will handle all phases.
-    - If ``task_phases`` is set, the agent will only handle the phases in the list.
-    - If ``excluded_task_phases`` is set, the agent will handle all phases except those in the list.
+2. **Custom Handler Resolution**
+   If a **custom phase handler** is registered (via ``register_phase_handler``) or detected by method naming convention (e.g., ``handle_phase_3``), the agent uses that handler.
 
-2. **Custom Handler Resolution**: If a custom handler is registered for the phase (either through explicit registration or method naming convention), it is used.
+3. **Default LLM Handler**
+   If no custom handler is found, the agent uses the default implementation:
+   1. **Prompt Resolution** (for system/user prompts)
+   2. **Call the LLM**
+   3. **Response Parsing** (using parser resolution)
+   4. Return the final result.
 
-3. **Default LLM Handler**: If no custom handler is found, the agent falls back to the default ``handle_phase_with_llm`` method, which:
+Comparing Prompt vs. Handler Resolution
+---------------------------------------
 
-   a. Gets the system prompt using the prompt resolution logic
-   b. Gets the user prompt using the prompt resolution logic
-   c. Sends both prompts to the LLM
-   d. Parses the response using the response parser resolution logic
+- **Prompt Resolution**: Determines *what text the agent sends to the LLM* (system + user prompts).
+- **Handler Resolution**: Determines *how the phase is handled overall*. This can include calls to the LLM (and hence prompt resolution) or skip the LLM entirely.
 
-This resolution process applies to all four customizable aspects:
-
-* **Phase Handlers**: Determine the overall behavior for a phase
-* **System Prompt Handlers**: Generate system prompts for a phase
-* **User Prompt Handlers**: Generate user prompts for a phase
-* **Response Parsers**: Parse LLM responses for a phase
-
-Each aspect follows the same pattern: check for a registered handler, then fall back to default behavior.
-
-Note that this is different from the prompt resolution logic, which only applies to prompt generation, not the overall phase handling logic.
+If you only need to change the *prompts* for a phase, you can rely on **prompt resolution**. If you need to change the *entire logic* for a phase (e.g., skipping the LLM, performing additional calculations), you must define or register a **custom handler**.
