@@ -44,7 +44,8 @@ The repository includes three example games:
 2. **`tudeflt/harberger`**: A Harberger Tax simulation with LLM agents.
 3. **`tudeflt/futarchy`**: A Futarchy simulation with LLM agents.
 
-### Running the Prisoner's Dilemma Experiment
+### Running the Prisoner's Dilemma game
+The simplest game to run is a version of the repeated prisoner's dilemma game that runs on your local machine.
 
 ```shell
 # Run the server
@@ -53,6 +54,7 @@ python examples/server/prisoner/server.py
 # Run the experiment (in a separate terminal)
 python examples/prisoner/run_game.py
 ```
+note: you still have to set up the connection to the agents.
 
 ## Key Features
 
