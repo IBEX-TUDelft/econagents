@@ -28,10 +28,10 @@ The system is designed so that you can provide both general default behaviors an
 How Phase Handling Works (High-Level Flow)
 ------------------------------------------
 
-A common source of confusion is how the agent decides *what to do* in a phase (the “handler”) vs. *what to say* to the LLM (the “prompt”). Here’s the high-level flow:
+The handler is how the agent decides *what to do* in a phase, while the prompt is how the agent decides *what to say* when it calls the LLM. Here's the high-level flow:
 
 1. **Check Phase Eligibility**
-   If a phase is in the agent’s ``task_phases`` (or not in ``excluded_phases``), the agent will attempt to handle it.
+   If a phase is in the agent's ``task_phases`` (or not in ``excluded_phases``), the agent will attempt to handle it.
 
 2. **Resolve a Phase Handler**
    The agent looks for a **custom handler** for that phase (either via explicitly registered handlers or naming conventions). If one is found, it executes that handler.
@@ -52,11 +52,11 @@ A common source of confusion is how the agent decides *what to do* in a phase (t
 Phase-Specific Customization Points
 -----------------------------------
 
-When you decide to customize the agent’s behavior for specific phases, you can change up to four components:
+When you decide to customize the agent's behavior for specific phases, you can change up to four components:
 
 1. **System Prompt** – a role-defining, scenario-framing prompt.
 2. **User Prompt** – instructions or context for the specific phase.
-3. **Response Parser** – logic to interpret the LLM’s response.
+3. **Response Parser** – logic to interpret the LLM's response.
 4. **Phase Handler** – overarching logic for that phase (which may not even call the LLM).
 
 You can customize these components by combining any of the following three approaches:
@@ -83,7 +83,7 @@ The **default and recommended** approach is to define prompt templates in the ``
     ├── your_agent_user_phase_6.jinja2          # Phase-specific user prompt
     └── all_user_phase_8.jinja2                 # Shared prompt for all agents
 
-The ``AgentRole`` class automatically discovers these templates and uses them to generate prompts according to a strict **naming convention** (explained in “Prompt Resolution Logic” below).
+The ``AgentRole`` class automatically discovers these templates and uses them to generate prompts according to a strict **naming convention** (explained in "Prompt Resolution Logic" below).
 
 **Note:** Prompt templates *only* control what text is sent to the LLM. If you want to customize the overall phase logic (e.g., do multiple calls to the LLM or skip the LLM entirely), you need to register or define a **custom handler** (see below).
 
@@ -122,7 +122,7 @@ Any method that matches these naming conventions is automatically detected and u
 Method 3: Explicit Registration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Finally, you can manually register handlers in your agent’s ``__init__`` method:
+Finally, you can manually register handlers in your agent's ``__init__`` method:
 
 .. code-block:: python
 
@@ -189,9 +189,9 @@ To do this, it follows a **cascading resolution order** for each prompt type (sy
    If none of the above exist, a ``FileNotFoundError`` is raised.
 
 Example (System Prompt, Phase 2)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For an agent named “trader” handling **phase 2**, the agent checks for a system prompt in this order:
+For an agent named "trader" handling **phase 2**, the agent checks for a system prompt in this order:
 
 .. code-block:: text
 
