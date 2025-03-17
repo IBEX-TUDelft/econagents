@@ -5,6 +5,7 @@ econagents: A Python library for setting up and running economic experiments wit
 from econagents.core.agent_role import AgentRole
 from econagents.core.game_runner import GameRunner, HybridGameRunnerConfig, TurnBasedGameRunnerConfig
 from econagents.core.manager import AgentManager
+from econagents.core.transport import WebSocketTransport
 from econagents.core.manager.phase import PhaseManager, HybridPhaseManager, TurnBasedPhaseManager
 from econagents.core.state.fields import EventField
 from econagents.core.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
@@ -28,4 +29,5 @@ __all__: list[str] = [
     "TurnBasedGameRunnerConfig",
     "HybridGameRunnerConfig",
     "EventField",
+    "WebSocketTransport",
 ]

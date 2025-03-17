@@ -1,5 +1,5 @@
 Welcome to econagents's documentation!
-==========================================
+======================================
 
 .. include:: ../../README.md
   :parser: myst_parser.sphinx_
@@ -11,6 +11,7 @@ Welcome to econagents's documentation!
    self
    Installation
    Overview
+   Definitions
    Tutorial
    Customizing_Agent_Roles
    Managing_State
