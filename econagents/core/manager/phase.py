@@ -18,7 +18,7 @@ class PhaseManager(AgentManager, ABC):
     Abstract manager that handles the concept of 'phases' in a game.
 
     This manager standardizes the interface for phase-based games with hooks for
-    phase transitions and optional continuous phase handling.
+    phase transitions and optional continuous-time phase handling.
 
     Features:
     1. Standardized interface for starting a phase
@@ -38,8 +38,8 @@ class PhaseManager(AgentManager, ABC):
         phase_transition_event (Optional[str]): Event name for phase transitions
         phase_identifier_key (Optional[str]): Key in the event data that identifies the phase
         continuous_phases (Optional[set[int]]): set of phase numbers that should be treated as continuous
-        min_action_delay (Optional[int]): Minimum delay in seconds between actions in continuous phases
-        max_action_delay (Optional[int]): Maximum delay in seconds between actions in continuous phases
+        min_action_delay (Optional[int]): Minimum delay in seconds between actions in continuous-time phases
+        max_action_delay (Optional[int]): Maximum delay in seconds between actions in continuous-time phases
         state (Optional[GameState]): Game state object to track game state
         agent_role (Optional[AgentRole]): Agent role instance to handle game phases
         auth_mechanism (Optional[AuthenticationMechanism]): Authentication mechanism to use
@@ -145,12 +145,12 @@ class PhaseManager(AgentManager, ABC):
 
     @property
     def continuous_phases(self) -> set[int]:
-        """Get the set of continuous phases."""
+        """Get the set of continuous-time phases."""
         return self._continuous_phases  # type: ignore
 
     @continuous_phases.setter
     def continuous_phases(self, value: set[int]):
-        """Set the continuous phases."""
+        """Set the continuous-time phases."""
         self._continuous_phases = value
 
     @property
@@ -220,21 +220,21 @@ class PhaseManager(AgentManager, ABC):
         Handle a phase transition.
 
         This method is the main orchestrator for phase transitions:
-        1. If leaving a continuous phase, stops the continuous task
+        1. If leaving a continuous-time phase, stops the continuous task
         2. Calls the on_phase_end hook for the old phase
         3. Updates the current phase
         4. Calls the on_phase_start hook for the new phase
-        5. Starts a continuous task if entering a continuous phase
-        6. Executes a single action if entering a non-continuous phase
+        5. Starts a continuous task if entering a continuous-time phase
+        6. Executes a single action if entering a non-continuous-time phase
 
         Args:
             new_phase (Optional[int]): The new phase number
         """
         self.logger.info(f"Transitioning to phase {new_phase}")
 
-        # If we were in a continuous phase, stop it
+        # If we were in a continuous-time phase, stop it
         if self.in_continuous_phase and new_phase != self.current_phase:
-            self.logger.info(f"Stopping continuous phase {self.current_phase}")
+            self.logger.info(f"Stopping continuous-time phase {self.current_phase}")
             self.in_continuous_phase = False
             if self._continuous_task:
                 self._continuous_task.cancel()
@@ -260,12 +260,12 @@ class PhaseManager(AgentManager, ABC):
                 # Execute an initial action
                 await self.execute_phase_action(new_phase)
             else:
-                # Execute a single action for non-continuous phases
+                # Execute a single action for non-continuous-time phases
                 await self.execute_phase_action(new_phase)
 
     async def _continuous_phase_loop(self, phase: int):
         """
-        Run a loop that periodically executes actions for a continuous phase.
+        Run a loop that periodically executes actions for a continuous-time phase.
 
         Args:
             phase (int): The phase number
@@ -277,16 +277,16 @@ class PhaseManager(AgentManager, ABC):
                 self.logger.debug(f"Waiting {delay} seconds before next action in phase {phase}")
                 await asyncio.sleep(delay)
 
-                # Check if we're still in the same continuous phase
+                # Check if we're still in the same continuous-time phase
                 if not self.in_continuous_phase or self.current_phase != phase:
                     break
 
                 # Execute the action
                 await self.execute_phase_action(phase)
         except asyncio.CancelledError:
-            self.logger.info(f"Continuous phase {phase} loop cancelled")
+            self.logger.info(f"Continuous-time phase {phase} loop cancelled")
         except Exception as e:
-            self.logger.exception(f"Error in continuous phase {phase} loop: {e}")
+            self.logger.exception(f"Error in continuous-time phase {phase} loop: {e}")
 
     @abstractmethod
     async def execute_phase_action(self, phase: int):
@@ -324,7 +324,7 @@ class PhaseManager(AgentManager, ABC):
         pass
 
     async def stop(self):
-        """Stop the manager and cancel any continuous phase tasks."""
+        """Stop the manager and cancel any continuous-time phase tasks."""
         self.in_continuous_phase = False
         if self._continuous_task:
             self._continuous_task.cancel()
@@ -337,7 +337,8 @@ class TurnBasedPhaseManager(PhaseManager):
     A manager for turn-based games that handles phase transitions.
 
     This manager inherits from PhaseManager and provides a concrete implementation
-    for executing actions in each phase.
+    for executing actions in each phase. All phases are treated as turn-based,
+    meaning actions are only taken when explicitly triggered (no continuous actions).
 
     Args:
         url (Optional[str]): WebSocket server URL
@@ -416,7 +417,11 @@ class HybridPhaseManager(PhaseManager):
     A manager for games that combine turn-based and continuous action phases.
 
     This manager extends PhaseManager and configures it with specific phases
-    that should be treated as continuous.
+    that should be treated as continuous. By default, all phases are treated as
+    turn-based unless explicitly included in the continuous_phases parameter.
+
+    For continuous-time phases, the manager will automatically execute actions periodically
+    with random delays between min_action_delay and max_action_delay seconds.
 
     Args:
         continuous_phases (Optional[set[int]]): Set of phase numbers that should be treated as continuous
@@ -425,8 +430,8 @@ class HybridPhaseManager(PhaseManager):
         auth_mechanism_kwargs (Optional[dict[str, Any]]): Keyword arguments for the authentication mechanism
         phase_transition_event (Optional[str]): Event name for phase transitions
         phase_identifier_key (Optional[str]): Key in the event data that identifies the phase
-        min_action_delay (Optional[int]): Minimum delay in seconds between actions in continuous phases
-        max_action_delay (Optional[int]): Maximum delay in seconds between actions in continuous phases
+        min_action_delay (Optional[int]): Minimum delay in seconds between actions in continuous-time phases
+        max_action_delay (Optional[int]): Maximum delay in seconds between actions in continuous-time phases
         state (Optional[GameState]): Game state object to track game state
         agent_role (Optional[AgentRole]): Agent role instance to handle game phases
         logger (Optional[logging.Logger]): Logger instance for tracking events

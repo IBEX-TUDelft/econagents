@@ -29,8 +29,8 @@ Naming and Organization
 **Phase**
     A distinct temporal segment of a game during which specific actions are available to players. Phases follow each other sequentially in time. Two primary types exist:
 
-    * **Turn-based Phase**: Discrete phases where agents take actions in turns or at specific moments
-    * **Continuous-time Phase**: Phases where agents can act continuously within time constraints
+    * **Turn-based Phase**: Discrete phases where agents take actions in turns or at specific moments. **By default, all phases are assumed to be turn-based.**
+    * **Continuous-time Phase**: Phases where agents can act continuously within time constraints. To designate specific phases as continuous, use the ``HybridPhaseManager`` and specify the continuous-time phases via the ``continuous_phases`` parameter.
 
 **Role**
     A set of tasks specified per phase of the game that defines player capabilities. Several players can have the same role. Roles encapsulate:
@@ -39,7 +39,7 @@ Naming and Organization
     * Available actions in each phase
     * Specialized knowledge or capabilities
 
-**Task**
+**Task/Action**
     The specific choices available to players of a particular role in a phase. Tasks may be:
 
     * **Empty**: Some roles may have no tasks in certain phases

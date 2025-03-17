@@ -134,7 +134,7 @@ class TestPhaseTransition:
         mock_handle.assert_called_once_with(1)
 
     async def test_handle_phase_transition_to_continuous(self, phase_manager, monkeypatch):
-        """Test transitioning to a continuous phase."""
+        """Test transitioning to a continuous-time phase."""
         # Mock methods
         mock_on_phase_end = AsyncMock()
         mock_on_phase_start = AsyncMock()
@@ -146,7 +146,7 @@ class TestPhaseTransition:
         # Set current phase
         phase_manager.current_phase = 0
 
-        # Call handle_phase_transition with a continuous phase
+        # Call handle_phase_transition with a continuous-time phase
         await phase_manager.handle_phase_transition(1)  # 1 is in continuous_phases
 
         # Check that methods were called
@@ -175,7 +175,7 @@ class TestPhaseTransition:
         monkeypatch.setattr(phase_manager, "on_phase_start", mock_on_phase_start)
         monkeypatch.setattr(phase_manager, "execute_phase_action", mock_execute_phase_action)
 
-        # Set current phase (a continuous phase)
+        # Set current phase (a continuous-time phase)
         phase_manager.current_phase = 1
         phase_manager.in_continuous_phase = True
         phase_manager._continuous_task = asyncio.create_task(asyncio.sleep(0))  # Dummy task
@@ -219,16 +219,16 @@ class TestPhaseTransition:
         assert phase_manager.current_phase is None
 
     async def test_continuous_phase_loop(self, phase_manager, monkeypatch):
-        """Test the continuous phase loop."""
+        """Test the continuous-time phase loop."""
         # Mock execute_phase_action to track calls
         mock_execute = AsyncMock()
         monkeypatch.setattr(phase_manager, "execute_phase_action", mock_execute)
 
-        # Set up for a continuous phase
+        # Set up for a continuous-time phase
         phase_manager.current_phase = 1
         phase_manager.in_continuous_phase = True
 
-        # Start continuous phase loop
+        # Start continuous-time phase loop
         task = asyncio.create_task(phase_manager._continuous_phase_loop(1))
 
         try:
@@ -256,8 +256,8 @@ class TestPhaseTransition:
                     pass
 
     async def test_stop_with_continuous_phase(self, phase_manager):
-        """Test stopping a manager with a continuous phase."""
-        # Set up for a continuous phase
+        """Test stopping a manager with a continuous-time phase."""
+        # Set up for a continuous-time phase
         phase_manager.current_phase = 1
         phase_manager.in_continuous_phase = True
         continuous_task = asyncio.create_task(asyncio.sleep(10))  # Long-running task
@@ -266,7 +266,7 @@ class TestPhaseTransition:
         # Stop the manager
         await phase_manager.stop()
 
-        # Check that continuous phase was stopped
+        # Check that continuous-time phase was stopped
         assert phase_manager.in_continuous_phase is False
         assert phase_manager._continuous_task is None
 
@@ -350,8 +350,8 @@ class TestHybridPhaseManager:
 
     @pytest.mark.asyncio
     async def test_execute_phase_action_continuous(self, hybrid_phase_manager, mock_agent):
-        """Test execute_phase_action for a continuous phase."""
-        # Set up for a continuous phase
+        """Test execute_phase_action for a continuous-time phase."""
+        # Set up for a continuous-time phase
         hybrid_phase_manager.current_phase = 1
         hybrid_phase_manager.in_continuous_phase = True
 

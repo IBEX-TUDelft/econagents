@@ -11,7 +11,7 @@ from examples.ibex_tudelft.futarchy.state import FGameState
 load_dotenv()
 
 # This manages the interactions between the server and the agents
-# It is a turn-based manager with continuous phases. It assumes that the server sends messages in the following format:
+# It is a turn-based manager with continuous-time phases. It assumes that the server sends messages in the following format:
 # {"message_type": <game_id>, "type": <event_type>, "data": <event_data>}
 # It can be initialized with or without a role. In this case, it uses custom logic to get the role from the server.
 

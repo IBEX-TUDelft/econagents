@@ -32,7 +32,7 @@ However, you'd rarely need to use the ``AgentManager`` class directly. Instead, 
 This abstract base class provides the foundation for all phase-based managers:
 
 * **Phase Transition Handling**: Core mechanism for handling phase changes
-* **Continuous Phase Support**: Built-in support for phases requiring periodic actions
+* **Continuous-time Phase Support**: Built-in support for phases requiring periodic actions
 * **Flexible Configuration**: Property setters for dynamic configuration
 * **Lifecycle Hooks**: Customizable hooks for phase start/end events
 * **State Management**: Automatic game state updates via event hooks
@@ -45,6 +45,7 @@ This concrete implementation handles turn-based games:
 * **Phase Action Execution**: Delegates phase actions to registered handlers or the agent
 * **Custom Phase Handlers**: Register specialized handlers for specific phases
 * **Agent Integration**: Automatically forwards phase actions to the agent when no handler exists
+* **All phases are turn-based**: All phases in this manager are treated as turn-based by default, with actions taken only when explicitly triggered
 
 Example usage:
 
@@ -76,8 +77,8 @@ Example usage:
 
 This manager handles games that combine turn-based and continuous action phases:
 
-* **Continuous Phase Configuration**: Define specific phases that should operate continuously
-* **Configurable Action Timing**: Control the frequency of actions in continuous phases
+* **Continuous-time Phase Configuration**: By default, all phases are treated as turn-based unless explicitly specified in the ``continuous_phases`` parameter
+* **Configurable Action Timing**: Control the frequency of actions in continuous-time phases
 * **Shared Implementation**: Leverages the same phase action execution mechanism as TurnBasedPhaseManager
 
 Example usage:
@@ -128,11 +129,13 @@ Phase Transition Process
 When using phase-based managers, phase transitions follow this sequence:
 
 1. **Phase Transition Event**: Server sends an event indicating a phase change
-2. **Current Phase Shutdown**: If in a continuous phase, any pending phase actions are cancelled
+2. **Current Phase Shutdown**: If in a continuous-time phase, any pending phase actions are cancelled
 3. **Phase End Hook**: The ``on_phase_end`` hook is called for the old phase
 4. **Phase Update**: The current phase is updated to the new phase
 5. **Phase Start Hook**: The ``on_phase_start`` hook is called for the new phase
-6. **Continuous Phase Setup**: If the new phase is continuous, a background task is started
+6. **Phase Type Determination**:
+   * For turn-based phases (default): An initial action is executed once
+   * For continuous-time phases (if specified in ``continuous_phases``): A background task is started that will repeatedly execute actions with random delays between ``min_action_delay`` and ``max_action_delay``
 7. **Initial Action**: An initial action is executed for the new phase
 
-This systematic approach ensures smooth transitions between game phases.
+This systematic approach ensures smooth transitions between different types of game phases. To designate specific phases as continuous, use the ``HybridPhaseManager`` and specify them in the ``continuous_phases`` parameter. By default, all phases are treated as turn-based.

@@ -7,7 +7,7 @@ This guide provides an overview of the econagents framework.
    :depth: 3
    :local:
 
-econagents is a framework that lets you use LLM agents in economic experiments. It assumes that you have a game server that runs the experiment that you can connect to, as well as api-level access to LLM agents that can be used in the experiment. 
+econagents is a framework that lets you use LLM agents in economic experiments. It assumes that you have a game server that runs the experiment that you can connect to, as well as api-level access to LLM agents that can be used in the experiment.
 
 There's a couple of default assumptions econagents makes about the game server:
 
@@ -20,9 +20,9 @@ There's a couple of default assumptions econagents makes about the game server:
 
 However, if the server doesn't use that format of messages, you can customize the `on_message_callback` of the `WebSocketTransport` to adjust the message parsing, so that it can be used with the rest of the framework.
 
-Aside from that, the framework only assumes that you have a description of the game including: 
+Aside from that, the framework only assumes that you have a description of the game including:
    - the roles that agents can take,
-   - the phases the game goes through and actions the agents can take in these phases, and 
+   - the phases the game goes through and actions the agents can take in these phases, and
    - a description of the information about the game state that is relevant.
 
 The library has four key components:
@@ -65,7 +65,7 @@ Here's how this looks in code:
         llm = ChatOpenAI(model="gpt-4o-mini")
 
 Given that you want your roles to take actions in specific phases of the game, you need to specify prompts for the phases where the agent must perform a task.
-Promts are separated into system prompts and user promtps, each can be altered per role and phase, or made persistent as required. 
+Prompts are separated into system prompts and user prompts, each can be altered per role and phase, or made persistent as required.
 
 For example, in a game where there is a market where tax shares are traded in the 6th phase of the game, you might have the following system and user prompts:
 
@@ -145,6 +145,7 @@ Here's an example of an agent manager with custom logic that assigns names and r
             super().__init__(
                 state=HLGameState(game_id=game_id),
                 auth_mechanism_kwargs=auth_mechanism_kwargs,
+                continuous_phases={3, 5},  # Explicitly specify phases 3 and 5 as continuous
             )
             self.game_id = game_id
             self.register_event_handler("assign-name", self._handle_name_assignment)
@@ -158,12 +159,13 @@ Here's an example of an agent manager with custom logic that assigns names and r
             ...
             # Custom logic to handle the role assignment event
 
-
+.. note::
+   By default, all phases are treated as turn-based. Only phases explicitly specified in the ``continuous_phases`` parameter are treated as continuous, with automatic periodic action execution.
 
 Game State
 ~~~~~~~~~~
 
-The state file of a game defines the data structures for the game state. 
+The state file of a game defines the data structures for the game state.
 
 For example, in the Harberger-for-spatial-planning problem used in the TUDelft-IBEX/harberger example, you might have the following state:
 
@@ -195,7 +197,7 @@ Game Runner
 
 Finally, to run a game you need to use the `GameRunner` class. This class is responsible for gluing everything together: agent managers and roles, game state, and the game server.
 
-The steps to running a game with the GameRunner are: 
+The steps to running a game with the GameRunner are:
 
 1. Create a new game on your server
 2. Set up the agent roles, agent managers, and game state

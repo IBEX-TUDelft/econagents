@@ -304,7 +304,7 @@ class GameRunner:
             agent_manager.min_action_delay = self.config.min_action_delay
             agent_manager.max_action_delay = self.config.max_action_delay
             agent_manager.logger.debug(
-                f"Injected default continuous phases: {agent_manager.continuous_phases}, min action delay: {agent_manager.min_action_delay}, max action delay: {agent_manager.max_action_delay}"
+                f"Injected default continuous-time phases: {agent_manager.continuous_phases}, min action delay: {agent_manager.min_action_delay}, max action delay: {agent_manager.max_action_delay}"
             )
 
     def _inject_agent_logger(self, agent_manager: PhaseManager, agent_id: int) -> None:
