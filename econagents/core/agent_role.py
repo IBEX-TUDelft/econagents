@@ -46,7 +46,7 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
     task_phases: ClassVar[list[int]] = []  # Empty list means no specific phases are required
     """List of phases this agent should participate in (empty means all phases)"""
     task_phases_excluded: ClassVar[list[int]] = []  # Empty list means no phases are excluded
-
+    """ Alternative way to specify phases this agent should participate in, listed phases are excluded (empty means nothing excluded)"""
     # Regex patterns for method name extraction
     _SYSTEM_PROMPT_PATTERN: ClassVar[Pattern] = re.compile(r"get_phase_(\d+)_system_prompt")
     _USER_PROMPT_PATTERN: ClassVar[Pattern] = re.compile(r"get_phase_(\d+)_user_prompt")
@@ -109,9 +109,9 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
 
         Template resolution order:
 
-        1. Agent-specific phase prompt (e.g., "agent_name_system_phase_1.jinja2")
+        1. Role-specific phase prompt (e.g., "role_name_system_phase_1.jinja2")
 
-        2. Agent-specific general prompt (e.g., "agent_name_system.jinja2")
+        2. Role-specific general prompt (e.g., "role_name_system.jinja2")
 
         3. All-role phase prompt (e.g., "all_system_phase_1.jinja2")
 

@@ -1,5 +1,5 @@
 """
-econagents: A Python library for setting up and running economic experiments with LLMs or human subjects.
+econagents: A Python library that lets you use LLM agents in economic experiments. 
 """
 
 from econagents.core.agent_role import AgentRole
