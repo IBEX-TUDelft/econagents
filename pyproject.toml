@@ -28,7 +28,7 @@ generate-setup-file = false
 # Be as loose as possible if writing a library.
 python = ">=3.10,<3.13"
 typing-extensions = "^4.12.2"
-openai = "^1.65.5"
+openai = "^1.66.3"
 langsmith = "^0.3.15"
 websockets = "^15.0"
 pydantic = "^2.10.6"
