@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 from econagents.core.events import Message
 from econagents.core.manager.phase import HybridPhaseManager
-from examples.ibex_tudelft.harberger.roles import Developer, Owner, Speculator
-from examples.ibex_tudelft.harberger.state import HLGameState
+from examples.ibex_tudelft.voting.roles import Developer, Owner
+from examples.ibex_tudelft.voting.state import HLGameState
 
 load_dotenv()
 
