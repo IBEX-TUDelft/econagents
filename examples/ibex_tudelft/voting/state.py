@@ -48,7 +48,7 @@ class HLPublic(PublicInformation):
     public_signal: list[float] = EventField(default_factory=list, event_key="publicSignal")
 
     #chat box
-    chat_state: MarketState = EventField(default_factory=ChatState)
+    chat_state: ChatState = EventField(default_factory=ChatState)
 
     #compensation offer
     compensationOffers: list[float] =  EventField(default_factory=list, event_key="compensation-offer-made")
@@ -73,9 +73,14 @@ class HLGameState(GameState):
 
     # This is needed to build the order book
     def get_custom_handlers(self) -> dict[str, EventHandler]:
-        """Provide custom event handlers for market events"""
+        """Provide custom event handlers for market and chat events"""
         market_events = ["add-order", "update-order", "delete-order", "contract-fulfilled", "asset-movement"]
-        return {event: self._handle_market_event for event in market_events}
+        chat_events = ["message-received"]
+        
+        handlers = {event: self._handle_market_event for event in market_events}
+        handlers.update({event: self._handle_chat_event for event in chat_events})
+        
+        return handlers
 
     # This is needed to build the order book
     def _handle_market_event(self, event_type: str, data: dict[str, Any]) -> None:
@@ -86,16 +91,9 @@ class HLGameState(GameState):
             winning_condition = self.public_information.winning_condition
             self.private_information.wallet[winning_condition]["balance"] = data["balance"]
             self.private_information.wallet[winning_condition]["shares"] = data["shares"]
- 
- # This is needed to build the Chat box  !AI
-    def get_custom_handlers(self) -> dict[str, EventHandler]:
-        """Provide custom event handlers for chat events"""
-        chat_events = ["message-received"]
-        return {event: self._handle_chat_event for event in chat_events}
 
-    # This is needed to build the chat log !AI
-    # now only deals with messages received, not send
+    # This is needed to build the chat log
     def _handle_chat_event(self, event_type: str, data: dict[str, Any]) -> None:
-        """Handle market-related events by delegating to MarketState"""
+        """Handle chat-related events by delegating to ChatState"""
         self.public_information.chat_state.process_event(event_type=event_type, data=data)
 
