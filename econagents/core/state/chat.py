@@ -62,4 +62,32 @@ class ChatState(BaseModel):
             self._on_add_msg(data["data"])
             self.messages.append(new_msg)
         
-        
+        from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, Field, computed_field
+
+class ChatMessage(BaseModel):
+    """Represents a single chat message in the game."""
+    
+    sender_id: int
+    sender_name: str
+    message: str
+    timestamp: str
+    is_system: bool = False
+
+class ChatHistory(BaseModel):
+    """Manages a collection of chat messages."""
+    
+    messages: List[ChatMessage] = Field(default_factory=list)
+    
+    def add_message(self, message: ChatMessage) -> None:
+        """Add a new message to the chat history."""
+        self.messages.append(message)
+    
+    @computed_field
+    def formatted_history(self) -> str:
+        """Return a formatted string representation of the chat history."""
+        result = []
+        for msg in self.messages:
+            prefix = "[SYSTEM]" if msg.is_system else f"[{msg.sender_name}]"
+            result.append(f"{prefix} {msg.message}")
+        return "\n".join(result)
