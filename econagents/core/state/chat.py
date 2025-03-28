@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -48,10 +48,12 @@ class ChatState(BaseModel):
         msg_id = msg_data["number"]
         new_msg = msg(
             sender=msg_data["sender"],
+            to=msg_data.get("to", []),
+            number=msg_data.get("number"),
             text=msg_data["text"],
+            time=msg_data["time"]
             )
         self.messages[msg_id] = new_msg
-
 
     def process_event(self, event_type: str, data: dict):
         """
@@ -59,11 +61,7 @@ class ChatState(BaseModel):
         event data from the server.
         """
         if event_type == "message-received":
-            self._on_add_msg(data["data"])
-            self.messages.append(new_msg)
-        
-        from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, computed_field
+            self._on_add_msg(data)
 
 class ChatMessage(BaseModel):
     """Represents a single chat message in the game."""
