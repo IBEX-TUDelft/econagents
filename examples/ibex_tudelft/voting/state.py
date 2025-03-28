@@ -5,6 +5,7 @@ from pydantic import Field, computed_field
 from econagents.core.state.fields import EventField
 from econagents.core.state.game import EventHandler, GameState, MetaInformation, PrivateInformation, PublicInformation
 from econagents.core.state.market import MarketState
+from econagents.core.state.chat import ChatState
 
 # EventField lets you specify the event key of the event data in the message
 # event_key is the key of the event data in the message. If not specified, the event key is the field name.
@@ -26,9 +27,9 @@ class HLPrivate(PrivateInformation):
     # PrivateInformation can have have any fields
     wallet: list[dict[str, Any]] = EventField(default_factory=list)
     value_signals: list[float] = EventField(default_factory=list, event_key="signals")
-    request: list[dict[str, Any]] = EventField(default_factory=list)
+    declarations: list[dict[str, Any]] = EventField(default_factory=list)
     property: dict[str, Any] = EventField(default_factory=dict, exclude_events=["profit"])
-
+    compensationRequestsReceived: list[float] =EventField(default_factory=list, event_key="compensation-requests-received") 
 
 class HLPublic(PublicInformation):
     # PublicInformation can have any fields
@@ -36,15 +37,24 @@ class HLPublic(PublicInformation):
     tax_rate: float = EventField(default=0, event_key="taxRate")
     initial_tax_rate: float = EventField(default=0, event_key="initialTaxRate")
     final_tax_rate: float = EventField(default=0, event_key="finalTaxRate")
-      
+
     # Boundaries and conditions
     boundaries: dict[str, Any] = EventField(default_factory=dict)
     conditions: list[dict[str, Any]] = EventField(default_factory=list)
-   
-    # compensation offer from developer to owners
-    compensationOffers: list[dict[str, Any]] = EventField(default=0, event_key="compensationOffers")
+
+    # Market
+    value_signals: list[float] = EventField(default_factory=list, event_key="signals")
+    market_state: MarketState = EventField(default_factory=MarketState)
+    public_signal: list[float] = EventField(default_factory=list, event_key="publicSignal")
+
+    #chat box
+    chat_state: MarketState = EventField(default_factory=ChatState)
+
+    #compensation offer
+    compensationOffers: list[float] =  EventField(default_factory=list, event_key="compensation-offer-made")
+
     # Winning condition
-    winning_condition: int = EventField(default_factory=dict, event_key="winningCondition")
+    winning_condition: int = EventField(default=0, event_key="winningCondition")
 
     @computed_field
     def winning_condition_description(self) -> dict[str, Any]:
@@ -76,3 +86,16 @@ class HLGameState(GameState):
             winning_condition = self.public_information.winning_condition
             self.private_information.wallet[winning_condition]["balance"] = data["balance"]
             self.private_information.wallet[winning_condition]["shares"] = data["shares"]
+ 
+ # This is needed to build the Chat box  !AI
+    def get_custom_handlers(self) -> dict[str, EventHandler]:
+        """Provide custom event handlers for chat events"""
+        chat_events = ["message-received"]
+        return {event: self._handle_chat_event for event in chat_events}
+
+    # This is needed to build the chat log !AI
+    # now only deals with messages received, not send
+    def _handle_chat_event(self, event_type: str, data: dict[str, Any]) -> None:
+        """Handle market-related events by delegating to MarketState"""
+        self.public_information.chat_state.process_event(event_type=event_type, data=data)
+
