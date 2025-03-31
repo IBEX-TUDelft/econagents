@@ -60,8 +60,8 @@ class GameRunnerConfig(BaseModel):
     """Class to use for the state"""
 
     # Observability configuration
-    observability_provider: Optional[Literal["noop", "langsmith", "langfuse"]] = None
-    """Name of the observability provider to use. Options: 'noop', 'langsmith', 'langfuse'"""
+    observability_provider: Optional[Literal["langsmith", "langfuse"]] = None
+    """Name of the observability provider to use. Options: 'langsmith' or 'langfuse'"""
 
 
 class TurnBasedGameRunnerConfig(GameRunnerConfig):

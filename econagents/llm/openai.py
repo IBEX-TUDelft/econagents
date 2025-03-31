@@ -1,6 +1,6 @@
 import importlib.util
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from econagents.llm.base import BaseLLM
 
@@ -33,8 +33,8 @@ class ChatOpenAI(BaseLLM):
 
     async def get_response(
         self,
-        messages: List[Dict[str, Any]],
-        tracing_extra: Dict[str, Any],
+        messages: list[dict[str, Any]],
+        tracing_extra: dict[str, Any],
         **kwargs: Any,
     ) -> str:
         """Get a response from the LLM.
