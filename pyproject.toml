@@ -28,11 +28,34 @@ generate-setup-file = false
 # Be as loose as possible if writing a library.
 python = ">=3.10,<3.13"
 typing-extensions = "^4.12.2"
-openai = "^1.68.2"
-langsmith = "^0.3.19"
-websockets = "^15.0"
 pydantic = "^2.10.6"
 requests = "^2.32.3"
+websockets = "^15.0"
+
+# Optional dependencies
+[tool.poetry.group.openai]
+optional = true
+
+[tool.poetry.group.openai.dependencies]
+openai = "^1.68.2"
+
+[tool.poetry.group.ollama]
+optional = true
+
+[tool.poetry.group.ollama.dependencies]
+ollama = "^0.1.9"
+
+[tool.poetry.group.langsmith]
+optional = true
+
+[tool.poetry.group.langsmith.dependencies]
+langsmith = "^0.3.19"
+
+[tool.poetry.group.langfuse]
+optional = true
+
+[tool.poetry.group.langfuse.dependencies]
+langfuse = "^2.60.2"
 
 [tool.poetry.group.docs.dependencies]
 myst-parser = {extras = ["linkify"], version = "^4.0.1"}
@@ -150,3 +173,11 @@ ignore = [
 
 [tool.codespell]
 skip = 'poetry.lock,'
+
+[tool.poetry.extras]
+openai = ["openai"]
+ollama = ["ollama"]
+langsmith = ["langsmith"]
+langfuse = ["langfuse"]
+default = ["openai", "langsmith"]
+all = ["openai", "ollama", "langsmith", "langfuse"]
