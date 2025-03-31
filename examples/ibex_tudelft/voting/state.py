@@ -5,7 +5,7 @@ from pydantic import Field, computed_field
 from econagents.core.state.fields import EventField
 from econagents.core.state.game import EventHandler, GameState, MetaInformation, PrivateInformation, PublicInformation
 from econagents.core.state.market import MarketState
-from econagents.core.state.chat import ChatState
+from econagents.core.state.chat import ChatState, ChatHistory
 
 # EventField lets you specify the event key of the event data in the message
 # event_key is the key of the event data in the message. If not specified, the event key is the field name.
@@ -29,7 +29,7 @@ class HLPrivate(PrivateInformation):
     value_signals: list[float] = EventField(default_factory=list, event_key="signals")
     declarations: list[dict[str, Any]] = EventField(default_factory=list)
     property: dict[str, Any] = EventField(default_factory=dict, exclude_events=["profit"])
-    compensationRequestsReceived: list[float] =EventField(default_factory=list, event_key="compensation-requests-received") 
+    compensationRequestsReceived: dict[float,float] =EventField(default_factory=list, event_key="compensation-requests-received") 
 
 class HLPublic(PublicInformation):
     # PublicInformation can have any fields
@@ -49,6 +49,7 @@ class HLPublic(PublicInformation):
 
     #chat box
     chat_state: ChatState = EventField(default_factory=ChatState)
+
 
     #compensation offer
     compensationOffers: list[float] =  EventField(default_factory=list, event_key="compensation-offer-made")
