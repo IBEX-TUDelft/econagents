@@ -9,7 +9,7 @@ from jinja2.sandbox import SandboxedEnvironment
 
 from econagents.core.logging_mixin import LoggerMixin
 from econagents.core.state.game import GameStateProtocol
-from econagents.llm.openai import ChatOpenAI
+from econagents.llm.base import BaseLLM
 
 StateT_contra = TypeVar("StateT_contra", bound=GameStateProtocol, contravariant=True)
 
@@ -17,7 +17,7 @@ StateT_contra = TypeVar("StateT_contra", bound=GameStateProtocol, contravariant=
 class AgentProtocol(Protocol):
     role: ClassVar[int]
     name: ClassVar[str]
-    llm: ChatOpenAI
+    llm: BaseLLM
     task_phases: ClassVar[list[int]]
 
 
@@ -41,7 +41,7 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
     """Unique identifier for this role"""
     name: ClassVar[str]
     """Human-readable name for this role"""
-    llm: ChatOpenAI
+    llm: BaseLLM
     """Language model instance for generating responses"""
     task_phases: ClassVar[list[int]] = []  # Empty list means no specific phases are required
     """List of phases this agent should participate in (empty means all phases)"""

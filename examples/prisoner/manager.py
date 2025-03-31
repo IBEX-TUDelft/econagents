@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from econagents import AgentRole
 from econagents.core.events import Message
 from econagents.core.manager.phase import TurnBasedPhaseManager
-from econagents.llm.openai import ChatOpenAI
+from econagents.llm import ChatOllama
 from examples.prisoner.state import PDGameState
 
 load_dotenv()
@@ -19,7 +19,7 @@ class Prisoner(AgentRole):
 
     role = 1
     name = "Prisoner"
-    llm = ChatOpenAI()
+    llm = ChatOllama(model_name="qwen2.5:7b")
 
 
 class PDManager(TurnBasedPhaseManager):

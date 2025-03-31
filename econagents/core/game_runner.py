@@ -4,14 +4,14 @@ import queue
 from contextvars import ContextVar
 from logging.handlers import QueueHandler, QueueListener
 from pathlib import Path
-from typing import Optional, Type
+from typing import Literal, Optional, Type
 
 from pydantic import BaseModel, Field
 
-from econagents.core.manager.base import AgentManager
 from econagents.core.manager.phase import PhaseManager
 from econagents.core.state.game import GameState
 from econagents.core.transport import AuthenticationMechanism, SimpleLoginPayloadAuth
+from econagents.llm.observability import get_observability_provider
 
 ctx_agent_id: ContextVar[str] = ContextVar("agent_id", default="N/A")
 
@@ -58,6 +58,10 @@ class GameRunnerConfig(BaseModel):
     # State configuration
     state_class: Optional[Type[GameState]] = None
     """Class to use for the state"""
+
+    # Observability configuration
+    observability_provider: Optional[Literal["noop", "langsmith", "langfuse"]] = None
+    """Name of the observability provider to use. Options: 'noop', 'langsmith', 'langfuse'"""
 
 
 class TurnBasedGameRunnerConfig(GameRunnerConfig):
@@ -298,6 +302,16 @@ class GameRunner:
         if not agent_manager.auth_mechanism:
             agent_manager.auth_mechanism = self.config.auth_mechanism
             agent_manager.logger.debug(f"Injected default auth mechanism: {agent_manager.auth_mechanism}")
+
+        if agent_manager.llm_provider and self.config.observability_provider:
+            try:
+                provider = get_observability_provider(self.config.observability_provider)
+                agent_manager.llm_provider.observability = provider
+                agent_manager.logger.debug(
+                    f"Injected {self.config.observability_provider} observability provider into LLM provider"
+                )
+            except Exception as e:
+                agent_manager.logger.error(f"Failed to initialize observability provider: {e}")
 
         if isinstance(self.config, HybridGameRunnerConfig):
             agent_manager.continuous_phases = set(self.config.continuous_phases)

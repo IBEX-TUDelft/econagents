@@ -181,6 +181,13 @@ class PhaseManager(AgentManager, ABC):
         """Set the prompts directory."""
         self._prompts_dir = value
 
+    @property
+    def llm_provider(self):
+        """Get the LLM provider from the agent role."""
+        if self._agent_role and hasattr(self._agent_role, "llm"):
+            return self._agent_role.llm
+        return None
+
     async def start(self):
         """Start the manager."""
         # TODO: is there a better place to do this?
