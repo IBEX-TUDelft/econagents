@@ -27,7 +27,6 @@ generate-setup-file = false
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
 python = ">=3.10,<3.13"
-typing-extensions = "^4.12.2"
 pydantic = "^2.10.6"
 requests = "^2.32.3"
 websockets = "^15.0"
