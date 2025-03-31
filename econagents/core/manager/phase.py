@@ -17,15 +17,13 @@ class PhaseManager(AgentManager, ABC):
     """
     Abstract manager that handles the concept of 'phases' in a game.
 
-    This manager standardizes the interface for phase-based games with hooks for
-    phase transitions and optional continuous-time phase handling.
+    This manager standardizes the interface for phase-based games with optional
+    continuous-time phase handling.
 
     Features:
     1. Standardized interface for starting a phase
 
     2. Optional continuous "tick loop" for phases
-
-    3. Hooks for "on phase start," "on phase end," and "on phase transition event"
 
     All configuration parameters can be:
 
@@ -221,11 +219,9 @@ class PhaseManager(AgentManager, ABC):
 
         This method is the main orchestrator for phase transitions:
         1. If leaving a continuous-time phase, stops the continuous task
-        2. Calls the on_phase_end hook for the old phase
-        3. Updates the current phase
-        4. Calls the on_phase_start hook for the new phase
-        5. Starts a continuous task if entering a continuous-time phase
-        6. Executes a single action if entering a non-continuous-time phase
+        2. Updates the current phase
+        3. Starts a continuous task if entering a continuous-time phase
+        4. Executes a single action if entering a non-continuous-time phase
 
         Args:
             new_phase (Optional[int]): The new phase number
@@ -240,18 +236,9 @@ class PhaseManager(AgentManager, ABC):
                 self._continuous_task.cancel()
                 self._continuous_task = None
 
-        # Call the on_phase_end hook for the old phase
-        old_phase = self.current_phase
-        if old_phase is not None:
-            await self.on_phase_end(old_phase)
-
-        # Update current phase
         self.current_phase = new_phase
 
         if new_phase is not None:
-            # Call the on_phase_start hook for the new phase
-            await self.on_phase_start(new_phase)
-
             # If the new phase is continuous, start a continuous task
             if self.continuous_phases and new_phase in self.continuous_phases:
                 self.in_continuous_phase = True
@@ -295,28 +282,6 @@ class PhaseManager(AgentManager, ABC):
 
         This is the core method that subclasses must implement to define
         how to handle actions for a specific phase.
-
-        Args:
-            phase (int): The phase number
-        """
-        pass
-
-    async def on_phase_start(self, phase: int):
-        """
-        Hook that is called when a phase starts.
-
-        Subclasses can override this to implement custom behavior.
-
-        Args:
-            phase (int): The phase number
-        """
-        pass
-
-    async def on_phase_end(self, phase: int):
-        """
-        Hook that is called when a phase ends.
-
-        Subclasses can override this to implement custom behavior.
 
         Args:
             phase (int): The phase number

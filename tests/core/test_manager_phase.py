@@ -136,11 +136,7 @@ class TestPhaseTransition:
     async def test_handle_phase_transition_to_continuous(self, phase_manager, monkeypatch):
         """Test transitioning to a continuous-time phase."""
         # Mock methods
-        mock_on_phase_end = AsyncMock()
-        mock_on_phase_start = AsyncMock()
         mock_execute_phase_action = AsyncMock()
-        monkeypatch.setattr(phase_manager, "on_phase_end", mock_on_phase_end)
-        monkeypatch.setattr(phase_manager, "on_phase_start", mock_on_phase_start)
         monkeypatch.setattr(phase_manager, "execute_phase_action", mock_execute_phase_action)
 
         # Set current phase
@@ -150,8 +146,6 @@ class TestPhaseTransition:
         await phase_manager.handle_phase_transition(1)  # 1 is in continuous_phases
 
         # Check that methods were called
-        mock_on_phase_end.assert_called_once_with(0)
-        mock_on_phase_start.assert_called_once_with(1)
         mock_execute_phase_action.assert_called_once_with(1)
 
         # Check that state was updated
@@ -168,11 +162,7 @@ class TestPhaseTransition:
     async def test_handle_phase_transition_to_discrete(self, phase_manager, monkeypatch):
         """Test transitioning to a discrete phase."""
         # Mock methods
-        mock_on_phase_end = AsyncMock()
-        mock_on_phase_start = AsyncMock()
         mock_execute_phase_action = AsyncMock()
-        monkeypatch.setattr(phase_manager, "on_phase_end", mock_on_phase_end)
-        monkeypatch.setattr(phase_manager, "on_phase_start", mock_on_phase_start)
         monkeypatch.setattr(phase_manager, "execute_phase_action", mock_execute_phase_action)
 
         # Set current phase (a continuous-time phase)
@@ -184,8 +174,6 @@ class TestPhaseTransition:
         await phase_manager.handle_phase_transition(2)  # 2 is not in continuous_phases
 
         # Check that methods were called
-        mock_on_phase_end.assert_called_once_with(1)
-        mock_on_phase_start.assert_called_once_with(2)
         mock_execute_phase_action.assert_called_once_with(2)
 
         # Check that state was updated
@@ -195,11 +183,7 @@ class TestPhaseTransition:
     async def test_handle_phase_transition_to_none(self, phase_manager, monkeypatch):
         """Test transitioning to None phase."""
         # Mock methods
-        mock_on_phase_end = AsyncMock()
-        mock_on_phase_start = AsyncMock()
         mock_execute_phase_action = AsyncMock()
-        monkeypatch.setattr(phase_manager, "on_phase_end", mock_on_phase_end)
-        monkeypatch.setattr(phase_manager, "on_phase_start", mock_on_phase_start)
         monkeypatch.setattr(phase_manager, "execute_phase_action", mock_execute_phase_action)
 
         # Set current phase
@@ -208,11 +192,6 @@ class TestPhaseTransition:
         # Call handle_phase_transition with None
         await phase_manager.handle_phase_transition(None)
 
-        # Check that on_phase_end was called
-        mock_on_phase_end.assert_called_once_with(0)
-
-        # Check that on_phase_start and execute_phase_action were not called
-        mock_on_phase_start.assert_not_called()
         mock_execute_phase_action.assert_not_called()
 
         # Check that state was updated
@@ -396,45 +375,3 @@ class TestHybridPhaseManager:
         # Check that send_message was called with the custom response
         expected_payload = json.dumps({"custom": True})
         hybrid_phase_manager.transport.send.assert_called_once_with(expected_payload)
-
-
-@pytest.mark.asyncio
-class TestPhaseLifecycleHooks:
-    """Tests for phase lifecycle hooks."""
-
-    async def test_on_phase_start(self, phase_manager, monkeypatch):
-        """Test the on_phase_start hook."""
-        # Create a mock for on_phase_start
-        mock_hook = AsyncMock()
-        monkeypatch.setattr(phase_manager, "on_phase_start", mock_hook)
-
-        # Call handle_phase_transition (which should call on_phase_start)
-        await phase_manager.handle_phase_transition(1)
-
-        # Check that on_phase_start was called
-        mock_hook.assert_called_once_with(1)
-
-        # Clean up the continuous task to avoid warnings
-        if phase_manager._continuous_task and not phase_manager._continuous_task.done():
-            phase_manager._continuous_task.cancel()
-            await asyncio.sleep(0.1)  # Allow cancellation to process
-
-    async def test_on_phase_end(self, phase_manager, monkeypatch):
-        """Test the on_phase_end hook."""
-        # Create a mock for on_phase_end
-        mock_hook = AsyncMock()
-        monkeypatch.setattr(phase_manager, "on_phase_end", mock_hook)
-
-        # Set current phase
-        phase_manager.current_phase = 1
-
-        # Call handle_phase_transition (which should call on_phase_end)
-        await phase_manager.handle_phase_transition(2)
-
-        # Check that on_phase_end was called
-        mock_hook.assert_called_once_with(1)
-
-        # Clean up any continuous task that might have been created
-        if phase_manager._continuous_task and not phase_manager._continuous_task.done():
-            phase_manager._continuous_task.cancel()
-            await asyncio.sleep(0.1)  # Allow cancellation to process
