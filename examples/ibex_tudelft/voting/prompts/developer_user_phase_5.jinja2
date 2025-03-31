@@ -27,16 +27,16 @@ Instructions for this phase:
    - you can sent chat messages to all players
    - Provide the output as a JSON object:
 
-    {"content": {
-                "gameId": {{ meta.gameId }},
-                "type": "chat-with-players",
-                "to": [
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    6
-                ],
-                "text": <chatMessage>
-            },
+   {
+    "gameId":  {{ meta.game_id }},
+    "type": "chat-with-players",
+    "to": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+           ],
+    "text": <chatMessage>
+    }
