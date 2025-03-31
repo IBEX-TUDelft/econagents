@@ -1504,14 +1504,14 @@ files = [
 
 [[package]]
 name = "langsmith"
-version = "0.3.17"
+version = "0.3.19"
 description = "Client library to connect to the LangSmith LLM Tracing and Evaluation Platform."
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "langsmith-0.3.17-py3-none-any.whl", hash = "sha256:c9d19b03ae2d1acef0c13334211ff2ef836b026837978c54afa6fb7467cd3acb"},
-    {file = "langsmith-0.3.17.tar.gz", hash = "sha256:650d6e4a0069151415e9c57e9a067f5d80e1520d0af9cc1916b5d30a044d95b0"},
+    {file = "langsmith-0.3.19-py3-none-any.whl", hash = "sha256:a306962ab53562c4094192f1da964309b48aac7898f82d1d421c3fb9c3f29367"},
+    {file = "langsmith-0.3.19.tar.gz", hash = "sha256:0133676689b5e1b879ed05a18e18570daf0dd05e0cefc397342656a58ebecbc5"},
 ]
 
 [package.dependencies]
@@ -1528,7 +1528,8 @@ zstandard = ">=0.23.0,<0.24.0"
 
 [package.extras]
 langsmith-pyo3 = ["langsmith-pyo3 (>=0.1.0rc2,<0.2.0)"]
-openai-agents = ["openai-agents (>=0.0.3,<0.0.4)"]
+openai-agents = ["openai-agents (>=0.0.3,<0.1)"]
+otel = ["opentelemetry-api (>=1.30.0,<2.0.0)", "opentelemetry-exporter-otlp-proto-http (>=1.30.0,<2.0.0)", "opentelemetry-sdk (>=1.30.0,<2.0.0)"]
 pytest = ["pytest (>=7.0.0)", "rich (>=13.9.4,<14.0.0)"]
 
 [[package]]
@@ -3852,4 +3853,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "7e69fc0521a20aff882c02640ff6e74c6f8dcf95430d8a6a7916d7e0e0c49d42"
+content-hash = "f3b0b16faf6e49615640322efd9d1936a74d129decd122161a521ede37e9a1cc"
