@@ -24,15 +24,75 @@ For development, its recommended to use Poetry:
 
 Note that [Poetry](https://python-poetry.org/) is used to create and manage the virtual environment for the project development. If you are not planning to contribute to the project, you can install the dependencies using your preferred package manager.
 
-Dependencies
-------------
+Optional Dependencies
+--------------------
 
-The project depends on the following packages:
+econagents is designed to be modular, allowing you to install only the dependencies you need.
+The core package is lightweight, and you can add optional dependencies based on your use case.
 
-- ``openai``: For LLM interactions
-- ``langsmith``: For tracing and monitoring
-- ``websockets``: For WebSocket connections
+LLM Providers
+~~~~~~~~~~~~
+
+econagents supports multiple LLM providers through optional dependencies:
+
+- ``openai``: For using OpenAI models like GPT-4
+
+   .. code-block:: bash
+
+      pip install econagents[openai]
+
+- ``ollama``: For using locally-hosted Ollama models
+
+   .. code-block:: bash
+
+      pip install econagents[ollama]
+
+Observability Providers
+~~~~~~~~~~~~~~~~~~~~~~
+
+For tracing and monitoring your LLM calls:
+
+- ``langsmith``: For using LangSmith to track and analyze LLM calls
+
+   .. code-block:: bash
+
+      pip install econagents[langsmith]
+
+- ``langfuse``: For using LangFuse for observability
+
+   .. code-block:: bash
+
+      pip install econagents[langfuse]
+
+Convenience Installations
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can combine multiple optional dependencies:
+
+- Default installation (includes OpenAI and LangSmith):
+
+   .. code-block:: bash
+
+      pip install econagents[default]
+
+- All optional dependencies:
+
+   .. code-block:: bash
+
+      pip install econagents[all]
+
+- Custom combinations:
+
+   .. code-block:: bash
+
+      pip install econagents[openai,langfuse]
+
+Core Dependencies
+----------------
+
+The core package depends on the following packages:
+
 - ``pydantic``: For data validation and parsing
+- ``typing-extensions``: For additional type hints
 - ``requests``: For HTTP requests
-
-For now, we require ``openai`` and ``langsmith`` to be installed. We plan to add more model providers and monitoring tools in the future. Users will be able to choose their preferred provider and monitoring tool, and the framework will be designed to be compatible with most popular LLM providers.
+- ``websockets``: For WebSocket connections
