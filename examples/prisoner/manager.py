@@ -19,7 +19,7 @@ class Prisoner(AgentRole):
 
     role = 1
     name = "Prisoner"
-    llm = ChatOllama(model_name="qwen2.5:7b")
+    llm = ChatOllama(model_name="qwen2.5:32b")
 
 
 class PDManager(TurnBasedPhaseManager):

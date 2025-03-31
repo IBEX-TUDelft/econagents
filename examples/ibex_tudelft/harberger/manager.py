@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from econagents.core.events import Message
 from econagents.core.manager.phase import HybridPhaseManager
+from econagents.llm.observability import LangFuseObservability
 from examples.ibex_tudelft.harberger.roles import Developer, Owner, Speculator
 from examples.ibex_tudelft.harberger.state import HLGameState
 
@@ -39,12 +40,15 @@ class HLAgentManager(HybridPhaseManager):
         if role == 1:
             self.agent_role = Speculator()
             self.agent_role.logger = self.logger
+            self.agent_role.llm.observability = LangFuseObservability()
         elif role == 2:
             self.agent_role = Developer()
             self.agent_role.logger = self.logger
+            self.agent_role.llm.observability = LangFuseObservability()
         elif role == 3:
             self.agent_role = Owner()
             self.agent_role.logger = self.logger
+            self.agent_role.llm.observability = LangFuseObservability()
         else:
             self.logger.error("Invalid role assigned; cannot initialize agent.")
             raise ValueError("Invalid role for agent initialization.")
