@@ -93,6 +93,5 @@ Core Dependencies
 The core package depends on the following packages:
 
 - ``pydantic``: For data validation and parsing
-- ``typing-extensions``: For additional type hints
 - ``requests``: For HTTP requests
 - ``websockets``: For WebSocket connections
