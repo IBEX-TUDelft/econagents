@@ -20,10 +20,20 @@ Instructions for this phase:
     {% endfor %}
     
     2.2. **Compensation Offer**:
-        - compensation offer made: {{public_information.compensationOffers.v[1]}}
+        - compensation offer made: {{public_information.compensationOffers[1]}}
  
+
+
+
 3. **Your Decision to Make**:
    - Deliberate in the chat box with the owners and developer about the development (Project and No Project)
+
+   
+  3.1 **the chat conversation so far**:
+
+    {{public_information.chat_state.messages}}
+
+  3.2 ** add to the chat**
    - you can sent chat messages to all players
    - Provide the output as a JSON object:
 
