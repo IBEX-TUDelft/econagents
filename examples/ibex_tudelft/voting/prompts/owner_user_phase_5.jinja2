@@ -20,8 +20,11 @@ Instructions for this phase:
     {% endfor %}
     
     2.2. **Compensation Offer**:
-        - compensation offer made: {{public_information.compensationOffers[1]}}
- 
+      {% if public_information.compensationOffers and public_information.compensationOffers[1] %}
+    - compensation offer made: {{public_information.compensationOffers[1]}}
+      {% else %}
+    - no compensation offer was made
+      {% endif %}
 
 
 
