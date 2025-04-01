@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, computed_field
 
 
 ##########################################
-# structure of json with message received AI!
+# structure of json with message received
 #{
 #    "type": "message-received",
 #    "data": {
@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field, computed_field
 #}
 #
 
-# AI class msg should be able to cover all information in a received chat
+# class msg should be able to cover all information in a received chat
 class msg(BaseModel):
     sender: int
     to: list[int]
@@ -28,7 +28,7 @@ class msg(BaseModel):
     text: str
     time: int
 
-# AI class ChatState should contain all messages
+# class ChatState should contain all messages
 #  messages should be grouped by the content of the "to" field
 #  messages in each group should be ordered by time from oldest to newest
 # 
@@ -86,6 +86,6 @@ class ChatHistory(BaseModel):
         """Return a formatted string representation of the chat history."""
         result = []
         for msg in self.messages:
-            prefix = "[SYSTEM]" if msg.is_system else f"[{msg.sender_name}]"
+            prefix = f"[{msg.sender_name}]"
             result.append(f"{prefix} {msg.message}")
         return "\n".join(result)
