@@ -1,17 +1,21 @@
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, BaseModel
 
 from econagents.core.state.fields import EventField
 from econagents.core.state.game import EventHandler, GameState, MetaInformation, PrivateInformation, PublicInformation
 from econagents.core.state.market import MarketState
-from econagents.core.state.chat import ChatState, ChatHistory
+from econagents.core.state.chat import ChatState
 
 # EventField lets you specify the event key of the event data in the message
 # event_key is the key of the event data in the message. If not specified, the event key is the field name.
 # exclude_from_mapping is used to exclude the field from the mapping of the event data, so it is not updated when an event is processed
 # exclude_events is used to exclude the field from the events that trigger an update, so it is not updated when an event is processed
 # events are the events that trigger an update, if not specified, all events will trigger an update if they have the event key
+
+class CompensationRequest(BaseModel):
+    number: int
+    compensation: Optional[int] = None
 
 
 class HLMeta(MetaInformation):
@@ -29,7 +33,22 @@ class HLPrivate(PrivateInformation):
     value_signals: list[float] = EventField(default_factory=list, event_key="signals")
     declarations: list[dict[str, Any]] = EventField(default_factory=list)
     property: dict[str, Any] = EventField(default_factory=dict, exclude_events=["profit"])
-    compensationRequestsReceived: dict[float,float] =EventField(default_factory=list, event_key="compensation-requests-received") 
+    
+     # Store the raw event data for compensation requests.
+    raw_compensation: Dict[str, Any] = EventField(default_factory=dict, event_key="compensation-requests-received")
+    
+    @computed_field
+    def compensationRequestsReceived(self) -> List[CompensationRequest]:
+        # Process the raw event data to extract compensation requests.
+        raw_data = self.raw_compensation or {}
+        requests = []
+        for item in raw_data.get("compensationRequests", []):
+            comp_value = None
+            # If the inner list exists and has a second element, extract it.
+            if "compensationRequests" in item and item["compensationRequests"]:
+                comp_value = item["compensationRequests"][1]
+            requests.append(CompensationRequest(number=item["number"], compensation=comp_value))
+        return requests
 
 class HLPublic(PublicInformation):
     # PublicInformation can have any fields
