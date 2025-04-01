@@ -39,16 +39,21 @@ class HLPrivate(PrivateInformation):
     
     @computed_field
     def compensationRequestsReceived(self) -> List[CompensationRequest]:
-        # Process the raw event data to extract compensation requests.
+        """Process and sort the raw compensation requests from smallest to largest amount."""
         raw_data = self.raw_compensation or {}
         requests = []
+        
+        # Extract and create CompensationRequest objects
         for item in raw_data.get("compensationRequests", []):
             comp_value = None
-            # If the inner list exists and has a second element, extract it.
-            if "compensationRequests" in item and item["compensationRequests"]:
-                comp_value = item["compensationRequests"][1]
+            if "compensationRequests" in item and len(item.get("compensationRequests", [])) > 1:
+                comp_value = item["compensationRequests"][1]  # Get the second element (actual compensation value)
             requests.append(CompensationRequest(number=item["number"], compensation=comp_value))
-        return requests
+        
+        # Sort requests by compensation amount
+        # Handle None values by putting them at the start
+        return sorted(requests, 
+                     key=lambda x: float('inf') if x.compensation is None else x.compensation)
 
 class HLPublic(PublicInformation):
     # PublicInformation can have any fields
@@ -93,12 +98,14 @@ class HLGameState(GameState):
 
     # This is needed to build the order book
     def get_custom_handlers(self) -> dict[str, EventHandler]:
-        """Provide custom event handlers for market and chat events"""
+        """Provide custom event handlers for market, chat, and compensation events"""
         market_events = ["add-order", "update-order", "delete-order", "contract-fulfilled", "asset-movement"]
         chat_events = ["message-received"]
+        compensation_events = ["compensation-offer-made", "compensation-requests-received"]
         
         handlers = {event: self._handle_market_event for event in market_events}
         handlers.update({event: self._handle_chat_event for event in chat_events})
+        handlers.update({event: self._handle_compensation_event for event in compensation_events})
         
         return handlers
 
@@ -117,3 +124,11 @@ class HLGameState(GameState):
         """Handle chat-related events by delegating to ChatState"""
         self.public_information.chat_state.process_event(event_type=event_type, data=data)
 
+    def _handle_compensation_event(self, event_type: str, data: dict[str, Any]) -> None:
+        """Handle compensation-related events"""
+        if event_type == "compensation-offer-made":
+            offers = data.get("compensationOffers", [None, 0])
+            self.public_information.compensationOffers = offers
+        elif event_type == "compensation-requests-received":
+            # Store the raw compensation request data
+            self.private_information.raw_compensation = data

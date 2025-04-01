@@ -21,7 +21,17 @@ Instructions for this phase:
   
   2.3 **Compensation requests received**
       - the median loss over all games by all owners is about 300000
-      - the owners have sent the following compensation requests: {{private_information.compensationRequestsReceived}} 
+      - the owners have sent the following compensation requests: 
+      {% if private_information.compensationRequestsReceived %}
+    Compensation requests (ordered from lowest to highest):
+      {% for request in private_information.compensationRequestsReceived %}
+        {% if request.compensation is not none %}
+            - Owner {{request.number}}: {{request.compensation}}
+        {% endif %}
+      {% endfor %}
+    {% else %}
+    - No compensation requests received yet
+    {% endif %} 
       - every owner sents two requests, one is the compensation for the "No Project" condition and is NULL for all owners, the other is the number you should use. 
         
 3. **Your Decision to Make**:
