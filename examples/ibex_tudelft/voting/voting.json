@@ -76,10 +76,10 @@
       "phase_6": "10",
       "phase_7": "5"
   },
-  "round_count": "1",
+  "round_count": "2",
   "agents_only": false,
   "game_type": "voting",
-  "practice": false,
+  "practice": true,
   "minutes_for_trading": 10,
   "minutes_for_sniping": 2,
   "session_number": 1,
