@@ -76,7 +76,8 @@ class HLPublic(PublicInformation):
 
 
     #compensation offer
-    compensationOffers: dict[str, list[Any, float]]  =  EventField(default_factory=dict, event_key="compensation-offer-made")
+    # Event structure: {"type":"event","eventType":"compensation-offer-made","data":{"compensationOffers":[null,300000]}}
+    compensationOffers: list[Optional[float]] = EventField(default_factory=lambda: [None, None], event_key="compensationOffers")
 
     # Winning condition
     winning_condition: int = EventField(default=0, event_key="winningCondition")
@@ -101,12 +102,10 @@ class HLGameState(GameState):
         """Provide custom event handlers for market, chat, and compensation events"""
         market_events = ["add-order", "update-order", "delete-order", "contract-fulfilled", "asset-movement"]
         chat_events = ["message-received"]
-        compensation_events = ["compensation-requests-received"]
-        
+               
         handlers = {event: self._handle_market_event for event in market_events}
         handlers.update({event: self._handle_chat_event for event in chat_events})
-        handlers.update({event: self._handle_compensation_event for event in compensation_events})
-        
+            
         return handlers
 
     # This is needed to build the order book
@@ -124,8 +123,4 @@ class HLGameState(GameState):
         """Handle chat-related events by delegating to ChatState"""
         self.public_information.chat_state.process_event(event_type=event_type, data=data)
 
-    def _handle_compensation_event(self, event_type: str, data: dict[str, Any]) -> None:
-        """Handle compensation-related events"""
-        if event_type == "compensation-requests-received":
-            # Store the raw compensation request data
-            self.private_information.raw_compensation = data
+ 
