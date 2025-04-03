@@ -257,3 +257,4 @@ examples/server/*/*/games/
 server_docs/
 .cursorrules
 .vscode/launch.json
+.aider*
