@@ -81,7 +81,7 @@ jobs:
           key: venv-cache-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.github/workflows/tests.yaml') }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Install library
-        run: poetry install --no-interaction --all-groups
+        run: poetry install --no-interaction --all-groups --no-plugins
 
       - name: Check tests folder existence
         id: check_test_files
