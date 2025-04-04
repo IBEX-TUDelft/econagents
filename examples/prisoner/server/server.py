@@ -44,7 +44,7 @@ PAYOFF_MATRIX = {
     },
 }
 
-SPECS_PATH = Path(__file__).parent / "specs" / "games"
+SPECS_PATH = Path(__file__).parent / "games"
 
 
 class PrisonersDilemmaGame:

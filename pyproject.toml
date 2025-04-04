@@ -1,5 +1,5 @@
 [build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.1"]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
 build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.poetry-dynamic-versioning]
@@ -7,32 +7,55 @@ enable = true
 vcs = "git"
 style = "semver"
 
+[project]
+name = "econagents"
+license = { file = "LICENSE" }
+description = "econagents is a Python library that lets you use LLM agents in economic experiments. The framework connects LLM agents to game servers through WebSockets and provides a flexible architecture for designing, customizing, and running economic simulations."
+readme = "README.md"
+homepage = "https://github.com/iwanalabs/econagents"
+repository = "https://github.com/iwanalabs/econagents"
+dynamic = ["version"]
+
 [tool.poetry]
 name = "econagents"
 version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
-homepage = "https://github.com/iwanalabs/econagents"
-repository = "https://github.com/iwanalabs/econagents"
-license = "Apache-2.0"
-description = ""
-authors = ["Dylan"]
-readme = "README.md"
 packages = [{include = "econagents"}]
 include = ["econagents/*.so", "econagents/*.pyd"]  # Compiled extensions
 
 [tool.poetry.build]
 generate-setup-file = false
 
-[tool.poetry.scripts]
-
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
 python = ">=3.10,<3.13"
-typing-extensions = "^4.12.2"
-openai = "^1.68.2"
-langsmith = "^0.3.19"
-websockets = "^15.0"
 pydantic = "^2.10.6"
 requests = "^2.32.3"
+websockets = "^15.0"
+
+# Optional dependencies
+[tool.poetry.group.openai]
+optional = true
+
+[tool.poetry.group.openai.dependencies]
+openai = "^1.68.2"
+
+[tool.poetry.group.ollama]
+optional = true
+
+[tool.poetry.group.ollama.dependencies]
+ollama = "^0.1.9"
+
+[tool.poetry.group.langsmith]
+optional = true
+
+[tool.poetry.group.langsmith.dependencies]
+langsmith = "^0.3.19"
+
+[tool.poetry.group.langfuse]
+optional = true
+
+[tool.poetry.group.langfuse.dependencies]
+langfuse = "^2.60.2"
 
 [tool.poetry.group.docs.dependencies]
 myst-parser = {extras = ["linkify"], version = "^4.0.1"}
@@ -150,3 +173,11 @@ ignore = [
 
 [tool.codespell]
 skip = 'poetry.lock,'
+
+[tool.poetry.extras]
+openai = ["openai"]
+ollama = ["ollama"]
+langsmith = ["langsmith"]
+langfuse = ["langfuse"]
+default = ["openai", "langsmith"]
+all = ["openai", "ollama", "langsmith", "langfuse"]
