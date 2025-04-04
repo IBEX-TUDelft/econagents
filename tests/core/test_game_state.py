@@ -245,36 +245,42 @@ class TestGameState:
         assert parsed["public_information"]["turn"] == 3
 
     def test_reset_state(self):
-        """Test resetting fields across meta, private, and public info."""
+        """Test reset_state when using subclasses for state components."""
 
-        class TMeta(MetaInformation):
-            phase: int = EventField(default=0, event_key="round")
-            total_rounds: int = EventField(default=5)
+        class SubMeta(MetaInformation):
+            custom_meta: str = EventField(default="default_meta")
 
-        class TPrivate(PrivateInformation):
-            total_score: int = EventField(default=0)
+        class SubPrivate(PrivateInformation):
+            custom_private: int = EventField(default=10)
 
-        class TPublic(PublicInformation):
-            history: list[dict[str, Any]] = EventField(default_factory=list)
+        class SubPublic(PublicInformation):
+            custom_public: list = EventField(default_factory=list)
 
-        class TGameState(GameState):
-            meta: TMeta = Field(default_factory=TMeta)
-            private_information: TPrivate = Field(default_factory=TPrivate)
-            public_information: TPublic = Field(default_factory=TPublic)
+        class SubGameState(GameState):
+            meta: SubMeta = Field(default_factory=SubMeta)
+            private_information: SubPrivate = Field(default_factory=SubPrivate)
+            public_information: SubPublic = Field(default_factory=SubPublic)
 
-        state = TGameState()
-        state.meta.game_id = 1
-        state.private_information.total_score = 100
-        state.public_information.history = [{"round": 1, "score": 100}]
+        state = SubGameState()
+
+        # Modify values from defaults
+        state.meta.game_id = 50
+        state.meta.custom_meta = "changed_meta"
+        state.private_information.custom_private = 20
+        state.public_information.custom_public = ["item1"]
 
         state.reset_state()
 
-        assert state.private_information.total_score == 0
-        assert state.public_information.history == []
-        assert isinstance(state.meta, TMeta)
-        assert isinstance(state.private_information, TPrivate)
-        assert isinstance(state.public_information, TPublic)
-        assert isinstance(state.meta.phase, int)
-        assert isinstance(state.meta.total_rounds, int)
-        assert isinstance(state.private_information.total_score, int)
-        assert isinstance(state.public_information.history, list)
+        # Verify reset to subclass defaults
+        assert state.meta.game_id == 0  # inherited field reset
+        assert state.meta.custom_meta == "default_meta"
+        assert state.private_information.custom_private == 10
+        assert state.public_information.custom_public == []
+
+        assert isinstance(state.meta, SubMeta)
+        assert isinstance(state.private_information, SubPrivate)
+        assert isinstance(state.public_information, SubPublic)
+
+        assert isinstance(state.meta.custom_meta, str)
+        assert isinstance(state.private_information.custom_private, int)
+        assert isinstance(state.public_information.custom_public, list)
