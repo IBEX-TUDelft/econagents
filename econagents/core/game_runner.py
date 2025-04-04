@@ -63,6 +63,10 @@ class GameRunnerConfig(BaseModel):
     observability_provider: Optional[Literal["langsmith", "langfuse"]] = None
     """Name of the observability provider to use. Options: 'langsmith' or 'langfuse'"""
 
+    # Agent stop configuration
+    end_game_event: str = "game-over"
+    """Event type that signals the end of the game and should stop the agent."""
+
 
 class TurnBasedGameRunnerConfig(GameRunnerConfig):
     """Configuration class for TurnBasedGameRunner."""
@@ -302,6 +306,10 @@ class GameRunner:
         if not agent_manager.auth_mechanism:
             agent_manager.auth_mechanism = self.config.auth_mechanism
             agent_manager.logger.debug(f"Injected default auth mechanism: {agent_manager.auth_mechanism}")
+
+        if agent_manager.end_game_event_type != self.config.end_game_event:
+            agent_manager.end_game_event_type = self.config.end_game_event
+            agent_manager.logger.debug(f"Injected default end game event: {agent_manager.end_game_event_type}")
 
         if agent_manager.llm_provider and self.config.observability_provider:
             try:
