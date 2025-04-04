@@ -403,7 +403,7 @@ class PrisonersDilemmaServer:
             websocket,
             {
                 "type": "event",
-                "eventType": "game-ended",
+                "eventType": "game-over",
                 "data": {
                     "gameId": game.game_id,
                     "result": result,
