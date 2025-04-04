@@ -9,7 +9,7 @@ Prerequisites
 Before running an experiment, ensure you have:
 
 1. Python 3.10+ installed
-2. All dependencies installed 
+2. All dependencies installed
 3. Have set up API keys for OpenAI and LangSmith
 
 Create a ``.env`` file in your project root with the following variables:
@@ -61,7 +61,35 @@ The Prisoner's Dilemma experiment uses the econagents framework's hierarchical s
         private_information: PDPrivate = Field(default_factory=PDPrivate)
         public_information: PDPublic = Field(default_factory=PDPublic)
 
-The state gets updated automatically through the ``EventField`` system, which maps incoming events from the server to state fields. For example, when a "round-started" event is received, the ``phase`` field in ``PDMeta`` is updated with the current round number. The other fields are updated when the even key in the server's events match their name.
+The state gets updated automatically through the ``EventField`` system, which maps data from incoming events from the server to state fields.
+
+For example, in our server implementation, the server sends events like after each round finishes:
+
+.. code-block:: json
+
+    {
+        "type": "event",
+        "eventType": "round-result",
+        "data": {
+            "gameId": 1743761219,
+            "round": 1,
+            "choices": {
+                "1": "cooperate",
+                "2": "cooperate"
+            },
+            "payoffs": {
+                "1": 3,
+                "2": 3
+            },
+            "total_score": 3,
+            "history": [
+                {"round": 1, "my_choice": "cooperate", "opponent_choice": "cooperate", "my_payoff": 3, "opponent_payoff": 3}
+            ]
+        }
+    }
+
+In this case, the ``EventField`` system updates the phase (using the ``round`` key) in ``PDMeta``, ``total_score`` in ``PDPrivate``, and ``history`` in ``PDPublic`` state. The ``payoffs`` key is ignored, because it was not included in the state definition.
+
 
 Agent Manager Implementation
 ----------------------------
@@ -239,7 +267,7 @@ Modifying Agent Prompts
 
 Edit the templates in ``examples/prisoner/prompts/`` to change the agent's behavior:
 
-- Change the payoff matrix in ``all_system.jinja2`` to explore different incentive structures (don't forget to update the game logic in server.py) 
+- Change the payoff matrix in ``all_system.jinja2`` to explore different incentive structures (don't forget to update the game logic in server.py)
 - Modify the instructions in ``all_user.jinja2`` to guide the agent toward specific strategies
 - Create phase-specific prompts like ``all_system_phase_3.jinja2`` to change behavior in specific rounds
 
