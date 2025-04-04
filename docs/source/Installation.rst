@@ -25,13 +25,13 @@ For development, its recommended to use Poetry:
 Note that [Poetry](https://python-poetry.org/) is used to create and manage the virtual environment for the project development. If you are not planning to contribute to the project, you can install the dependencies using your preferred package manager.
 
 Optional Dependencies
---------------------
+---------------------
 
 econagents is designed to be modular, allowing you to install only the dependencies you need.
 The core package is lightweight, and you can add optional dependencies based on your use case.
 
 LLM Providers
-~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 econagents supports multiple LLM providers through optional dependencies:
 
@@ -48,7 +48,7 @@ econagents supports multiple LLM providers through optional dependencies:
       pip install econagents[ollama]
 
 Observability Providers
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 For tracing and monitoring your LLM calls:
 
@@ -65,7 +65,7 @@ For tracing and monitoring your LLM calls:
       pip install econagents[langfuse]
 
 Convenience Installations
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can combine multiple optional dependencies:
 
@@ -88,7 +88,7 @@ You can combine multiple optional dependencies:
       pip install econagents[openai,langfuse]
 
 Core Dependencies
-----------------
+-----------------
 
 The core package depends on the following packages:
 
