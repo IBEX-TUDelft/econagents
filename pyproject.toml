@@ -14,6 +14,7 @@ description = "econagents is a Python library that lets you use LLM agents in ec
 readme = "README.md"
 homepage = "https://github.com/iwanalabs/econagents"
 repository = "https://github.com/iwanalabs/econagents"
+dynamic = ["version"]
 
 [tool.poetry]
 name = "econagents"
