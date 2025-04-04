@@ -20,7 +20,6 @@ class ChatOpenAI(BaseLLM):
         Args:
             model_name: The model name to use.
             api_key: The API key to use for authentication.
-            observability: The observability provider to use.
         """
         self.model_name = model_name
         self.api_key = api_key
