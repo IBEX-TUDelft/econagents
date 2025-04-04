@@ -1,1 +1,1 @@
-"""Tests for the econagents.core package."""
+"""Tests for the core package."""
