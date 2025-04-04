@@ -57,7 +57,7 @@ jobs:
         id: cached-poetry
         with:
           path: ${{ env.POETRY_HOME }}
-          key: poetry-cache-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.github/workflows/tests.yaml') }}
+          key: poetry-cache-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.github/workflows/tests.yaml') }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Install poetry
         uses: snok/install-poetry@v1
@@ -78,7 +78,7 @@ jobs:
         id: cached-venv
         with:
           path: .venv/
-          key: venv-cache-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.github/workflows/tests.yaml') }}
+          key: venv-cache-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.github/workflows/tests.yaml') }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Install library
         run: poetry install --no-interaction --extras all
