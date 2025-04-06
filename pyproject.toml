@@ -10,7 +10,6 @@ style = "semver"
 [project]
 name = "econagents"
 license = { file = "LICENSE" }
-description = "econagents is a Python library that lets you use LLM agents in economic experiments. The framework connects LLM agents to game servers through WebSockets and provides a flexible architecture for designing, customizing, and running economic simulations."
 readme = "README.md"
 homepage = "https://github.com/iwanalabs/econagents"
 repository = "https://github.com/iwanalabs/econagents"
