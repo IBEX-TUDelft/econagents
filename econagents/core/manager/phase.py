@@ -3,14 +3,14 @@ import json
 import logging
 import random
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional
 from pathlib import Path
+from typing import Any, Callable, Optional
 
 from econagents.core.agent_role import AgentRole
 from econagents.core.events import Message
 from econagents.core.manager.base import AgentManager
 from econagents.core.state.game import GameState
-from econagents.core.transport import AuthenticationMechanism, SimpleLoginPayloadAuth
+from econagents.core.transport import AuthenticationMechanism
 
 
 class PhaseManager(AgentManager, ABC):

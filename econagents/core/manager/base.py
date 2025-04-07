@@ -68,6 +68,10 @@ class AgentManager(LoggerMixin):
         self._global_pre_event_hooks: list[Callable[[Message], Any]] = []
         self._global_post_event_hooks: list[Callable[[Message], Any]] = []
 
+        # Default event type to trigger stopping the agent
+        self._end_game_event_type: str = "game-over"
+        self.register_event_handler(self._end_game_event_type, self._handle_end_game)
+
         # Initialize transport if URL is provided
         if url:
             self._initialize_transport()
@@ -156,6 +160,30 @@ class AgentManager(LoggerMixin):
             return None
         return Message(message_type=message_type, event_type=event_type, data=data)
 
+    @property
+    def end_game_event_type(self) -> str:
+        """Get the event type that triggers the agent to stop."""
+        return self._end_game_event_type
+
+    @end_game_event_type.setter
+    def end_game_event_type(self, value: str):
+        """
+        Set the event type that triggers the agent to stop.
+
+        Unregisters the stop handler from the old event type and registers it
+        for the new event type.
+
+        Args:
+            value (str): The new event type to listen for.
+        """
+        if self._end_game_event_type != value:
+            # Unregister from the old event type
+            self.unregister_event_handler(self._end_game_event_type, self._handle_end_game)
+            # Register for the new event type
+            self._end_game_event_type = value
+            self.register_event_handler(self._end_game_event_type, self._handle_end_game)
+            self.logger.info(f"End game event type set to: {value}")
+
     async def on_message(self, message: Message):
         """
         Default implementation to handle incoming messages from the server.
@@ -202,6 +230,7 @@ class AgentManager(LoggerMixin):
         self.running = False
         if self.transport:
             await self.transport.stop()
+            self.logger.info("Agent manager stopped and connection closed.")
 
     async def on_event(self, message: Message):
         """
@@ -269,6 +298,16 @@ class AgentManager(LoggerMixin):
             result = handler(message)
             if hasattr(result, "__await__"):
                 await result
+
+    async def _handle_end_game(self, message: Message):
+        """
+        Default handler for the 'end_game_event_type'. Stops the agent manager.
+
+        Args:
+            message (Message): The event message triggering the end game.
+        """
+        self.logger.info(f"Received end game event ({message.event_type}). Stopping agent manager...")
+        await self.stop()
 
     # Event handler registration
     def register_event_handler(self, event_type: str, handler: Callable[[Message], Any]):
@@ -355,7 +394,17 @@ class AgentManager(LoggerMixin):
             if handler is None:
                 self._event_handlers.pop(event_type)
             else:
-                self._event_handlers[event_type] = [h for h in self._event_handlers[event_type] if h != handler]
+                # Use list comprehension to avoid modifying list while iterating
+                handlers_to_keep = [h for h in self._event_handlers[event_type] if h != handler]
+                if not handlers_to_keep:
+                    # Remove the key if the list becomes empty
+                    self._event_handlers.pop(event_type, None)
+                else:
+                    self._event_handlers[event_type] = handlers_to_keep
+                # Explicitly handle removal of the default end game handler
+                if event_type == self._end_game_event_type and handler == self._handle_end_game:
+                    self.logger.warning(f"Default end game handler for '{event_type}' unregistered.")
+
         return self
 
     def unregister_global_event_handler(self, handler: Optional[Callable] = None):
@@ -384,7 +433,13 @@ class AgentManager(LoggerMixin):
             if hook is None:
                 self._pre_event_hooks.pop(event_type)
             else:
-                self._pre_event_hooks[event_type] = [h for h in self._pre_event_hooks[event_type] if h != hook]
+                # Use list comprehension to avoid modifying list while iterating
+                hooks_to_keep = [h for h in self._pre_event_hooks[event_type] if h != hook]
+                if not hooks_to_keep:
+                    # Remove the key if the list becomes empty
+                    self._pre_event_hooks.pop(event_type, None)
+                else:
+                    self._pre_event_hooks[event_type] = hooks_to_keep
         return self
 
     def unregister_global_pre_event_hook(self, hook: Optional[Callable] = None):
@@ -413,7 +468,13 @@ class AgentManager(LoggerMixin):
             if hook is None:
                 self._post_event_hooks.pop(event_type)
             else:
-                self._post_event_hooks[event_type] = [h for h in self._post_event_hooks[event_type] if h != hook]
+                # Use list comprehension to avoid modifying list while iterating
+                hooks_to_keep = [h for h in self._post_event_hooks[event_type] if h != hook]
+                if not hooks_to_keep:
+                    # Remove the key if the list becomes empty
+                    self._post_event_hooks.pop(event_type, None)
+                else:
+                    self._post_event_hooks[event_type] = hooks_to_keep
         return self
 
     def unregister_global_post_event_hook(self, hook: Optional[Callable] = None):
