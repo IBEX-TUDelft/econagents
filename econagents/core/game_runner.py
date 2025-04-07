@@ -357,7 +357,7 @@ class GameRunner:
             agent_manager.logger.info(f"Connecting to WebSocket URL: {agent_manager.url}")
             await agent_manager.start()
         except Exception:
-            agent_manager.logger.exception(f"Error in simulation for Agent {agent_id}")
+            agent_manager.logger.exception(f"Error in game for Agent {agent_id}")
             raise
 
     async def run_game(self) -> None:
@@ -368,7 +368,7 @@ class GameRunner:
 
         try:
             tasks = []
-            game_logger.info("Starting simulations")
+            game_logger.info("Starting game")
 
             for i, agent_manager in enumerate(self.agents, start=1):
                 tasks.append(self.spawn_agent(agent_manager, i))
@@ -377,4 +377,5 @@ class GameRunner:
             game_logger.exception(f"Failed to run game: {e}")
             raise
         finally:
+            game_logger.info("Game over")
             self.cleanup_logging()
