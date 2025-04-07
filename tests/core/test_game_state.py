@@ -269,7 +269,7 @@ class TestGameState:
         state.private_information.custom_private = 20
         state.public_information.custom_public = ["item1"]
 
-        state.reset_state()
+        state.reset()
 
         # Verify reset to subclass defaults
         assert state.meta.game_id == 0  # inherited field reset

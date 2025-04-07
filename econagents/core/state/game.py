@@ -221,7 +221,7 @@ class GameState(BaseModel):
         """
         return {}
 
-    def reset_state(self) -> None:
+    def reset(self) -> None:
         """
         Resets meta, private_information, and public_information
         to their initial state by re-initializing them using their default factories.
