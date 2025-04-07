@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional, Protocol, Type, TypeVar
+from typing import Any, Callable, Optional, Protocol, Type, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -220,3 +220,25 @@ class GameState(BaseModel):
             dict[str, EventHandler]: A mapping of event types to handler functions.
         """
         return {}
+
+    def reset(self) -> None:
+        """
+        Resets meta, private_information, and public_information
+        to their initial state by re-initializing them using their default factories.
+        This effectively removes any dynamically added attributes.
+        """
+        # Re-initialize components using their default factories from the GameState model definition
+        meta_field = self.__class__.model_fields["meta"]
+        if meta_field.default_factory:
+            fac = cast("Callable[[], Any]", meta_field.default_factory)
+            self.meta = fac()
+
+        private_field = self.__class__.model_fields["private_information"]
+        if private_field.default_factory:
+            fac = cast("Callable[[], Any]", private_field.default_factory)
+            self.private_information = fac()
+
+        public_field = self.__class__.model_fields["public_information"]
+        if public_field.default_factory:
+            fac = cast("Callable[[], Any]", public_field.default_factory)
+            self.public_information = fac()

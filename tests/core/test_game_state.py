@@ -243,3 +243,44 @@ class TestGameState:
         assert parsed["meta"]["phase"] == 2
         assert parsed["private_information"]["cards"] == ["card1", "card2"]
         assert parsed["public_information"]["turn"] == 3
+
+    def test_reset_state(self):
+        """Test reset_state when using subclasses for state components."""
+
+        class SubMeta(MetaInformation):
+            custom_meta: str = EventField(default="default_meta")
+
+        class SubPrivate(PrivateInformation):
+            custom_private: int = EventField(default=10)
+
+        class SubPublic(PublicInformation):
+            custom_public: list = EventField(default_factory=list)
+
+        class SubGameState(GameState):
+            meta: SubMeta = Field(default_factory=SubMeta)
+            private_information: SubPrivate = Field(default_factory=SubPrivate)
+            public_information: SubPublic = Field(default_factory=SubPublic)
+
+        state = SubGameState()
+
+        # Modify values from defaults
+        state.meta.game_id = 50
+        state.meta.custom_meta = "changed_meta"
+        state.private_information.custom_private = 20
+        state.public_information.custom_public = ["item1"]
+
+        state.reset()
+
+        # Verify reset to subclass defaults
+        assert state.meta.game_id == 0  # inherited field reset
+        assert state.meta.custom_meta == "default_meta"
+        assert state.private_information.custom_private == 10
+        assert state.public_information.custom_public == []
+
+        assert isinstance(state.meta, SubMeta)
+        assert isinstance(state.private_information, SubPrivate)
+        assert isinstance(state.public_information, SubPublic)
+
+        assert isinstance(state.meta.custom_meta, str)
+        assert isinstance(state.private_information.custom_private, int)
+        assert isinstance(state.public_information.custom_public, list)
