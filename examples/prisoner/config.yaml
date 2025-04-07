@@ -1,0 +1,55 @@
+name: "Prisoner's Dilemma"
+description: "A simple prisoner's dilemma experiment with LLM agents"
+
+agent_roles:
+  - role_id: 1
+    name: "prisoner"
+    llm_type: "ChatOpenAI"
+    llm_params:
+      model_name: "gpt-4o"
+
+agents:
+  - id: 1
+    role_id: 1
+  - id: 2
+    role_id: 1
+
+state:
+  meta_fields:
+    - name: "game_id"
+      type: "int"
+      default: 0
+      exclude_from_mapping: true
+    - name: "phase"
+      type: "int"
+      default: 0
+      event_key: "round"
+    - name: "total_rounds"
+      type: "int"
+      default: 5
+
+  private_fields:
+    - name: "total_score"
+      type: "int"
+      default: 0
+
+  public_fields:
+    - name: "history"
+      type: "list"
+      default_factory: "list"
+
+manager:
+  type: "TurnBasedPhaseManager"
+
+runner:
+  type: "TurnBasedGameRunner"
+  hostname: "localhost"
+  port: 8765
+  path: "wss"
+  game_id: 123
+  logs_dir: "logs"
+  log_level: "DEBUG"
+  phase_transition_event: "round-started"
+  phase_identifier_key: "round"
+  observability_provider: "langfuse"
+  prompts_dir: "prompts"
