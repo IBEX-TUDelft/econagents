@@ -301,6 +301,8 @@ class GameRunner:
 
         if not agent_manager.state and self.config.state_class:
             agent_manager.state = self.config.state_class()
+            # Set the game_id in the state
+            agent_manager.state.meta.game_id = self.config.game_id
             agent_manager.logger.debug(f"Injected default state: {agent_manager.state}")
 
         if not agent_manager.auth_mechanism:
@@ -369,7 +371,6 @@ class GameRunner:
         try:
             tasks = []
             game_logger.info("Starting game")
-
             for i, agent_manager in enumerate(self.agents, start=1):
                 tasks.append(self.spawn_agent(agent_manager, i))
             await asyncio.gather(*tasks)

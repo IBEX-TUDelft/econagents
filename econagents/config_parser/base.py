@@ -192,13 +192,6 @@ class StateConfig(BaseModel):
             private_information: DynamicPrivate = Field(default_factory=DynamicPrivate)
             public_information: DynamicPublic = Field(default_factory=DynamicPublic)
 
-            def __init__(self, **kwargs: Any):
-                game_id = kwargs.pop("game_id", 0)
-                super().__init__(**kwargs)
-                # Set game_id explicitly if the field exists
-                if hasattr(self.meta, "game_id"):
-                    setattr(self.meta, "game_id", game_id)
-
         return DynamicGameState
 
 

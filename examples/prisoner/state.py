@@ -32,7 +32,3 @@ class PDGameState(GameState):
     meta: PDMeta = Field(default_factory=PDMeta)
     private_information: PDPrivate = Field(default_factory=PDPrivate)
     public_information: PDPublic = Field(default_factory=PDPublic)
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
-        self.meta.game_id = kwargs.get("game_id", 0)
