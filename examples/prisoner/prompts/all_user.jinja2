@@ -2,8 +2,9 @@
 
 ## Current Game State
 
+Game ID: {{ meta.game_id }}
 Round {{ meta.phase }} of {{ meta.total_rounds }} rounds
-Your current score: {{ private_information.total_score }}
+{% if private_information.total_score %} Your current score: {{ private_information.total_score }} {% endif %}
 
 ## Your History
 
@@ -32,7 +33,7 @@ Provide your choice as a JSON object with the following fields:
 Example:
 ```
 {
-    "gameId": {{ meta.game_id }},
+    "gameId": <game_id>,
     "type": "choice",
     "choice": "COOPERATE"
 }

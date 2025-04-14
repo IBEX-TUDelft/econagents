@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from econagents.core.game_runner import GameRunner, TurnBasedGameRunnerConfig
 from examples.prisoner.manager import PDManager
 from examples.prisoner.server.create_game import create_game_from_specs
+from examples.prisoner.state import PDGameState
 
 logger = logging.getLogger("prisoners_dilemma")
 
@@ -33,6 +34,8 @@ async def main():
         hostname="localhost",
         port=8765,
         path="wss",
+        # State configuration
+        state_class=PDGameState,
         # Phase transition configuration
         phase_transition_event="round-started",
         phase_identifier_key="round",
