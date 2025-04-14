@@ -20,6 +20,8 @@ name = "econagents"
 version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
 packages = [{include = "econagents"}]
 include = ["econagents/*.so", "econagents/*.pyd"]  # Compiled extensions
+description = ""
+authors = ["Dylan Castillo <dylan@iwanalabs.com>"]
 
 [tool.poetry.build]
 generate-setup-file = false
