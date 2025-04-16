@@ -1,5 +1,5 @@
 {
-  "title": "voting test",
+  "title": "voting simulation",
   "tax_rate": {
       "initial": 1,
       "final": 33
@@ -68,21 +68,21 @@
   },
   "timers": {
       "phase_0": null,
-      "phase_1": "10",
-      "phase_2": "30",
-      "phase_3": "30",
-      "phase_4": "30",
-      "phase_5": "3",
-      "phase_6": "10",
-      "phase_7": "5"
+      "phase_1": "15",
+      "phase_2": "180",
+      "phase_3": "120",
+      "phase_4": "120",
+      "phase_5": "120",
+      "phase_6": "60",
+      "phase_7": "15"
   },
   "round_count": "1",
   "agents_only": false,
   "game_type": "voting",
-  "practice": true,
+  "practice": false,
   "minutes_for_trading": 10,
   "minutes_for_sniping": 2,
   "session_number": 1,
-  "seconds_for_deliberation": 30,
+  "seconds_for_deliberation": 120,
   "show_up_fee": 5
 }
