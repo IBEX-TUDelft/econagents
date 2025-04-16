@@ -1,0 +1,145 @@
+
+{# ==================== MARKET PHASE INTRO ==================== #}
+
+<p>
+As a reminder you are the <strong>developer</strong> with the goal to <strong>maximize the total number of points</strong> in this experiment, without regard for the other players in the experiment.
+You will now be taking part in the <strong>market phase</strong>.
+</p>
+
+<pre><strong>
+Total Points = 
+(Real Value of the Property under the Chosen Condition) 
+– ((First Declaration × 1% tax) + (Final Declaration × 33% tax)) 
++ (First Speculation Result + Final Speculation Result) 
++ (Cash Position + (Number of Shares × True Share Value in the Chosen Condition))
+</strong></pre>
+
+<p>
+You are playing together with your fully aligned <em>o1 Pro model</em>. Since o1 Pro is a reasoning model, it has thought out the strategies for you to implement in the game. 
+Your job is to <strong>strictly follow the instructions</strong> given by your o1 Pro strategy agent as best as you can, in order to maximize your points in the game.
+</p>
+
+<p>
+Your o1 Pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the market phase.
+</p>
+
+<p><strong>The instructions for the market phase follow:</strong></p>
+
+{# ==================== MARKET PHASE STRATEGY ==================== #}
+
+<h2>💹 Market Phase Strategy – Developer</h2>
+
+<p><strong>Below is how we (the Developer) want our GPT-4o representative to act during this Market Phase to maximize our total number of points.</strong></p>
+
+<hr>
+
+<h3>🎯 High-Level Strategy</h3>
+
+<p>Our overall goal is to maximize:</p>
+
+<pre>
+Real Value of our property 
+− [1% (first decl.) + 33% (final decl.)] 
++ (first speculation + final speculation) 
++ (cash + [#shares × share value])
+</pre>
+
+<p>
+In the <em>Market Phase</em>, we trade tax shares, each worth:
+</p>
+
+<pre>Total Final Tax Revenue / 100</pre>
+
+<h4>1. 🧠 Assessing Final Share Value</h4>
+<ul>
+  <li>Final declarations influence tax revenue → share value.</li>
+  <li>Public signal = assumes everyone declares same as before.</li>
+  <li>Private signal = noisy estimate around true value.</li>
+  <li>Real final share value may differ from both signals.</li>
+</ul>
+
+<h4>2. 📈 Simple Trading Heuristic</h4>
+<p>Compare current market prices to our internal “fair value” estimate:</p>
+<ol>
+  <li>If “ask” (sell offer) is <strong>well below</strong> fair value → <em>Buy</em>.</li>
+  <li>If “bid” (buy offer) is <strong>well above</strong> fair value → <em>Sell</em>.</li>
+  <li>Otherwise → Do nothing.</li>
+</ol>
+
+<h4>3. ⚙️ Practical Considerations</h4>
+<ul>
+  <li>Start with 30 shares. Add more if cheap, sell some if overpriced.</li>
+  <li>Don’t deplete all cash or oversell.</li>
+</ul>
+
+<hr>
+
+<h3>🧾 Implementation Instructions to GPT-4o</h3>
+
+<ol>
+  <li><strong>Estimate fair value</strong> of a share:
+    <pre>
+fair_value ≈ (private_signal + public_signal) / 2
+    </pre>
+    (Or weight more toward private_signal if trusted.)
+  </li>
+
+  <li><strong>If lowest ask</strong> < fair_value → Buy immediately:
+<pre><code>{
+  "gameId": {{ meta.game_id }},
+  "type": "post-order",
+  "order": {
+    "price": 0,
+    "quantity": 1,
+    "type": "bid",
+    "now": true,
+    "condition": {{ public_information.winning_condition }}
+  }
+}</code></pre>
+  </li>
+
+  <li><strong>If highest bid</strong> > fair_value → Sell immediately:
+<pre><code>{
+  "gameId": {{ meta.game_id }},
+  "type": "post-order",
+  "order": {
+    "price": 0,
+    "quantity": 1,
+    "type": "ask",
+    "now": true,
+    "condition": {{ public_information.winning_condition }}
+  }
+}</code></pre>
+  </li>
+
+  <li><strong>If no good trades</strong> → Do nothing:
+<pre><code>{}</code></pre>
+  </li>
+</ol>
+
+<h4>⏱️ Multiple Trades?</h4>
+<p>Repeat decisions quickly if needed. Keep it simple if time is short.</p>
+
+<hr>
+
+<h3>✅ Sample Output</h3>
+
+<p><strong>Do nothing:</strong></p>
+<pre><code>{}</code></pre>
+
+<p><strong>Buy one share if undervalued:</strong></p>
+<pre><code>{
+  "gameId": {{ meta.game_id }},
+  "type": "post-order",
+  "order": {
+    "price": 0,
+    "quantity": 1,
+    "type": "bid",
+    "now": true,
+    "condition": {{ public_information.winning_condition }}
+  }
+}</code></pre>
+
+<hr>
+
+<p><strong>That is the concise guidance.</strong> Your GPT-4o agent should act rationally based on market price deviations from our fair value estimate.</p>

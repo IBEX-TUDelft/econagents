@@ -257,4 +257,8 @@ examples/server/*/*/games/
 server_docs/
 .cursorrules
 .vscode/launch.json
-.aider*
+.aider.input.history
+.aider.tags.cache.v4/cache.db-shm
+.aider.chat.history.md
+.aider.tags.cache.v4/cache.db
+.aider.tags.cache.v4/cache.db-wal

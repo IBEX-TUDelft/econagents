@@ -1,39 +1,100 @@
-Instructions for this phase:
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Developer (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+{# ==================== FINAL DECLARATION PHASE INTRO ==================== #}
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+<p>
+As a reminder you are the <strong>developer</strong> with the goal to <strong>maximize the total number of points</strong> in this experiment, without regard for the other players in the experiment.
+You will now be taking part in the <strong>final declaration phase</strong>.
+</p>
 
-  2.2. **Winning Condition**:
-    - {{ public_information.winning_condition_description }} ({{ public_information.winning_condition }})
+<pre><strong>
+Total Points = 
+(Real Value of the Property under the Chosen Condition) 
+– ((First Declaration × 1% tax) + (Final Declaration × 33% tax)) 
++ (First Speculation Result + Final Speculation Result) 
++ (Cash Position + (Number of Shares × True Share Value in the Chosen Condition))
+</strong></pre>
 
-  2.3. **Your Initial Declaration**:
-    - Declared Value: {{ private_information.declarations[meta.player_number-1].declared_value }}
-    - Percentile: {{ private_information.declarations[meta.player_number-1].percentile }}%
+<p>
+You are playing together with your fully aligned <em>o1 Pro model</em>. Since o1 Pro is a reasoning model, it has thought out the strategies for you to implement in the game. 
+Your job is to <strong>strictly follow the instructions</strong> given by your o1 Pro strategy agent as best as you can, in order to maximize your points in the game.
+</p>
 
-  2.4. **Tax Information**:
-    - Current tax rate: {{ public_information.tax_rate }}%
+<p>
+Your o1 Pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the final declaration phase.
+</p>
 
-  2.4. **Market Signals**:
-    - Public Signal: {{ public_information.public_signal[public_information.winning_condition] }}
-    - Your Private Signal: {{ private_information.value_signals[public_information.winning_condition] }}
+<p><strong>The instructions for the final declaration phase follow:</strong></p>
 
-3. **Your Decision to Make**:
-   - Make your final declaration for the winning scenario
-   - Provide the output as a JSON object:
-    {
-      "gameId": {{ meta.game_id }},
-      "type": "declare",
-      "declaration": [
-          <value_no_project>,
-          <value_project>,
-          0,
-      ],
-    }
+{# ==================== FINAL DECLARATION PHASE STRATEGY ==================== #}
+
+<h2>📍 Final Declaration Phase Strategy – Developer</h2>
+
+<p><strong>Below is how we (the Developer) want our GPT-4o representative to act during this Final Declaration Phase to maximize our total number of points.</strong></p>
+
+<hr>
+
+<h3>🧠 Rationale</h3>
+
+<ol>
+  <li><strong>We Only Declare for the Winning Condition</strong>
+    <ul>
+      <li>Since the <em>Project</em> condition won, we only declare our value under the Project scenario.</li>
+      <li>No Project declaration is ignored (can be any placeholder).</li>
+    </ul>
+  </li>
+
+  <li><strong>Balancing Tax Costs vs. Speculation</strong>
+    <ul>
+      <li>We pay <strong>33%</strong> tax on our final declaration.</li>
+      <li>If we <em>under-declare</em>, we save some tax but lose to speculators.</li>
+      <li>If we <em>over-declare</em>, we pay extra tax and avoid speculation loss.</li>
+    </ul>
+  </li>
+</ol>
+
+<h4>✅ Why “Declare Exactly Your Real Value” is Optimal</h4>
+<ul>
+  <li><strong>Under-declare</strong> by ε → Gain = 0.33ε (tax saved), Loss = 0.50ε (to speculator), Net = -0.17ε</li>
+  <li><strong>Over-declare</strong> by ε → Loss = 0.33ε (tax), No speculation loss</li>
+</ul>
+
+<p>
+<b>Conclusion:</b> The minimum cost occurs at:
+</p>
+
+<pre><strong>Final Declaration = Your True (Real) Value</strong></pre>
+
+<p>This yields optimal tax without any speculation loss.</p>
+
+<hr>
+
+<h3>🧾 Instruction to GPT-4o Representative</h3>
+
+<ol>
+  <li>Get your <strong>true real value</strong> for the Project scenario: <code>{{ private_information.property.v[1] }}</code></li>
+  <li>Submit a declaration:
+    <ul>
+      <li>No Project = <code>0</code></li>
+      <li>Project = <code>{{ private_information.property.v[1] }}</code></li>
+    </ul>
+  </li>
+</ol>
+
+<h4>📤 JSON Output</h4>
+
+<pre><code>{
+  "gameId": {{ meta.game_id }},
+  "type": "declare",
+  "declaration": [
+    0,
+    {{ private_information.property.v[1] }},
+    0
+  ]
+}
+</code></pre>
+
+<p>
+<strong>Summary:</strong> Declare exactly the real value in the winning condition. This avoids excess tax or speculation penalties. Trust the o1 Pro strategy.
+</p>
+
+<hr>

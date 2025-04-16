@@ -1,42 +1,65 @@
-Instructions for this phase:
+{#
+As a reminder you are the Speculator with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the first **speculation phase**.
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Speculator (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
 
-2. **Available Information**:
-  2.1. **Declarations**:
-    - Winning Condition: {{ public_information.winning_condition_description }} ({{ public_information.winning_condition }})
-    {% set key = "projectA" if public_information.winning_condition == 1 else "noProject" %}
-    {% for declaration in private_information.declarations %}
-      {% set role_name = "Speculator" if declaration["role"] == 1 else "Developer" if declaration["role"] == 2 else "Owner" %}
-      {% set declared_value = declaration["d"][public_information.winning_condition] %}
-      {% if declaration["role"] == 2 %}
-        {% set min_value = public_information.boundaries["developer"][key]["low"] %}
-        {% set max_value = public_information.boundaries["developer"][key]["high"] %}
-      {% else %}
-        {% set min_value = public_information.boundaries["owner"][key]["low"] %}
-        {% set max_value = public_information.boundaries["owner"][key]["high"] %}
-      {% endif %}
-      {% set percentile = ((declared_value - min_value) / (max_value - min_value) * 100) | round(2) %}
-      - Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value }}, percentile: {{ percentile }}%
-    {% endfor %}
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
 
-  2.2. **Real Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
 
-3. **Your Decision to Make**:
-   - Decide which properties to purchase based on their declared values and your assessment of true value
-   - You should provide the id of the player you want to trade with
-   - Provide the output as a JSON object:
-    {
-      "gameId": {{ meta.game_id }},
-      "type": "done-speculating",
-      "snipe": [<player_id>, <player_id>, <player_id>],
-    }
+Your o1 pro strategy agent will give you the strategies to strictly follow as a speculator in the experiment for the first speculation phase.
+
+The instructions for the first speculation phase follow;
+#}
+
+{# 
+First Speculation Phase – Step-by-Step Instructions for GPT-4o Speculator Agent
+#}
+
+---
+
+### 1. Identify the Relevant Bounds
+- From the **Winning Condition** (either "No Project" or "Project"), determine the **minimum** and **maximum** possible real values for:
+  - Each Owner’s land
+  - The Developer’s land
+
+### 2. Compute the Midpoint
+For each property \( i \):
+1. Let \(	ext{min}_i\) and \(	ext{max}_i\) be the lower and upper bounds for that property’s real value under the chosen condition.
+2. Compute \( 	ext{midpoint}_i = rac{	ext{min}_i + 	ext{max}_i}{2}.\)
+
+### 3. Compare Declared Value to Midpoint
+- For each landowner or developer \( i \):
+  - Let \(D_i\) be their **declared value** under the winning condition.
+  - If \( D_i < 	ext{midpoint}_i \), it suggests the property is **under-declared** on average and thus profitable to buy.
+  - If \( D_i \ge 	ext{midpoint}_i \), the property is likely **over-declared** or fairly priced, so do **not** buy.
+
+### 4. Make Your “Snipe” List
+- Collect the **IDs** of all players \( i \) for whom \( D_i < 	ext{midpoint}_i \) into a list:  
+  \[
+    	ext{snipeList} = [\,i \mid D_i < 	ext{midpoint}_i \,].
+  \]
+- If no property is under-declared, the list can be empty.
+
+### 5. Produce the Final JSON Decision
+Use the following format:
+```json
+{
+  "gameId": <GAME_ID>,
+  "type": "done-speculating",
+  "snipe": [<player_id_1>, <player_id_2>, ...]
+}
+```
+
+Where:
+- `snipe` is the array of **player IDs** you decided to buy from.
+
+---
+
+#### **Summary to GPT-4o** 
+1. **Calculate** the midpoint for each declaration based on the known boundaries.  
+2. **Compare** each declaration to its midpoint.  
+3. **Snipe** any property where the declaration is strictly below that midpoint (or is clearly profitable).  
+4. **Return** the array of those player IDs in the specified JSON format.
+
+**This completes your instructions for the first speculation phase.**

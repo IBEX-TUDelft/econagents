@@ -1,0 +1,105 @@
+
+{# ===================================================================================== #}
+{# INTRODUCTION - MARKET PHASE INSTRUCTIONS FOR GPT-4o OWNER AGENT                       #}
+{# ===================================================================================== #}
+
+{# REMINDER OF ROLE AND GOAL #}
+As a reminder, you are the **Owner** with the goal to **maximize the total number of points** in this experiment, without regard for the other players in the experiment.
+
+You are now taking part in the **market phase**.
+
+{# OBJECTIVE FUNCTION #}
+Your total points are computed as:
+
+```
+total number of points =
+  (The Real Value of the property under the chosen condition)
+  – ((Initial Declaration × 1%) + (Final Declaration × 33%))
+  + (First Speculation Result + Final Speculation Result)
+  + (Cash Position + Number of Shares × True Share Value under Winning Condition)
+```
+
+{# AGENT ALIGNMENT #}
+You are playing together with your fully aligned **o1 Pro model**. Since o1 Pro is a reasoning model, it has thought out the strategies for you to implement in the game.
+
+Your job is to **strictly follow the instructions** given by your o1 Pro strategy agent as best as you can, in order to **maximize the number of points**.
+
+Your o1 Pro strategy agent will now provide the specific instructions for you to follow in the **market phase**.
+
+{# ===================================================================================== #}
+
+{# ===================================================================================== #}
+{# FIRST MARKET PHASE STRATEGY FOR GPT-4o OWNER AGENT                                    #}
+{# ===================================================================================== #}
+
+{# == STRATEGIC CONTEXT == #}
+As the Owner, your objective is to maximize your total points. You are now participating in the **first Market phase**.  
+Your starting position includes:
+- 6 tax shares
+- A public signal (based on inflated initial declarations)
+- A private signal (based on real values + noise)
+
+Your o1 Pro strategy agent anticipates **final declarations will be significantly lower** than the initial ones due to the 33% tax, which will reduce the **final tax revenue** and thus **depress the final share value**.
+
+{# == KEY CONSIDERATIONS == #}
+1. You own 6 shares by default.  
+2. Everyone (including us) is likely to under-declare later → final tax revenue will drop.  
+3. Public signal likely **overstates** share value.  
+4. Private signal may still **overestimate** final share value.  
+5. Final share value may be lower than both public and private signals.  
+6. Thus, we try to **sell shares now** while prices are high.
+
+{# == STRATEGY SUMMARY == #}
+
+- Compute a target price:
+  ```jinja2
+  {% set pPublic = public_information.public_signal[public_information.winning_condition] %}
+  {% set pPrivate = private_information.value_signals[public_information.winning_condition] %}
+  {% set pTarget = (pPublic if pPublic < pPrivate else pPrivate) * 0.95 %}
+  ```
+
+- Loop over each share:
+  - If a bid exists ≥ `pTarget`, **accept immediately**:
+    ```json
+    {
+      "gameId": {{ meta.game_id }},
+      "type": "post-order",
+      "order": {
+          "price": 0,
+          "quantity": 1,
+          "type": "ask",
+          "now": true,
+          "condition": {{ public_information.winning_condition }}
+      }
+    }
+    ```
+  - Else, post an ask at `pTarget`:
+    ```json
+    {
+      "gameId": {{ meta.game_id }},
+      "type": "post-order",
+      "order": {
+          "price": pTarget,
+          "quantity": 1,
+          "type": "ask",
+          "now": false,
+          "condition": {{ public_information.winning_condition }}
+      }
+    }
+    ```
+
+- Stop selling if market price drops below `pTarget`.
+
+- Do not buy shares unless a listing is **well below expected value** (extremely rare in rational play).
+
+- If no sales occur at a good price, do nothing:
+  ```json
+  {}
+  ```
+
+{# == FINAL SUMMARY == #}
+You aim to convert shares to untaxed cash now, while their market price may be inflated.  
+If the market doesn't offer acceptable value, keep the shares for later.  
+Never sell for too little, and avoid buying unless it's a dramatic underpricing.
+
+{# ===================================================================================== #}
