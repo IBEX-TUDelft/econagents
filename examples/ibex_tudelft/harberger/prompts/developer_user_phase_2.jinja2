@@ -1,81 +1,60 @@
 
 {# ==================== FIRST DECLARATION PHASE INTRO ==================== #}
 
-<p>
-As a reminder you are the <strong>developer</strong> with the goal to <strong>maximize the total number of points</strong> in this experiment, without regard for the other players in the experiment.
-You will now be taking part in the <strong>first declaration phase</strong>.
-</p>
+As a reminder you are the **developer** with the goal to **maximize the total number of points**
+in this experiment, without regard for the other players in the experiment.
+You will now be taking part in the **first declaration phase**.
 
-<pre><strong>
-Total Points = 
-(Real Value of the Property under the Chosen Condition) 
-– ((First Declaration × 1% tax) + (Final Declaration × 33% tax)) 
-+ (First Speculation Result + Final Speculation Result) 
+Total Points =
+(Real Value of the Property under the Chosen Condition)
+– ((First Declaration × 1% tax) + (Final Declaration × 33% tax))
++ (First Speculation Result + Final Speculation Result)
 + (Cash Position + (Number of Shares × True Share Value in the Chosen Condition))
-</strong></pre>
 
-<p>
-You are playing together with your fully aligned <em>o1 Pro model</em>. Since o1 Pro is a reasoning model, it has thought out the strategies for you to implement in the game. 
-Your job is to <strong>strictly follow the instructions</strong> given by your o1 Pro strategy agent as best as you can, in order to maximize your points in the game.
-</p>
+You are playing together with your fully aligned *o1 Pro model*.
+Since o1 Pro is a reasoning model, it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 Pro strategy agent as best as you can,
+in order to maximize your points in the game.
 
-<p>
 Your o1 Pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the first declaration phase.
-</p>
 
-<p><strong>The instructions for the first declaration phase follow:</strong></p>
+The instructions for the first declaration phase follow:
 
 {# ==================== FIRST DECLARATION PHASE STRATEGY ==================== #}
 
-<h2>📍 First Declaration Phase Strategy – Developer</h2>
+== First Declaration Phase Strategy – Developer ==
 
-<p><strong>Below is how we (the Developer) want our GPT-4o representative to act in this First Declaration Phase.</strong></p>
+Below is how we (the Developer) want our GPT-4o representative to act in this First Declaration Phase.
 
-<hr>
+== Developer’s Goal ==
 
-<h3>🎯 Developer’s Goal</h3>
-<p>
-We want the <strong>Project</strong> scenario to be chosen. This is because our real land value is always higher when the Project is implemented.
+We want the **Project** scenario to be chosen. This is because our real land value is always higher when the Project is implemented.
 The scenario (Project vs. No Project) that receives the highest total of declared values (from the developer and owners) will be selected.
-</p>
 
-<p>
 Therefore, we follow this logic:
-<ol>
-  <li>Declare a <strong>very low</strong> value for the <code>No Project</code> scenario.</li>
-  <li>Declare a <strong>very high</strong> value for the <code>Project</code> scenario.</li>
-</ol>
-</p>
+1. Declare a **very low** value for the No Project scenario.
+2. Declare a **very high** value for the Project scenario.
 
-<hr>
+== Declaration Strategy Details ==
 
-<h3>📊 Declaration Strategy Details</h3>
+- No Project Declaration:
+  - We want this value to be as low as possible to lower the No Project sum.
+  - Developer No Project bounds: 200,000 to 500,000
+  - Declare: 200000 (minimum)
 
-<ul>
-  <li><strong>No Project Declaration</strong>: We want this value to be as low as possible to lower the No Project sum.</li>
-  <ul>
-    <li>Developer No Project bounds: 200,000 to 500,000</li>
-    <li><strong>Declare:</strong> <code>200000</code> (minimum)</li>
-  </ul>
+- Project Declaration:
+  - We want this value to be as high as possible to increase the Project sum.
+  - Developer Project bounds: 500,000 to 2,750,000
+  - Declare: 2750000 (maximum)
 
-  <li><strong>Project Declaration</strong>: We want this value to be as high as possible to increase the Project sum.</li>
-  <ul>
-    <li>Developer Project bounds: 500,000 to 2,750,000</li>
-    <li><strong>Declare:</strong> <code>2750000</code> (maximum)</li>
-  </ul>
+- Tax Consideration:
+  - We pay 1% of the declared value under the chosen scenario.
+  - If Project wins, tax = 1% of 2,750,000 = 27,500
+  - This is acceptable given our high real value under Project.
 
-  <li><strong>Tax Consideration</strong>: We pay 1% of the declared value under the chosen scenario.</li>
-  <ul>
-    <li>If Project wins, tax = 1% of 2,750,000 = <code>27,500</code></li>
-    <li>This is acceptable given our high real value under Project.</li>
-  </ul>
-</ul>
+== JSON Output to Submit ==
 
-<hr>
-
-<h3>🧾 JSON Output to Submit</h3>
-
-<pre><code>{
+{
   "gameId": {{ meta.game_id }},
   "type": "declare",
   "declaration": [
@@ -84,8 +63,8 @@ Therefore, we follow this logic:
     0
   ]
 }
-</code></pre>
 
-<p><strong>Summary:</strong> This declaration strategy maximizes our chance of getting the Project chosen and aligns with our long-term payoff goal. Declare <code>200000</code> for No Project and <code>2750000</code> for Project. Trust the o1 Pro strategy.</p>
+== Summary ==
 
-<hr>
+This declaration strategy maximizes our chance of getting the Project chosen and aligns with our long-term payoff goal.
+Declare 200000 for No Project and 2750000 for Project. Trust the o1 Pro strategy.

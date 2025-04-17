@@ -1,88 +1,65 @@
 
 {# ==================== FINAL DECLARATION PHASE INTRO ==================== #}
 
-<p>
-As a reminder you are the <strong>developer</strong> with the goal to <strong>maximize the total number of points</strong> in this experiment, without regard for the other players in the experiment.
-You will now be taking part in the <strong>final declaration phase</strong>.
-</p>
+As a reminder you are the **developer** with the goal to **maximize the total number of points**
+in this experiment, without regard for the other players in the experiment.
+You will now be taking part in the **final declaration phase**.
 
-<pre><strong>
-Total Points = 
-(Real Value of the Property under the Chosen Condition) 
-– ((First Declaration × 1% tax) + (Final Declaration × 33% tax)) 
-+ (First Speculation Result + Final Speculation Result) 
+Total Points =
+(Real Value of the Property under the Chosen Condition)
+– ((First Declaration × 1% tax) + (Final Declaration × 33% tax))
++ (First Speculation Result + Final Speculation Result)
 + (Cash Position + (Number of Shares × True Share Value in the Chosen Condition))
-</strong></pre>
 
-<p>
-You are playing together with your fully aligned <em>o1 Pro model</em>. Since o1 Pro is a reasoning model, it has thought out the strategies for you to implement in the game. 
-Your job is to <strong>strictly follow the instructions</strong> given by your o1 Pro strategy agent as best as you can, in order to maximize your points in the game.
-</p>
+You are playing together with your fully aligned *o1 Pro model*.
+Since o1 Pro is a reasoning model, it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 Pro strategy agent as best as you can,
+in order to maximize your points in the game.
 
-<p>
 Your o1 Pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the final declaration phase.
-</p>
 
-<p><strong>The instructions for the final declaration phase follow:</strong></p>
+The instructions for the final declaration phase follow:
 
 {# ==================== FINAL DECLARATION PHASE STRATEGY ==================== #}
 
-<h2>📍 Final Declaration Phase Strategy – Developer</h2>
+== Final Declaration Phase Strategy – Developer ==
 
-<p><strong>Below is how we (the Developer) want our GPT-4o representative to act during this Final Declaration Phase to maximize our total number of points.</strong></p>
+Below is how we (the Developer) want our GPT-4o representative to act during this Final Declaration Phase to maximize our total number of points.
 
-<hr>
+== Rationale ==
 
-<h3>🧠 Rationale</h3>
+1. We Only Declare for the Winning Condition
+   - Since the *Project* condition won, we only declare our value under the Project scenario.
+   - No Project declaration is ignored (can be any placeholder).
 
-<ol>
-  <li><strong>We Only Declare for the Winning Condition</strong>
-    <ul>
-      <li>Since the <em>Project</em> condition won, we only declare our value under the Project scenario.</li>
-      <li>No Project declaration is ignored (can be any placeholder).</li>
-    </ul>
-  </li>
+2. Balancing Tax Costs vs. Speculation
+   - We pay 33% tax on our final declaration.
+   - If we under-declare, we save some tax but lose to speculators.
+   - If we over-declare, we pay extra tax and avoid speculation loss.
 
-  <li><strong>Balancing Tax Costs vs. Speculation</strong>
-    <ul>
-      <li>We pay <strong>33%</strong> tax on our final declaration.</li>
-      <li>If we <em>under-declare</em>, we save some tax but lose to speculators.</li>
-      <li>If we <em>over-declare</em>, we pay extra tax and avoid speculation loss.</li>
-    </ul>
-  </li>
-</ol>
+== Why “Declare Exactly Your Real Value” is Optimal ==
 
-<h4>✅ Why “Declare Exactly Your Real Value” is Optimal</h4>
-<ul>
-  <li><strong>Under-declare</strong> by ε → Gain = 0.33ε (tax saved), Loss = 0.50ε (to speculator), Net = -0.17ε</li>
-  <li><strong>Over-declare</strong> by ε → Loss = 0.33ε (tax), No speculation loss</li>
-</ul>
+- Under-declare by ε → Gain = 0.33ε (tax saved), Loss = 0.50ε (to speculator), Net = -0.17ε
+- Over-declare by ε → Loss = 0.33ε (tax), No speculation loss
 
-<p>
-<b>Conclusion:</b> The minimum cost occurs at:
-</p>
+Conclusion: The minimum cost occurs at:
 
-<pre><strong>Final Declaration = Your True (Real) Value</strong></pre>
+Final Declaration = Your True (Real) Value
 
-<p>This yields optimal tax without any speculation loss.</p>
+This yields optimal tax without any speculation loss.
 
-<hr>
+== Instruction to GPT-4o Representative ==
 
-<h3>🧾 Instruction to GPT-4o Representative</h3>
+1. Get your true real value for the Project scenario:
+   → {{ private_information.property.v[1] }}
 
-<ol>
-  <li>Get your <strong>true real value</strong> for the Project scenario: <code>{{ private_information.property.v[1] }}</code></li>
-  <li>Submit a declaration:
-    <ul>
-      <li>No Project = <code>0</code></li>
-      <li>Project = <code>{{ private_information.property.v[1] }}</code></li>
-    </ul>
-  </li>
-</ol>
+2. Submit a declaration:
+   - No Project = 0
+   - Project = {{ private_information.property.v[1] }}
 
-<h4>📤 JSON Output</h4>
+== JSON Output ==
 
-<pre><code>{
+{
   "gameId": {{ meta.game_id }},
   "type": "declare",
   "declaration": [
@@ -91,10 +68,8 @@ Your o1 Pro strategy agent will give you the strategies to strictly follow as a 
     0
   ]
 }
-</code></pre>
 
-<p>
-<strong>Summary:</strong> Declare exactly the real value in the winning condition. This avoids excess tax or speculation penalties. Trust the o1 Pro strategy.
-</p>
+== Summary ==
 
-<hr>
+Declare exactly the real value in the winning condition.
+This avoids excess tax or speculation penalties. Trust the o1 Pro strategy.

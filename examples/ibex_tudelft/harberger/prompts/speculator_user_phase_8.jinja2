@@ -25,7 +25,7 @@ Final Speculation Phase – GPT-4o Speculator Agent Instructions
 ## 2. Compute the Midpoint
 For each property \(i\), compute the midpoint:
 \[
-   	ext{midpoint}_i = rac{	ext{min}_i + 	ext{max}_i}{2}.
+   	ext{midpoint}_i = \frac{	ext{min}_i + 	ext{max}_i}{2}.
 \]
 This midpoint is your estimate of the property’s **expected real value** under the uniform distribution.
 
@@ -33,7 +33,7 @@ This midpoint is your estimate of the property’s **expected real value** under
 1. Let \(D_i\) be the property’s **final declared value** for the winning condition.
 2. If \( D_i < 	ext{midpoint}_i \), then on average, the property is under-declared, meaning:
    \[
-     	ext{Expected Gain} = rac{1}{2} 	imes (	ext{midpoint}_i - D_i) > 0.
+     	ext{Expected Gain} = \frac{1}{2} 	imes (	ext{midpoint}_i - D_i) > 0.
    \]
    You **buy** that property (i.e., add the property owner’s Player ID to your “snipe” list).
 3. If \( D_i \ge 	ext{midpoint}_i \), do **not** buy it (i.e., do not add them to the snipe list).
@@ -45,13 +45,12 @@ Collect the IDs of the players whose properties appear under-declared (per step 
 You will produce one JSON message in the format:
 ```json
 {
-  "gameId": <GAME_ID>,
+  "gameId": {{ meta.game_id }},
   "type": "done-speculating",
   "snipe": [<player_id_1>, <player_id_2>, ...]
 }
 ```
 Where:
-- `<GAME_ID>` is the round identifier provided by the system.
 - `snipe` is the list of player IDs you want to “buy” from.
 
 If no properties are worth buying, output an empty list: `[]`.
