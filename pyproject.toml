@@ -9,7 +9,7 @@ style = "semver"
 
 [project]
 name = "econagents"
-license = { file = "LICENSE" }
+license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/iwanalabs/econagents"
 repository = "https://github.com/iwanalabs/econagents"
@@ -20,6 +20,7 @@ name = "econagents"
 version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
 packages = [{include = "econagents"}]
 include = ["econagents/*.so", "econagents/*.pyd"]  # Compiled extensions
+license = "MIT"
 description = ""
 authors = ["Dylan Castillo <dylan@iwanalabs.com>"]
 
