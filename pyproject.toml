@@ -45,7 +45,7 @@ openai = "^1.68.2"
 optional = true
 
 [tool.poetry.group.ollama.dependencies]
-ollama = "^0.1.9"
+ollama = "^0.4.8"
 
 [tool.poetry.group.langsmith]
 optional = true
