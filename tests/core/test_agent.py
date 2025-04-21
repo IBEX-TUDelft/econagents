@@ -132,6 +132,16 @@ class TestPromptHandling:
 
         assert result == "Custom user prompt for phase 0"
 
+    def test_render_prompt_with_partial(self, mock_agent_role, game_state, prompts_path):
+        """Test rendering a prompt that includes a partial template."""
+        # Set phase to 2 to match the prompt file name
+        game_state.meta.phase = 2
+        result = mock_agent_role.render_prompt(
+            context=game_state.model_dump(), prompt_type="user", phase=2, prompts_path=prompts_path
+        )
+        expected_output = "Phase 2 instructions.\nShared info: game ID is 123\nMore instructions."
+        assert result == expected_output
+
 
 @pytest.mark.asyncio
 class TestPhaseHandling:
