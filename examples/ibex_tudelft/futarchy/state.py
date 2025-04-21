@@ -20,6 +20,7 @@ class FMeta(MetaInformation):
     player_number: Optional[int] = EventField(default=None, event_key="number")
     players: list[dict[str, Any]] = EventField(default_factory=list, event_key="players")
     phase: int = EventField(default=0, event_key="phase")
+    role: Optional[str] = EventField(default=None, exclude_from_mapping=True)
 
 
 class FPrivate(PrivateInformation):
