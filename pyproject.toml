@@ -57,7 +57,7 @@ langsmith = "^0.3.19"
 optional = true
 
 [tool.poetry.group.langfuse.dependencies]
-langfuse = "^2.60.2"
+langfuse = "^2.60.3"
 
 [tool.poetry.group.docs.dependencies]
 myst-parser = {extras = ["linkify"], version = "^4.0.1"}
