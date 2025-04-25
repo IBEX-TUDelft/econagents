@@ -74,6 +74,21 @@ def prompts_path(tmp_path):
     all_system_prompt = prompts_dir / "all_system.jinja2"
     all_system_prompt.write_text("General system prompt for {{ meta.phase }}")
 
+    # --- Add partials --- #
+    partials_dir = prompts_dir / "_partials"
+    partials_dir.mkdir()
+
+    # Sample partial file
+    partial_file = partials_dir / "shared_info.jinja2"
+    partial_file.write_text("Shared info: game ID is {{ meta.game_id }}")
+
+    # Prompt that uses the partial
+    user_prompt_with_partial = prompts_dir / "test_agent_user_phase_2.jinja2"
+    user_prompt_with_partial.write_text(
+        "Phase 2 instructions.\n{% include '_partials/shared_info.jinja2' %}\nMore instructions."
+    )
+    # --------------------- #
+
     return prompts_dir
 
 

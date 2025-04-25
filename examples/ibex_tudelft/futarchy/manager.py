@@ -39,12 +39,15 @@ class FAgentManager(HybridPhaseManager):
         if role == 1:
             self.agent_role = Speculator()
             self.agent_role.logger = self.logger
+            self.state.meta.role = "Speculator"
         elif role == 2:
             self.agent_role = Developer()
             self.agent_role.logger = self.logger
+            self.state.meta.role = "Developer"
         elif role == 3:
             self.agent_role = Owner()
             self.agent_role.logger = self.logger
+            self.state.meta.role = "Owner"
         else:
             self.logger.error("Invalid role assigned; cannot initialize agent.")
             raise ValueError("Invalid role for agent initialization.")

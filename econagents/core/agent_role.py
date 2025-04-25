@@ -3,6 +3,7 @@ import logging
 import re
 from abc import ABC
 from pathlib import Path
+from jinja2 import FileSystemLoader
 from typing import Any, Callable, ClassVar, Dict, Generic, Literal, Optional, Pattern, Protocol, TypeVar
 
 from jinja2.sandbox import SandboxedEnvironment
@@ -129,12 +130,20 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
         Raises:
             FileNotFoundError: If no matching prompt template is found
         """
+        # Initialize Jinja environment with a file system loader
+        env = SandboxedEnvironment(loader=FileSystemLoader(prompts_path))
+
         # Try role-specific prompt first, then fall back to 'all'
         for role in [self.name, "all"]:
-            if prompt_file := self._resolve_prompt_file(prompt_type, phase, role, prompts_path):
-                with prompt_file.open() as f:
-                    template = SandboxedEnvironment().from_string(f.read())
-                return template.render(**context)
+            if prompt_file_path := self._resolve_prompt_file(prompt_type, phase, role, prompts_path):
+                # Get filename relative to the prompts_path for the loader
+                template_filename = str(prompt_file_path.relative_to(prompts_path))
+                try:
+                    template = env.get_template(template_filename)
+                    return template.render(**context)
+                except Exception as e:  # Catch potential Jinja errors during loading/rendering
+                    self.logger.error(f"Error loading/rendering template {template_filename}: {e}")
+                    raise  # Re-raise after logging
 
         raise FileNotFoundError(
             f"No prompt template found for type={prompt_type}, phase={phase}, "
