@@ -51,7 +51,7 @@ ollama = "^0.4.8"
 optional = true
 
 [tool.poetry.group.langsmith.dependencies]
-langsmith = "^0.3.19"
+langsmith = "^0.3.33"
 
 [tool.poetry.group.langfuse]
 optional = true
