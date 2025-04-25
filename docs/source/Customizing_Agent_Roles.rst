@@ -85,6 +85,31 @@ The **default and recommended** approach is to define prompt templates in the ``
 
 The ``AgentRole`` class automatically discovers these templates and uses them to generate prompts according to a strict **naming convention** (explained in "Prompt Resolution Logic" below).
 
+Using Partials for Reusability
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To promote reusability and maintain consistency across your prompts, you can leverage Jinja's `include` tag to insert common snippets. For example, you might create a partial template containing standard game information:
+
+.. code-block:: text
+    :caption: prompts/_partials/_game_information.jinja2
+
+    1. **Game Information**:
+       - Phase: {{ meta.phase }}
+       - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
+       - Name: {{ meta.player_name }}
+
+You can then include this partial in your main prompt templates:
+
+.. code-block:: jinja
+    :caption: Example user prompt using include
+
+    {% include "_partials/_game_information.jinja2" %}
+
+    **Your Decision Options**:
+    ... rest of the prompt ...
+
+This approach helps keep your prompts organized and DRY (Don't Repeat Yourself), making maintenance easier. The `AgentRole`'s prompt rendering mechanism supports standard Jinja features, including includes.
+
 **Note:** Prompt templates *only* control what text is sent to the LLM. If you want to customize the overall phase logic (e.g., do multiple calls to the LLM or skip the LLM entirely), you need to register or define a **custom handler** (see below).
 
 Method 2: Phase-Specific Methods
