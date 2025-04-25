@@ -37,7 +37,7 @@ async def main():
         phase_transition_event="round-started",
         phase_identifier_key="round",
         # Observability configuration
-        observability_provider="langfuse",
+        observability_provider="langsmith",
     )
     agents = [
         PDManager(

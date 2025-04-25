@@ -7,6 +7,7 @@ from econagents.core.events import Message
 from econagents.core.manager.phase import HybridPhaseManager
 from examples.ibex_tudelft.voting.roles import Developer, Owner
 from examples.ibex_tudelft.voting.state import HLGameState
+from econagents.llm.observability import get_observability_provider
 
 load_dotenv()
 
@@ -36,15 +37,14 @@ class HLAgentManager(HybridPhaseManager):
         """
         Create and cache the agent instance based on the assigned role.
         """
-        if role == 1:
-            self.agent_role = Speculator()
-            self.agent_role.logger = self.logger
-        elif role == 2:
+        if role == 2:
             self.agent_role = Developer()
             self.agent_role.logger = self.logger
+            self.agent_role.llm.observability = get_observability_provider("langsmith")
         elif role == 3:
             self.agent_role = Owner()
             self.agent_role.logger = self.logger
+            self.agent_role.llm.observability = get_observability_provider("langsmith")
         else:
             self.logger.error("Invalid role assigned; cannot initialize agent.")
             raise ValueError("Invalid role for agent initialization.")

@@ -13,6 +13,7 @@ from econagents.core.state.chat import ChatState
 # exclude_events is used to exclude the field from the events that trigger an update, so it is not updated when an event is processed
 # events are the events that trigger an update, if not specified, all events will trigger an update if they have the event key
 
+
 class CompensationRequest(BaseModel):
     number: int
     compensation: Optional[int] = None
@@ -33,27 +34,27 @@ class HLPrivate(PrivateInformation):
     value_signals: list[float] = EventField(default_factory=list, event_key="signals")
     declarations: list[dict[str, Any]] = EventField(default_factory=list)
     property: dict[str, Any] = EventField(default_factory=dict, exclude_events=["profit"])
-    
-     # Store the raw event data for compensation requests.
+
+    # Store the raw event data for compensation requests.
     raw_compensation: Dict[str, Any] = EventField(default_factory=dict, event_key="compensation-requests-received")
-    
+
     @computed_field
     def compensationRequestsReceived(self) -> List[CompensationRequest]:
         """Process and sort the raw compensation requests from smallest to largest amount."""
         raw_data = self.raw_compensation or {}
         requests = []
-        
+
         # Extract and create CompensationRequest objects
         for item in raw_data.get("compensationRequests", []):
             comp_value = None
             if "compensationRequests" in item and len(item.get("compensationRequests", [])) > 1:
                 comp_value = item["compensationRequests"][1]  # Get the second element (actual compensation value)
             requests.append(CompensationRequest(number=item["number"], compensation=comp_value))
-        
+
         # Sort requests by compensation amount
         # Handle None values by putting them at the start
-        return sorted(requests, 
-                     key=lambda x: float('inf') if x.compensation is None else x.compensation)
+        return sorted(requests, key=lambda x: float("inf") if x.compensation is None else x.compensation)
+
 
 class HLPublic(PublicInformation):
     # PublicInformation can have any fields
@@ -71,13 +72,14 @@ class HLPublic(PublicInformation):
     market_state: MarketState = EventField(default_factory=MarketState)
     public_signal: list[float] = EventField(default_factory=list, event_key="publicSignal")
 
-    #chat box
+    # chat box
     chat_state: ChatState = EventField(default_factory=ChatState)
 
-
-    #compensation offer
+    # compensation offer
     # Event structure: {"type":"event","eventType":"compensation-offer-made","data":{"compensationOffers":[null,300000]}}
-    compensationOffers: list[Optional[float]] = EventField(default_factory=lambda: [None, None], event_key="compensationOffers")
+    compensationOffers: list[Optional[float]] = EventField(
+        default_factory=lambda: [None, None], event_key="compensationOffers"
+    )
 
     # Winning condition
     winning_condition: int = EventField(default=0, event_key="winningCondition")
@@ -101,11 +103,10 @@ class HLGameState(GameState):
     def get_custom_handlers(self) -> dict[str, EventHandler]:
         """Provide custom event handlers for market, chat, and compensation events"""
         market_events = ["add-order", "update-order", "delete-order", "contract-fulfilled", "asset-movement"]
-        chat_events = ["message-received"]
-               
+
         handlers = {event: self._handle_market_event for event in market_events}
-        handlers.update({event: self._handle_chat_event for event in chat_events})
-            
+        handlers["message-received"] = self._handle_chat_event
+
         return handlers
 
     # This is needed to build the order book
@@ -122,5 +123,3 @@ class HLGameState(GameState):
     def _handle_chat_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Handle chat-related events by delegating to ChatState"""
         self.public_information.chat_state.process_event(event_type=event_type, data=data)
-
- 
