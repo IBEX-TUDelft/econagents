@@ -10,6 +10,7 @@ Welcome to econagents's documentation!
 
    self
    Installation
+   Contributing
    Overview
    Definitions
    Tutorial
