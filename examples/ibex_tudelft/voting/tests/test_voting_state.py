@@ -1,7 +1,8 @@
 from jinja2 import Template
 import pytest
-from examples.ibex_tudelft.voting.state import HLGameState 
+from examples.ibex_tudelft.voting.state import HLGameState
 from econagents.core.events import Message
+
 
 class TestVotingState:
     @pytest.fixture
@@ -20,9 +21,9 @@ class TestVotingState:
                     {"number": 2},  # missing compensationRequests
                     {"number": 3, "compensationRequests": [None, 287000]},
                     {"number": 4, "compensationRequests": [None, 150000]},
-                    {"number": 5, "compensationRequests": [None, 425000]}
+                    {"number": 5, "compensationRequests": [None, 425000]},
                 ]
-            }
+            },
         )
         game_state.update(requests_event)
 
@@ -37,7 +38,7 @@ class TestVotingState:
       {% endfor %}
     {% else %}
     - No compensation requests received yet
-    {% endif %} 
+    {% endif %}
         """
 
         # Create and render template
@@ -45,7 +46,7 @@ class TestVotingState:
         rendered = template.render(private_information=game_state.private_information)
 
         # Clean up whitespace for comparison
-        rendered_lines = [line.strip() for line in rendered.split('\n') if line.strip()]
+        rendered_lines = [line.strip() for line in rendered.split("\n") if line.strip()]
 
         # Expected output
         expected_lines = [
@@ -53,7 +54,7 @@ class TestVotingState:
             "- Owner 4: 150000",
             "- Owner 3: 287000",
             "- Owner 1: 370000",
-            "- Owner 5: 425000"
+            "- Owner 5: 425000",
         ]
 
         # Compare rendered output with expected
@@ -62,22 +63,14 @@ class TestVotingState:
     def test_compensation_offers_handling(self, game_state):
         # Test case 1: Normal compensation offer
         event = Message(
-            message_type="event",
-            event_type="compensation-offer-made",
-            data={
-                "compensationOffers": [None, 300000]
-            }
+            message_type="event", event_type="compensation-offer-made", data={"compensationOffers": [None, 300000]}
         )
         game_state.update(event)
         assert game_state.public_information.compensationOffers == [None, 300000]
 
         # Test case 2: Update existing offer
         event = Message(
-            message_type="event",
-            event_type="compensation-offer-made",
-            data={
-                "compensationOffers": [None, 400000]
-            }
+            message_type="event", event_type="compensation-offer-made", data={"compensationOffers": [None, 400000]}
         )
         game_state.update(event)
         assert game_state.public_information.compensationOffers == [None, 400000]
@@ -85,11 +78,7 @@ class TestVotingState:
     def test_compensation_offers_jinja_rendering(self, game_state):
         # Test compensation offer rendering
         offer_event = Message(
-            message_type="event",
-            event_type="compensation-offer-made",
-            data={
-                "compensationOffers": [None, 300000]
-            }
+            message_type="event", event_type="compensation-offer-made", data={"compensationOffers": [None, 300000]}
         )
         game_state.update(offer_event)
 
@@ -107,24 +96,20 @@ class TestVotingState:
         rendered = template.render(public_information=game_state.public_information)
 
         # Clean up whitespace for comparison
-        rendered_lines = [line.strip() for line in rendered.split('\n') if line.strip()]
+        rendered_lines = [line.strip() for line in rendered.split("\n") if line.strip()]
 
         # Verify offer is displayed correctly
         assert rendered_lines == ["- compensation offer made: 300000"]
 
         # Test empty case
         empty_event = Message(
-            message_type="event",
-            event_type="compensation-offer-made",
-            data={
-                "compensationOffers": [None, None]
-            }
+            message_type="event", event_type="compensation-offer-made", data={"compensationOffers": [None, None]}
         )
         game_state.update(empty_event)
 
         # Render template with empty data
         rendered_empty = template.render(public_information=game_state.public_information)
-        rendered_empty_lines = [line.strip() for line in rendered_empty.split('\n') if line.strip()]
-        
+        rendered_empty_lines = [line.strip() for line in rendered_empty.split("\n") if line.strip()]
+
         # Verify empty case
         assert rendered_empty_lines == ["- no compensation offer made yet"]

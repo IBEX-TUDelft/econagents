@@ -12,7 +12,7 @@ Your o1 pro strategy agent will give you the strategies to strictly follow as a 
 The instructions for the first speculation phase follow;
 #}
 
-{# 
+{#
 First Speculation Phase – Step-by-Step Instructions for GPT-4o Speculator Agent
 #}
 
@@ -35,7 +35,7 @@ For each property \( i \):
   - If \( D_i \ge 	ext{midpoint}_i \), the property is likely **over-declared** or fairly priced, so do **not** buy.
 
 ### 4. Make Your “Snipe” List
-- Collect the **IDs** of all players \( i \) for whom \( D_i < 	ext{midpoint}_i \) into a list:  
+- Collect the **IDs** of all players \( i \) for whom \( D_i < 	ext{midpoint}_i \) into a list:
   \[
     	ext{snipeList} = [\,i \mid D_i < 	ext{midpoint}_i \,].
   \]
@@ -56,10 +56,10 @@ Where:
 
 ---
 
-#### **Summary to GPT-4o** 
-1. **Calculate** the midpoint for each declaration based on the known boundaries.  
-2. **Compare** each declaration to its midpoint.  
-3. **Snipe** any property where the declaration is strictly below that midpoint (or is clearly profitable).  
+#### **Summary to GPT-4o**
+1. **Calculate** the midpoint for each declaration based on the known boundaries.
+2. **Compare** each declaration to its midpoint.
+3. **Snipe** any property where the declaration is strictly below that midpoint (or is clearly profitable).
 4. **Return** the array of those player IDs in the specified JSON format.
 
 **This completes your instructions for the first speculation phase.**

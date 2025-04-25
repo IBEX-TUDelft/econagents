@@ -18,7 +18,7 @@ Instructions for this phase:
       - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
       {% endfor %}
     {% endfor %}
-    
+
     2.2. **Compensation Offer**:
       {% if public_information.compensationOffers and public_information.compensationOffers[1] %}
     - compensation offer made: {{public_information.compensationOffers[1]}}
@@ -31,7 +31,7 @@ Instructions for this phase:
 3. **Your Decision to Make**:
    - Deliberate in the chat box with the owners and developer about the development (Project and No Project)
 
-   
+
   3.1 **the chat conversation so far**:
 
     {{public_information.chat_state.messages}}
