@@ -33,31 +33,11 @@ python = ">=3.10,<4"
 pydantic = "^2.11.3"
 requests = "^2.32.3"
 websockets = "^15.0"
-jinja2 = "^3.1.6"
+openai = {version = "^1.68.2", optional = true}
+ollama = {version = "^0.4.8", optional = true}
+langsmith = {version = "^0.3.33", optional = true}
+langfuse = {version = "^2.60.3", optional = true}
 
-[tool.poetry.group.openai]
-optional = true
-
-[tool.poetry.group.openai.dependencies]
-openai = "^1.68.2"
-
-[tool.poetry.group.ollama]
-optional = true
-
-[tool.poetry.group.ollama.dependencies]
-ollama = "^0.4.8"
-
-[tool.poetry.group.langsmith]
-optional = true
-
-[tool.poetry.group.langsmith.dependencies]
-langsmith = "^0.3.33"
-
-[tool.poetry.group.langfuse]
-optional = true
-
-[tool.poetry.group.langfuse.dependencies]
-langfuse = "^2.60.3"
 
 [tool.poetry.group.docs.dependencies]
 myst-parser = {extras = ["linkify"], version = "^4.0.1"}
@@ -181,5 +161,5 @@ openai = ["openai"]
 ollama = ["ollama"]
 langsmith = ["langsmith"]
 langfuse = ["langfuse"]
-default = ["openai", "langsmith"]
+standard = ["openai", "langsmith"]
 all = ["openai", "ollama", "langsmith", "langfuse"]
