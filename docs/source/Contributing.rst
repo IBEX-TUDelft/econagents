@@ -70,7 +70,7 @@ You can also run tests with coverage reporting:
 Code Style and Linting
 ----------------------
 
-We use \`Ruff <https://github.com/astral-sh/ruff>\`_ for linting and formatting. The pre-commit hooks automatically handle formatting. You can also run Ruff manually:
+We use [Ruff](https://github.com/astral-sh/ruff) for linting and formatting. The pre-commit hooks automatically handle formatting. You can also run Ruff manually:
 
 .. code-block:: bash
 
