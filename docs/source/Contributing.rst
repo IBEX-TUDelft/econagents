@@ -19,14 +19,14 @@ Setting Up the Development Environment
        cd econagents
 
 2.  **Install Poetry:**
-    This project uses \`Poetry <https://python-poetry.org/>\`_ for dependency management and packaging. If you don't have Poetry installed, follow the official installation guide.
+    This project uses [Poetry](https://python-poetry.org/) for dependency management and packaging. If you don't have Poetry installed, follow the official installation guide.
 
 3.  **Install Dependencies:**
     Once Poetry is installed, you can install the project dependencies, including development tools:
 
     .. code-block:: bash
 
-       poetry install --with dev,openai,ollama,langsmith,langfuse
+       poetry install --all-extras
 
     This command creates a virtual environment (if one doesn't exist) and installs all required packages defined in ``pyproject.toml``, including optional groups like ``dev``, LLM provider, and observability provider dependencies.
 
