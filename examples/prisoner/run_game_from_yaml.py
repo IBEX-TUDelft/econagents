@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 
-from econagents.config_parser import BasicConfigParser
+from econagents.config_parser.base import run_experiment_from_yaml
 from examples.prisoner.server.create_game import create_game_from_specs
 
 
@@ -13,8 +13,7 @@ async def main():
         for i, code in enumerate(game_specs["recovery_codes"], start=1)
     ]
 
-    parsed_config = BasicConfigParser(config_path=Path(__file__).parent / "config.yaml")
-    await parsed_config.run_experiment(login_payloads)
+    await run_experiment_from_yaml(Path(__file__).parent / "prisoner.yaml", login_payloads)
 
 
 if __name__ == "__main__":

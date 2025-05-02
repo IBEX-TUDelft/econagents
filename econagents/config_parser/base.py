@@ -1,21 +1,19 @@
 import asyncio
 import importlib
-import json
 import logging
+import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Type
 from datetime import datetime, date, time
 
 import yaml
-from pydantic import BaseModel, Field, create_model, validator
-from pydantic_core import PydanticUndefined
+from pydantic import BaseModel, Field
 
-from econagents import AgentRole
 from econagents.core.game_runner import GameRunner, GameRunnerConfig, HybridGameRunnerConfig, TurnBasedGameRunnerConfig
-from econagents.core.manager.phase import PhaseManager, TurnBasedPhaseManager
+from econagents.core.manager.phase import PhaseManager, TurnBasedPhaseManager, HybridPhaseManager
 from econagents.core.state.fields import EventField
 from econagents.core.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
-from econagents.llm import BaseLLM, ChatOpenAI
+from econagents.core.agent_role import AgentRole
 
 # --- Type Mapping ---
 # Map type strings to Python types
@@ -49,6 +47,7 @@ class AgentRoleConfig(BaseModel):
     name: str
     llm_type: str = "ChatOpenAI"
     llm_params: Dict[str, Any] = Field(default_factory=dict)
+    prompts: List[Dict[str, str]] = Field(default_factory=list)
 
     def create_agent_role(self) -> AgentRole:
         """Create an AgentRole instance from this configuration."""
@@ -107,31 +106,22 @@ class StateFieldConfig(BaseModel):
 class StateConfig(BaseModel):
     """Configuration for a game state."""
 
-    meta_fields: List[StateFieldConfig] = Field(default_factory=list)
-    private_fields: List[StateFieldConfig] = Field(default_factory=list)
-    public_fields: List[StateFieldConfig] = Field(default_factory=list)
+    meta_information: List[StateFieldConfig] = Field(default_factory=list)
+    private_information: List[StateFieldConfig] = Field(default_factory=list)
+    public_information: List[StateFieldConfig] = Field(default_factory=list)
 
     def create_state_class(self) -> Type[GameState]:
         """Create a GameState subclass from this configuration."""
 
-        # Function to resolve the field type using the TYPE_MAPPING
         def resolve_field_type(field_type_str: str) -> Any:
             if field_type_str in TYPE_MAPPING:
                 return TYPE_MAPPING[field_type_str]
-            elif field_type_str.startswith("List[") and field_type_str.endswith("]"):
-                inner_type = field_type_str[5:-1]
-                return List[resolve_field_type(inner_type)]  # type: ignore
-            elif field_type_str.startswith("Dict[") and field_type_str.endswith("]"):
-                # Simple handling for Dict[str, Any] pattern
-                return Dict[str, Any]  # type: ignore
             else:
-                # For complex or custom types not in mapping
                 try:
                     return eval(field_type_str)
                 except (NameError, SyntaxError):
                     raise ValueError(f"Unsupported field type: {field_type_str}")
 
-        # Function to get the appropriate default factory
         def get_default_factory(factory_name: str) -> Any:
             if factory_name == "list":
                 return list
@@ -156,7 +146,7 @@ class StateConfig(BaseModel):
             pass
 
         # Add fields to Meta class
-        for field in self.meta_fields:
+        for field in self.meta_information:
             event_field = EventField(
                 default=field.default if field.default_factory is None else None,
                 default_factory=get_default_factory(field.default_factory) if field.default_factory else None,
@@ -166,7 +156,7 @@ class StateConfig(BaseModel):
             setattr(DynamicMeta, field.name, event_field)
 
         # Add fields to Private class
-        for field in self.private_fields:
+        for field in self.private_information:
             event_field = EventField(
                 default=field.default if field.default_factory is None else None,
                 default_factory=get_default_factory(field.default_factory) if field.default_factory else None,
@@ -176,7 +166,7 @@ class StateConfig(BaseModel):
             setattr(DynamicPrivate, field.name, event_field)
 
         # Add fields to Public class
-        for field in self.public_fields:
+        for field in self.public_information:
             event_field = EventField(
                 default=field.default if field.default_factory is None else None,
                 default_factory=get_default_factory(field.default_factory) if field.default_factory else None,
@@ -205,14 +195,18 @@ class ManagerConfig(BaseModel):
         self, game_id: int, state: GameState, agent_role: AgentRole, auth_kwargs: Dict[str, Any]
     ) -> PhaseManager:
         """Create a PhaseManager instance from this configuration."""
-        # Determine the manager class based on type
+        # TODO: Add HybridPhaseManager
         if self.type == "TurnBasedPhaseManager":
             manager_class = TurnBasedPhaseManager
         else:
-            manager_class = getattr(importlib.import_module("econagents.core.manager.phase"), self.type)
+            raise ValueError(f"Invalid manager type: {self.type}")
 
         # Create the manager instance
-        manager = manager_class(auth_mechanism_kwargs=auth_kwargs, state=state, agent_role=agent_role)
+        manager = manager_class(
+            auth_mechanism_kwargs=auth_kwargs,
+            state=state,
+            agent_role=agent_role,
+        )
 
         # Safely set game_id if the manager has this attribute
         if hasattr(manager, "game_id"):
@@ -319,11 +313,57 @@ class ExperimentConfig(BaseModel):
 
     name: str
     description: str = ""
+    prompt_partials: List[Dict[str, str]] = Field(default_factory=list)
     agent_roles: List[AgentRoleConfig] = Field(default_factory=list)
     agents: List[AgentMappingConfig] = Field(default_factory=list)
     state: StateConfig
     manager: ManagerConfig
     runner: RunnerConfig
+    _temp_prompts_dir: Optional[Path] = None
+
+    def _compile_inline_prompts(self) -> Path:
+        """Compile prompts from config into a temporary directory.
+
+        Returns:
+            Path to the temporary directory containing compiled prompts
+        """
+        # Create a temporary directory for prompts
+        temp_dir = Path(tempfile.mkdtemp(prefix="econagents_prompts_"))
+        self._temp_prompts_dir = temp_dir
+
+        # Create _partials directory
+        partials_dir = temp_dir / "_partials"
+        partials_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write prompt partials
+        for partial in self.prompt_partials:
+            partial_file = partials_dir / f"{partial['name']}.jinja2"
+            partial_file.write_text(partial["content"])
+
+        # Write prompts for each agent role
+        for role in self.agent_roles:
+            if not hasattr(role, "prompts") or not role.prompts:
+                continue
+
+            for prompt in role.prompts:
+                # Each prompt should be a dict with one key (type) and one value (content)
+                for prompt_type, content in prompt.items():
+                    # Parse the prompt type to get the base type and phase
+                    parts = prompt_type.split("_phase_")
+                    base_type = parts[0]  # system or user
+                    phase = parts[1] if len(parts) > 1 else None
+
+                    # Create the prompt file name
+                    if phase:
+                        file_name = f"{role.name.lower()}_{base_type}_phase_{phase}.jinja2"
+                    else:
+                        file_name = f"{role.name.lower()}_{base_type}.jinja2"
+
+                    # Write the prompt file
+                    prompt_file = temp_dir / file_name
+                    prompt_file.write_text(content)
+
+        return temp_dir
 
     async def run_experiment(self, login_payloads: List[Dict[str, Any]]) -> None:
         """Run the experiment from this configuration."""
@@ -372,9 +412,20 @@ class ExperimentConfig(BaseModel):
         # Set state class in runner config
         runner_config.state_class = state_class
 
+        # If we have inline prompts, compile them and update the prompts directory
+        if any(hasattr(role, "prompts") and role.prompts for role in self.agent_roles):
+            prompts_dir = self._compile_inline_prompts()
+            runner_config.prompts_dir = prompts_dir
+
         # Create and run game runner
         runner = GameRunner(config=runner_config, agents=agents)
         await runner.run_game()
+
+        # Clean up temporary prompts directory if it exists
+        if self._temp_prompts_dir and self._temp_prompts_dir.exists():
+            import shutil
+
+            shutil.rmtree(self._temp_prompts_dir)
 
 
 class BaseConfigParser:
@@ -432,52 +483,7 @@ class BaseConfigParser:
         Args:
             login_payloads: A list of dictionaries containing login information for each agent
         """
-        # Create state class
-        state_class = self.config.state.create_state_class()
-
-        # Create agent roles from agent_roles configurations
-        role_instances = {
-            role_config.role_id: role_config.create_agent_role() for role_config in self.config.agent_roles
-        }
-
-        # Create a mapping from agent ID to role ID
-        agent_to_role_map = {agent_map.id: agent_map.role_id for agent_map in self.config.agents}
-
-        # Create managers for each agent
-        agents = []
-        for payload in login_payloads:
-            agent_id = payload.get("agent_id")
-            if agent_id is None:
-                raise ValueError(f"Login payload missing 'agent_id' field: {payload}")
-
-            role_id = agent_to_role_map.get(agent_id)
-            if role_id is None:
-                raise ValueError(f"No role_id mapping found for agent {agent_id}")
-
-            if role_id not in role_instances:
-                raise ValueError(f"No agent role configuration found for role_id {role_id}")
-
-            state_instance = state_class(game_id=self.config.runner.game_id)
-
-            # Use the create_manager method which can be overridden by subclasses
-            agent_manager = self.create_manager(
-                game_id=self.config.runner.game_id,
-                state=state_instance,
-                agent_role=role_instances[role_id],
-                auth_kwargs=payload,
-            )
-
-            agents.append(agent_manager)
-
-        # Create runner config
-        runner_config = self.config.runner.create_runner_config()
-
-        # Set state class in runner config
-        runner_config.state_class = state_class
-
-        # Create and run game runner
-        runner = GameRunner(config=runner_config, agents=agents)
-        await runner.run_game()
+        await self.config.run_experiment(login_payloads)
 
 
 async def run_experiment_from_yaml(yaml_path: Path, login_payloads: List[Dict[str, Any]]) -> None:
