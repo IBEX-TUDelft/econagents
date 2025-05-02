@@ -27,6 +27,9 @@ authors = ["Dylan Castillo <dylan@iwanalabs.com>"]
 [tool.poetry.build]
 generate-setup-file = false
 
+[tool.poetry.scripts]
+econagents = "econagents.cli:run_cli"
+
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
 python = ">=3.10,<4"
@@ -71,6 +74,9 @@ line_profiler = ">=3.5.1"
 branch = true
 omit = [
     "tests/*",
+    "examples/*",
+    "docs/*",
+    "econagents/cli.py",
 ]
 
 [tool.coverage.report]
