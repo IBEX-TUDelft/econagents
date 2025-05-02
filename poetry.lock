@@ -1602,15 +1602,15 @@ openai = ["openai (>=0.27.8)"]
 
 [[package]]
 name = "langsmith"
-version = "0.3.33"
+version = "0.3.40"
 description = "Client library to connect to the LangSmith LLM Tracing and Evaluation Platform."
 optional = true
-python-versions = "<4.0,>=3.9"
+python-versions = ">=3.9"
 groups = ["main"]
 markers = "extra == \"all\" or extra == \"langsmith\" or extra == \"standard\""
 files = [
-    {file = "langsmith-0.3.33-py3-none-any.whl", hash = "sha256:6fa453942014945e1de7e283880ed3e8031b5d84e0dc75b87d101ecedb62371b"},
-    {file = "langsmith-0.3.33.tar.gz", hash = "sha256:0f439e945528c6d14140137b918cc048aea04c6a987525926dbfda2560002924"},
+    {file = "langsmith-0.3.40-py3-none-any.whl", hash = "sha256:c3709246097e6bd08c23589f9e6c89af8ad180719a388be3524fe66927b2006d"},
+    {file = "langsmith-0.3.40.tar.gz", hash = "sha256:a0fc79a8871a7308862bfe7efd97183cea4a75f0567057fd137f2d009f7abc81"},
 ]
 
 [package.dependencies]
@@ -4072,4 +4072,4 @@ standard = ["langsmith", "openai"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4"
-content-hash = "4d5a52d1cb7f0c888299269d3259e8ee16498ac0d74898247852839238ed30af"
+content-hash = "ea8e16d98fc6e820d86cfe33b1ec01924037c8a4e3c0a7649d9ecfc9d4fffe55"
