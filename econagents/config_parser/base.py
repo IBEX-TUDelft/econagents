@@ -367,23 +367,18 @@ class ExperimentConfig(BaseModel):
 
     async def run_experiment(self, login_payloads: List[Dict[str, Any]]) -> None:
         """Run the experiment from this configuration."""
-        # Create state class and instances
+        # Create state class
         state_class = self.state.create_state_class()
+        role_configs = {role_config.role_id: role_config for role_config in self.agent_roles}
 
-        # Create agent roles from agent_roles configurations
-        role_instances = {role_config.role_id: role_config.create_agent_role() for role_config in self.agent_roles}
-
-        # If we have legacy format with agents instead of agent_roles, use those
         if not self.agent_roles and self.agents:
             raise ValueError(
                 "Configuration has 'agents' but no 'agent_roles'. Cannot determine agent role configurations."
             )
 
-        # Create a mapping from agent ID to role ID
         agent_to_role_map = {agent_map.id: agent_map.role_id for agent_map in self.agents}
 
-        # Create managers for each agent, matching login payloads with appropriate agent roles
-        # Each login payload should have an 'agent_id' field to match with the agent mapping
+        # Create managers for each agent
         agents = []
         for payload in login_payloads:
             agent_id = payload.get("agent_id")
@@ -394,25 +389,25 @@ class ExperimentConfig(BaseModel):
             if role_id is None:
                 raise ValueError(f"No role_id mapping found for agent {agent_id}")
 
-            if role_id not in role_instances:
+            if role_id not in role_configs:
                 raise ValueError(f"No agent role configuration found for role_id {role_id}")
+
+            agent_role_instance = role_configs[role_id].create_agent_role()
 
             agents.append(
                 self.manager.create_manager(
                     game_id=self.runner.game_id,
                     state=state_class(game_id=self.runner.game_id),
-                    agent_role=role_instances[role_id],
+                    agent_role=agent_role_instance,
                     auth_kwargs=payload,
                 )
             )
 
         # Create runner config
         runner_config = self.runner.create_runner_config()
+        runner_config.state_class = state_class  # Set state class in runner config
 
-        # Set state class in runner config
-        runner_config.state_class = state_class
-
-        # If we have inline prompts, compile them and update the prompts directory
+        # Compile inline prompts if needed
         if any(hasattr(role, "prompts") and role.prompts for role in self.agent_roles):
             prompts_dir = self._compile_inline_prompts()
             runner_config.prompts_dir = prompts_dir
@@ -421,7 +416,7 @@ class ExperimentConfig(BaseModel):
         runner = GameRunner(config=runner_config, agents=agents)
         await runner.run_game()
 
-        # Clean up temporary prompts directory if it exists
+        # Clean up temporary prompts directory
         if self._temp_prompts_dir and self._temp_prompts_dir.exists():
             import shutil
 
