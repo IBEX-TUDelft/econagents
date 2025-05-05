@@ -103,6 +103,14 @@ state:
       type: "int"
       default: 0
       exclude_from_mapping: true
+    - name: "player_name"
+      type: "str"
+      default: null
+      optional: true
+    - name: "player_number"
+      type: "int"
+      default: null
+      optional: true
     - name: "phase"
       type: "int"
       default: 0

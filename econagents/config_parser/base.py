@@ -3,11 +3,11 @@ import importlib
 import logging
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Type
+from typing import Any, Dict, List, Literal, Optional, Type, cast
 from datetime import datetime, date, time
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from econagents.core.game_runner import GameRunner, GameRunnerConfig, HybridGameRunnerConfig, TurnBasedGameRunnerConfig
 from econagents.core.manager.phase import PhaseManager, TurnBasedPhaseManager, HybridPhaseManager
@@ -101,6 +101,7 @@ class StateFieldConfig(BaseModel):
     default_factory: Optional[str] = None
     event_key: Optional[str] = None
     exclude_from_mapping: bool = False
+    optional: bool = False
 
 
 class StateConfig(BaseModel):
@@ -111,78 +112,87 @@ class StateConfig(BaseModel):
     public_information: List[StateFieldConfig] = Field(default_factory=list)
 
     def create_state_class(self) -> Type[GameState]:
-        """Create a GameState subclass from this configuration."""
+        """Create a GameState subclass from this configuration using create_model."""
 
         def resolve_field_type(field_type_str: str) -> Any:
+            """Resolve type string to Python type."""
             if field_type_str in TYPE_MAPPING:
                 return TYPE_MAPPING[field_type_str]
             else:
                 try:
-                    return eval(field_type_str)
+                    resolved_type = eval(field_type_str, {"list": list, "dict": dict, "Any": Any})
+                    return resolved_type
                 except (NameError, SyntaxError):
                     raise ValueError(f"Unsupported field type: {field_type_str}")
 
         def get_default_factory(factory_name: str) -> Any:
+            """Get default factory function."""
             if factory_name == "list":
                 return list
             elif factory_name == "dict":
                 return dict
             else:
-                return eval(factory_name)
+                try:
+                    return eval(factory_name)
+                except (NameError, SyntaxError):
+                    raise ValueError(f"Unsupported default_factory: {factory_name}")
 
-        # Create the dynamic Meta class
-        class DynamicMeta(MetaInformation):
-            model_config = {"arbitrary_types_allowed": True}
-            pass
+        def create_fields_dict(field_configs: List[StateFieldConfig]) -> Dict[str, Any]:
+            """Create a dictionary of field definitions for create_model."""
+            fields = {}
+            for field in field_configs:
+                base_type = resolve_field_type(field.type)
+                field_type = Optional[base_type] if field.optional else base_type
 
-        # Create the dynamic Private class
-        class DynamicPrivate(PrivateInformation):
-            model_config = {"arbitrary_types_allowed": True}
-            pass
+                event_field_args = {
+                    "event_key": field.event_key,
+                    "exclude_from_mapping": field.exclude_from_mapping,
+                }
+                # Handle default vs default_factory
+                if field.default_factory:
+                    event_field_args["default_factory"] = get_default_factory(field.default_factory)
+                else:
+                    # Pydantic handles Optional defaults correctly (None if optional and no default)
+                    event_field_args["default"] = field.default
 
-        # Create the dynamic Public class
-        class DynamicPublic(PublicInformation):
-            model_config = {"arbitrary_types_allowed": True}
-            pass
+                # EventField needs to be the default value passed to create_model
+                field_definition = EventField(**event_field_args)  # type: ignore
+                fields[field.name] = (field_type, field_definition)
+            return fields
 
-        # Add fields to Meta class
-        for field in self.meta_information:
-            event_field = EventField(
-                default=field.default if field.default_factory is None else None,
-                default_factory=get_default_factory(field.default_factory) if field.default_factory else None,
-                event_key=field.event_key,
-                exclude_from_mapping=field.exclude_from_mapping,
-            )
-            setattr(DynamicMeta, field.name, event_field)
+        # Create dynamic classes using create_model
+        meta_fields = create_fields_dict(self.meta_information)
+        DynamicMeta = create_model(
+            "DynamicMeta",
+            __base__=MetaInformation,
+            **meta_fields,
+        )
 
-        # Add fields to Private class
-        for field in self.private_information:
-            event_field = EventField(
-                default=field.default if field.default_factory is None else None,
-                default_factory=get_default_factory(field.default_factory) if field.default_factory else None,
-                event_key=field.event_key,
-                exclude_from_mapping=field.exclude_from_mapping,
-            )
-            setattr(DynamicPrivate, field.name, event_field)
+        private_fields = create_fields_dict(self.private_information)
+        DynamicPrivate = create_model(
+            "DynamicPrivate",
+            __base__=PrivateInformation,
+            **private_fields,
+        )
 
-        # Add fields to Public class
-        for field in self.public_information:
-            event_field = EventField(
-                default=field.default if field.default_factory is None else None,
-                default_factory=get_default_factory(field.default_factory) if field.default_factory else None,
-                event_key=field.event_key,
-                exclude_from_mapping=field.exclude_from_mapping,
-            )
-            setattr(DynamicPublic, field.name, event_field)
+        public_fields = create_fields_dict(self.public_information)
+        DynamicPublic = create_model(
+            "DynamicPublic",
+            __base__=PublicInformation,
+            **public_fields,
+        )
 
-        # Create the game state class
-        class DynamicGameState(GameState):
-            model_config = {"arbitrary_types_allowed": True}
-            meta: DynamicMeta = Field(default_factory=DynamicMeta)
-            private_information: DynamicPrivate = Field(default_factory=DynamicPrivate)
-            public_information: DynamicPublic = Field(default_factory=DynamicPublic)
+        # Create the final game state class
+        DynamicGameState = create_model(
+            "DynamicGameState",
+            __base__=GameState,
+            meta=(DynamicMeta, Field(default_factory=DynamicMeta)),
+            private_information=(DynamicPrivate, Field(default_factory=DynamicPrivate)),
+            public_information=(DynamicPublic, Field(default_factory=DynamicPublic)),
+        )
 
-        return DynamicGameState
+        # Cast to Type[GameState] for type hinting
+        return cast(Type[GameState], DynamicGameState)
 
 
 class ManagerConfig(BaseModel):
@@ -365,7 +375,7 @@ class ExperimentConfig(BaseModel):
 
         return temp_dir
 
-    async def run_experiment(self, login_payloads: List[Dict[str, Any]]) -> None:
+    async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
         """Run the experiment from this configuration."""
         # Create state class
         state_class = self.state.create_state_class()
@@ -396,8 +406,8 @@ class ExperimentConfig(BaseModel):
 
             agents.append(
                 self.manager.create_manager(
-                    game_id=self.runner.game_id,
-                    state=state_class(game_id=self.runner.game_id),
+                    game_id=game_id,
+                    state=state_class(game_id=game_id),
                     agent_role=agent_role_instance,
                     auth_kwargs=payload,
                 )
@@ -406,6 +416,7 @@ class ExperimentConfig(BaseModel):
         # Create runner config
         runner_config = self.runner.create_runner_config()
         runner_config.state_class = state_class  # Set state class in runner config
+        runner_config.game_id = game_id
 
         # Compile inline prompts if needed
         if any(hasattr(role, "prompts") and role.prompts for role in self.agent_roles):
@@ -471,17 +482,17 @@ class BaseConfigParser:
             game_id=game_id, state=state, agent_role=agent_role, auth_kwargs=auth_kwargs
         )
 
-    async def run_experiment(self, login_payloads: List[Dict[str, Any]]) -> None:
+    async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
         """
         Run the experiment from this configuration.
 
         Args:
             login_payloads: A list of dictionaries containing login information for each agent
         """
-        await self.config.run_experiment(login_payloads)
+        await self.config.run_experiment(login_payloads, game_id)
 
 
-async def run_experiment_from_yaml(yaml_path: Path, login_payloads: List[Dict[str, Any]]) -> None:
+async def run_experiment_from_yaml(yaml_path: Path, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
     """Run an experiment from a YAML configuration file."""
     parser = BaseConfigParser(yaml_path)
-    await parser.run_experiment(login_payloads)
+    await parser.run_experiment(login_payloads, game_id)
