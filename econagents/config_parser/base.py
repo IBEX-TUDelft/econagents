@@ -13,6 +13,7 @@ from econagents.core.game_runner import GameRunner, GameRunnerConfig, HybridGame
 from econagents.core.manager.phase import PhaseManager, TurnBasedPhaseManager, HybridPhaseManager
 from econagents.core.state.fields import EventField
 from econagents.core.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
+from econagents.core.state.market import MarketState
 from econagents.core.agent_role import AgentRole
 
 # --- Type Mapping ---
@@ -28,6 +29,7 @@ TYPE_MAPPING = {
     "date": date,
     "time": time,
     "any": Any,
+    "MarketState": MarketState,
 }
 
 
@@ -120,7 +122,7 @@ class StateConfig(BaseModel):
                 return TYPE_MAPPING[field_type_str]
             else:
                 try:
-                    resolved_type = eval(field_type_str, {"list": list, "dict": dict, "Any": Any})
+                    resolved_type = eval(field_type_str, {"list": list, "dict": dict, "Any": Any, "MarketState": MarketState})
                     return resolved_type
                 except (NameError, SyntaxError):
                     raise ValueError(f"Unsupported field type: {field_type_str}")
@@ -133,7 +135,7 @@ class StateConfig(BaseModel):
                 return dict
             else:
                 try:
-                    return eval(factory_name)
+                    return eval(factory_name, {"MarketState": MarketState})
                 except (NameError, SyntaxError):
                     raise ValueError(f"Unsupported default_factory: {factory_name}")
 

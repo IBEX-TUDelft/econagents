@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from econagents.config_parser.base import BaseConfigParser, ExperimentConfig, StateConfig
 from econagents.core.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
+from econagents.core.state.market import MarketState
 from econagents.core.events import Message
 
 
@@ -62,6 +63,44 @@ def config_file(tmp_path: Path, sample_config_dict: Dict[str, Any]) -> Path:
     config_path = tmp_path / "test_config.yaml"
     with open(config_path, "w") as f:
         yaml.dump(sample_config_dict, f)
+    return config_path
+
+
+@pytest.fixture
+def market_state_config_dict() -> Dict[str, Any]:
+    """Provides a sample configuration dictionary with a MarketState field."""
+    return {
+        "name": "MarketState Experiment",
+        "agent_roles": [
+            {
+                "role_id": 1,
+                "name": "MarketAgent",
+                "llm_type": "ChatOpenAI",
+            }
+        ],
+        "agents": [{"id": 1, "role_id": 1}],
+        "state": {
+            "public_information": [
+                {"name": "current_market", "type": "MarketState", "default_factory": "MarketState"},
+            ]
+        },
+        "manager": {"type": "TurnBasedPhaseManager"},
+        "runner": {
+            "type": "TurnBasedGameRunner",
+            "hostname": "localhost",
+            "port": 8765,
+            "path": "ws",
+            "game_id": 1000,
+        },
+    }
+
+
+@pytest.fixture
+def market_state_config_file(tmp_path: Path, market_state_config_dict: Dict[str, Any]) -> Path:
+    """Creates a temporary YAML config file with MarketState."""
+    config_path = tmp_path / "market_state_config.yaml"
+    with open(config_path, "w") as f:
+        yaml.dump(market_state_config_dict, f)
     return config_path
 
 
@@ -290,3 +329,36 @@ class TestBaseConfigParser:
 
         with pytest.raises(ValidationError):
             DynamicGameState(public_information={"optional_int_list": ["a", "b"]})  # list[str] instead of list[int]
+
+    def test_dynamic_state_with_market_state(self, market_state_config_file: Path):
+        """Test creating and instantiating a dynamic GameState with a MarketState field."""
+        parser = BaseConfigParser(config_path=market_state_config_file)
+        DynamicGameState = parser.config.state.create_state_class()
+
+        # Check the field type in the generated model
+        assert "current_market" in DynamicGameState.model_fields["public_information"].annotation.model_fields  # type: ignore
+        assert (
+            DynamicGameState.model_fields["public_information"].annotation.model_fields["current_market"].annotation  # type: ignore
+            == MarketState
+        )
+
+        # Instantiate the state
+        state_instance = DynamicGameState()
+
+        # Verify the field is initialized correctly using the default factory
+        assert isinstance(state_instance.public_information.current_market, MarketState)  # type: ignore
+        assert state_instance.public_information.current_market.orders == {}  # type: ignore
+        assert state_instance.public_information.current_market.trades == []  # type: ignore
+
+        order_data = {
+            "id": 1,
+            "sender": 1,
+            "price": 10.0,
+            "quantity": 5.0,
+            "type": "bid",
+            "condition": 0,
+        }
+        state_instance.public_information.current_market.process_event("add-order", {"order": order_data})  # type: ignore
+
+        assert 1 in state_instance.public_information.current_market.orders  # type: ignore
+        assert state_instance.public_information.current_market.orders[1].price == 10.0  # type: ignore
