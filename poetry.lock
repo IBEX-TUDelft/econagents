@@ -4084,4 +4084,4 @@ standard = ["langsmith", "openai"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4"
-content-hash = "1d13fcc7556d5dea7c98df7eb9e0823bf823e55f4142024b5c23e45e695c6f92"
+content-hash = "4ba6690f4ad6d3fbfdcd6549181fc7a546a801e4fa9c99e3595c1dec2d67582b"
