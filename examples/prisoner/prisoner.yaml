@@ -1,0 +1,153 @@
+name: "Prisoner's Dilemma"
+description: "A simple prisoner's dilemma experiment with LLM agents"
+
+prompt_partials:
+  - name: "game_description"
+    content: |
+      You are playing the role of a criminal who has been arrested and is being interrogated by the police. You had a partner in the crime, which is also being interrogated.
+      
+      In each round, you will need to choose between:
+      - **Cooperate**: Remain silent (don't betray your partner)
+      - **Defect**: Testify against your partner
+      
+      Your payoffs depend on both your choice and your partner's choice:
+      
+      - Both cooperate: You get 3, opponent gets 3
+      - You cooperate, opponent defects: You get 0, opponent gets 5
+      - You defect, opponent cooperates: You get 5, opponent gets 0
+      - Both defect: You get 1, opponent gets 1
+      
+  - name: "game_instructions"
+    content: |
+      ## Instructions
+      
+      Based on the current game state and your strategy, please choose whether to **cooperate** or **defect** in this round.
+      
+      Respond with only one of the following:
+      1. "COOPERATE" - if you choose to remain silent (cooperate)
+      2. "DEFECT" - if you choose to testify against the other player (defect)
+      
+      Provide your choice as a JSON object with the following fields:
+      - `gameId`: The ID of the game
+      - `type`: The type of message, which should be "choice"
+      - `choice`: The choice you made
+      
+      Example:
+      ```
+      {
+          "gameId": <game_id>,
+          "type": "choice",
+          "choice": "COOPERATE"
+      }
+      ```
+      
+      Don't include any other text in your response. Start with `{` and end with `}`.
+      
+  - name: "game_history"
+    content: |
+      {% if public_information.history %}
+      Previous rounds:
+      {% for round in public_information.history %}
+      Round {{round.round}}: You chose **{{ round.my_choice}}**, opponent chose **{{ round.opponent_choice }}**. You earned {{ round.my_payoff }} points.
+      {% endfor %}
+      {% else %}
+      This is the first round.
+      {% endif %}
+      
+
+agent_roles:
+  - role_id: 1
+    name: "cooperator"
+    llm_type: "ChatOpenAI"
+    llm_params:
+      model_name: "gpt-4o"
+    prompts:
+      - system: |
+          {% include "_partials/game_description.jinja2" %}
+          You will generally cooperate with the other prisoner.
+          
+      - user: |
+          {% include "_partials/game_history.jinja2" %}
+          {% include "_partials/game_instructions.jinja2" %}
+          
+      - system_phase_2: |
+          {% include "_partials/game_description.jinja2" %}
+          You're feeling happy and want to cooperate.
+          
+      - user_phase_2: |
+          In this round, you forgot the history of the game.
+          {% include "_partials/game_instructions.jinja2" %}
+          
+  - role_id: 2
+    name: "defector"
+    llm_type: "ChatOpenAI"
+    llm_params:
+      model_name: "gpt-4o"
+    prompts:
+      - system: |
+          {% include "_partials/game_instructions.jinja2" %}
+          You will generally defect
+          
+      - user: |
+          {% include "_partials/game_history.jinja2" %}
+          {% include "_partials/game_instructions.jinja2" %}
+          
+      - system_phase_2: |
+          {% include "_partials/game_description.jinja2" %}
+          You're feeling angry and want to defect.
+          
+      - user_phase_2: |
+          In this round, you forgot the history of the game.
+          {% include "_partials/game_instructions.jinja2" %}
+          
+
+agents:
+  - id: 1
+    role_id: 1
+  - id: 2
+    role_id: 1
+
+state:
+  meta_information:
+    - name: "game_id"
+      type: "int"
+      default: 0
+      exclude_from_mapping: true
+    - name: "player_name"
+      type: "str"
+      optional: true
+    - name: "player_number"
+      type: "int"
+      optional: true
+    - name: "players"
+      type: "list"
+      default_factory: "list"
+    - name: "phase"
+      type: "int"
+      default: 0
+      event_key: "round"
+    - name: "total_rounds"
+      type: "int"
+      default: 5
+  private_information:
+    - name: "total_score"
+      type: "int"
+      default: 0
+  public_information:
+    - name: "history"
+      type: "list"
+      default_factory: "list"
+
+manager:
+  type: "TurnBasedPhaseManager"
+
+runner:
+  game_id: 0
+  type: "TurnBasedGameRunner"
+  hostname: "localhost"
+  port: 8765
+  path: "wss"
+  log_level: "DEBUG"
+  phase_transition_event: "round-started"
+  phase_identifier_key: "round"
+  observability_provider: "langsmith"
