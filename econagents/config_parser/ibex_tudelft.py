@@ -14,7 +14,9 @@ from econagents.config_parser.base import BaseConfigParser
 def handle_market_event_impl(self: GameState, event_type: str, data: dict[str, Any]) -> None:
     """Handles market-related events by delegating to the MarketState instance."""
     try:
-        self.public_information.current_market.process_event(event_type=event_type, data=data)  # type: ignore
+        getattr(self.public_information, self.meta._market_state_variable_name).process_event(  # type: ignore
+            event_type=event_type, data=data
+        )
     except Exception as e:
         raise ValueError(f"Error processing market event: {e}") from e
 
@@ -150,22 +152,15 @@ class IbexTudelftConfigParser(BaseConfigParser):
         setattr(enhanced_class, "get_custom_handlers", get_custom_handlers_impl)
         return cast(Type[GameState], enhanced_class)
 
-    def _check_market_state_fields(self, base_dynamic_state_class: Type[GameState]) -> None:
-        meta_fields = base_dynamic_state_class().meta.model_json_schema()["properties"]  # type: ignore
+    def _check_additional_required_fields(self, base_dynamic_state_class: Type[GameState]) -> None:
         public_fields = base_dynamic_state_class().public_information.model_json_schema()["properties"]  # type: ignore
         private_fields = base_dynamic_state_class().private_information.model_json_schema()["properties"]  # type: ignore
 
-        if any(
-            [
-                "MarketState" in v.get("$ref", "")  # type: ignore
-                for v in {**meta_fields, **public_fields, **private_fields}.values()
-            ]
+        if (
+            "winning_condition" not in public_fields.keys()  # type: ignore
+            or "wallet" not in private_fields.keys()  # type: ignore
         ):
-            if (
-                "winning_condition" not in public_fields.keys()  # type: ignore
-                or "wallet" not in private_fields.keys()  # type: ignore
-            ):
-                raise ValueError("Winning condition or wallet is not present in the config")
+            raise ValueError("Winning condition or wallet is not present in the config")
 
     async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
         """
@@ -175,22 +170,18 @@ class IbexTudelftConfigParser(BaseConfigParser):
         # Step 1: Get the base state class from the original StateConfig
         base_dynamic_state_class = self.config.state.create_state_class()
 
-        # check if a field of type MarketState is present in the config
-        self._check_market_state_fields(base_dynamic_state_class)
-
         # Step 2: Detect if MarketState is used and get details
         has_market_state_field, market_state_details = self._detect_market_state_in_config()
 
         # Step 3: If MarketState is present, create an enhanced state class
         if has_market_state_field and market_state_details:
+            self._check_additional_required_fields(base_dynamic_state_class)
             final_state_class = self._create_enhanced_state_class(base_dynamic_state_class)
         else:
             final_state_class = base_dynamic_state_class
 
-        if not self.config.agent_roles and self.config.agents:
-            raise ValueError(
-                "Configuration has 'agents' but no 'agent_roles'. Cannot determine agent role configurations."
-            )
+        if not self.config.agent_roles:
+            raise ValueError("Configuration has no 'agent_roles'.")
 
         # Create managers for each agent
         agents_for_runner = []
@@ -201,6 +192,9 @@ class IbexTudelftConfigParser(BaseConfigParser):
                 agent_role=None,
                 auth_kwargs=payload,
             )
+            current_agent_manager.state.meta.game_id = game_id
+            if market_state_details:
+                setattr(current_agent_manager.state.meta, "_market_state_variable_name", market_state_details[0])
             agents_for_runner.append(current_agent_manager)
 
         # Create runner config

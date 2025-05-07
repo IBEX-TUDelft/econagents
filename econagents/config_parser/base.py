@@ -50,6 +50,8 @@ class AgentRoleConfig(BaseModel):
     llm_type: str = "ChatOpenAI"
     llm_params: Dict[str, Any] = Field(default_factory=dict)
     prompts: List[Dict[str, str]] = Field(default_factory=list)
+    task_phases: List[int] = Field(default_factory=list)
+    task_phases_excluded: List[int] = Field(default_factory=list)
 
     def create_agent_role(self) -> AgentRole:
         """Create an AgentRole instance from this configuration."""
@@ -58,8 +60,17 @@ class AgentRoleConfig(BaseModel):
         llm_instance = llm_class(**self.llm_params)
 
         # Create a dynamic AgentRole subclass
+        agent_role_attrs = {
+            "role": self.role_id,
+            "name": self.name,
+            "llm": llm_instance,
+            "task_phases": self.task_phases,
+            "task_phases_excluded": self.task_phases_excluded,
+        }
         agent_role = type(
-            f"Dynamic{self.name}Role", (AgentRole,), {"role": self.role_id, "name": self.name, "llm": llm_instance}
+            f"Dynamic{self.name}Role",
+            (AgentRole,),
+            agent_role_attrs,
         )
 
         return agent_role()
@@ -104,6 +115,8 @@ class StateFieldConfig(BaseModel):
     event_key: Optional[str] = None
     exclude_from_mapping: bool = False
     optional: bool = False
+    events: Optional[List[str]] = None
+    exclude_events: Optional[List[str]] = None
 
 
 class StateConfig(BaseModel):
@@ -151,6 +164,8 @@ class StateConfig(BaseModel):
                 event_field_args = {
                     "event_key": field.event_key,
                     "exclude_from_mapping": field.exclude_from_mapping,
+                    "events": field.events,
+                    "exclude_events": field.exclude_events,
                 }
                 # Handle default vs default_factory
                 if field.default_factory:
