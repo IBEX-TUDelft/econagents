@@ -50,6 +50,8 @@ class AgentRoleConfig(BaseModel):
     llm_type: str = "ChatOpenAI"
     llm_params: Dict[str, Any] = Field(default_factory=dict)
     prompts: List[Dict[str, str]] = Field(default_factory=list)
+    task_phases: List[int] = Field(default_factory=list)
+    task_phases_excluded: List[int] = Field(default_factory=list)
 
     def create_agent_role(self) -> AgentRole:
         """Create an AgentRole instance from this configuration."""
@@ -58,8 +60,17 @@ class AgentRoleConfig(BaseModel):
         llm_instance = llm_class(**self.llm_params)
 
         # Create a dynamic AgentRole subclass
+        agent_role_attrs = {
+            "role": self.role_id,
+            "name": self.name,
+            "llm": llm_instance,
+            "task_phases": self.task_phases,
+            "task_phases_excluded": self.task_phases_excluded,
+        }
         agent_role = type(
-            f"Dynamic{self.name}Role", (AgentRole,), {"role": self.role_id, "name": self.name, "llm": llm_instance}
+            f"Dynamic{self.name}Role",
+            (AgentRole,),
+            agent_role_attrs,
         )
 
         return agent_role()
@@ -104,6 +115,8 @@ class StateFieldConfig(BaseModel):
     event_key: Optional[str] = None
     exclude_from_mapping: bool = False
     optional: bool = False
+    events: Optional[List[str]] = None
+    exclude_events: Optional[List[str]] = None
 
 
 class StateConfig(BaseModel):
@@ -122,7 +135,9 @@ class StateConfig(BaseModel):
                 return TYPE_MAPPING[field_type_str]
             else:
                 try:
-                    resolved_type = eval(field_type_str, {"list": list, "dict": dict, "Any": Any, "MarketState": MarketState})
+                    resolved_type = eval(
+                        field_type_str, {"list": list, "dict": dict, "Any": Any, "MarketState": MarketState}
+                    )
                     return resolved_type
                 except (NameError, SyntaxError):
                     raise ValueError(f"Unsupported field type: {field_type_str}")
@@ -149,6 +164,8 @@ class StateConfig(BaseModel):
                 event_field_args = {
                     "event_key": field.event_key,
                     "exclude_from_mapping": field.exclude_from_mapping,
+                    "events": field.events,
+                    "exclude_events": field.exclude_events,
                 }
                 # Handle default vs default_factory
                 if field.default_factory:
@@ -204,12 +221,16 @@ class ManagerConfig(BaseModel):
     event_handlers: List[EventHandler] = Field(default_factory=list)
 
     def create_manager(
-        self, game_id: int, state: GameState, agent_role: AgentRole, auth_kwargs: Dict[str, Any]
+        self, game_id: int, state: GameState, agent_role: Optional[AgentRole], auth_kwargs: Dict[str, Any]
     ) -> PhaseManager:
         """Create a PhaseManager instance from this configuration."""
-        # TODO: Add HybridPhaseManager
+
+        manager_class: Type[PhaseManager]
+
         if self.type == "TurnBasedPhaseManager":
             manager_class = TurnBasedPhaseManager
+        elif self.type == "HybridPhaseManager":
+            manager_class = HybridPhaseManager
         else:
             raise ValueError(f"Invalid manager type: {self.type}")
 
@@ -220,7 +241,7 @@ class ManagerConfig(BaseModel):
             agent_role=agent_role,
         )
 
-        # Safely set game_id if the manager has this attribute
+        # Set Game ID
         if hasattr(manager, "game_id"):
             setattr(manager, "game_id", game_id)
 
@@ -297,7 +318,7 @@ class RunnerConfig(BaseModel):
                 phase_transition_event=self.phase_transition_event,
                 phase_identifier_key=self.phase_identifier_key,
                 observability_provider=self.observability_provider,
-                state_class=None,  # Default to None, will be set later
+                state_class=None,
             )
         elif self.type == "HybridGameRunner":
             return HybridGameRunnerConfig(
@@ -417,7 +438,7 @@ class ExperimentConfig(BaseModel):
 
         # Create runner config
         runner_config = self.runner.create_runner_config()
-        runner_config.state_class = state_class  # Set state class in runner config
+        runner_config.state_class = state_class
         runner_config.game_id = game_id
 
         # Compile inline prompts if needed
@@ -465,7 +486,7 @@ class BaseConfigParser:
         return ExperimentConfig(**config_data)
 
     def create_manager(
-        self, game_id: int, state: GameState, agent_role: AgentRole, auth_kwargs: Dict[str, Any]
+        self, game_id: int, state: GameState, agent_role: Optional[AgentRole], auth_kwargs: Dict[str, Any]
     ) -> PhaseManager:
         """
         Create a manager instance based on the configuration.

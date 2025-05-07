@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from econagents import AgentRole
 from econagents.core.events import Message
@@ -15,7 +15,7 @@ class BasicConfigParser(BaseConfigParser):
     """
 
     def create_manager(
-        self, game_id: int, state: GameState, agent_role: AgentRole, auth_kwargs: Dict[str, Any]
+        self, game_id: int, state: GameState, agent_role: Optional[AgentRole], auth_kwargs: Dict[str, Any]
     ) -> PhaseManager:
         """
         Create a manager instance with a custom event handler for the assign-name event.
