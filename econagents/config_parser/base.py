@@ -122,7 +122,9 @@ class StateConfig(BaseModel):
                 return TYPE_MAPPING[field_type_str]
             else:
                 try:
-                    resolved_type = eval(field_type_str, {"list": list, "dict": dict, "Any": Any, "MarketState": MarketState})
+                    resolved_type = eval(
+                        field_type_str, {"list": list, "dict": dict, "Any": Any, "MarketState": MarketState}
+                    )
                     return resolved_type
                 except (NameError, SyntaxError):
                     raise ValueError(f"Unsupported field type: {field_type_str}")
@@ -204,12 +206,16 @@ class ManagerConfig(BaseModel):
     event_handlers: List[EventHandler] = Field(default_factory=list)
 
     def create_manager(
-        self, game_id: int, state: GameState, agent_role: AgentRole, auth_kwargs: Dict[str, Any]
+        self, game_id: int, state: GameState, agent_role: Optional[AgentRole], auth_kwargs: Dict[str, Any]
     ) -> PhaseManager:
         """Create a PhaseManager instance from this configuration."""
-        # TODO: Add HybridPhaseManager
+
+        manager_class: Type[PhaseManager]
+
         if self.type == "TurnBasedPhaseManager":
             manager_class = TurnBasedPhaseManager
+        elif self.type == "HybridPhaseManager":
+            manager_class = HybridPhaseManager
         else:
             raise ValueError(f"Invalid manager type: {self.type}")
 
@@ -220,7 +226,7 @@ class ManagerConfig(BaseModel):
             agent_role=agent_role,
         )
 
-        # Safely set game_id if the manager has this attribute
+        # Set Game ID
         if hasattr(manager, "game_id"):
             setattr(manager, "game_id", game_id)
 
@@ -417,7 +423,7 @@ class ExperimentConfig(BaseModel):
 
         # Create runner config
         runner_config = self.runner.create_runner_config()
-        runner_config.state_class = state_class  # Set state class in runner config
+        runner_config.state_class = state_class
         runner_config.game_id = game_id
 
         # Compile inline prompts if needed
@@ -465,7 +471,7 @@ class BaseConfigParser:
         return ExperimentConfig(**config_data)
 
     def create_manager(
-        self, game_id: int, state: GameState, agent_role: AgentRole, auth_kwargs: Dict[str, Any]
+        self, game_id: int, state: GameState, agent_role: Optional[AgentRole], auth_kwargs: Dict[str, Any]
     ) -> PhaseManager:
         """
         Create a manager instance based on the configuration.
