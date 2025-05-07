@@ -104,7 +104,7 @@ agent_roles:
       - user_phase_3: |
           Instructions for this phase:
 
-          {% include "_partials/_game_information.jinja2" %}
+          {% include "_partials/game_information.jinja2" %}
 
           2. **Available Information**:
             2.1. **Declarations**:
@@ -286,7 +286,7 @@ agent_roles:
       - user_phase_7: |
           Instructions for this phase:
 
-          {% include "_partials/_game_information.jinja2" %}
+          {% include "_partials/game_information.jinja2" %}
 
           2. **Available Information**:
             2.1. **Your True Land Values**:
