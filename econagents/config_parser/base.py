@@ -318,7 +318,7 @@ class RunnerConfig(BaseModel):
                 phase_transition_event=self.phase_transition_event,
                 phase_identifier_key=self.phase_identifier_key,
                 observability_provider=self.observability_provider,
-                state_class=None,  # Default to None, will be set later
+                state_class=None,
             )
         elif self.type == "HybridGameRunner":
             return HybridGameRunnerConfig(

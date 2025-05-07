@@ -9,6 +9,7 @@ from econagents.core.manager.phase import PhaseManager
 from econagents.core.state.game import GameState
 from econagents.core.game_runner import GameRunner
 from econagents.config_parser.base import BaseConfigParser
+from econagents.llm.observability import get_observability_provider
 
 
 def handle_market_event_impl(self: GameState, event_type: str, data: dict[str, Any]) -> None:
@@ -227,6 +228,10 @@ class IbexTudelftConfigParser(BaseConfigParser):
         if agent_role:
             manager.agent_role = agent_role.create_agent_role()
             manager.agent_role.logger = manager.logger  # type: ignore
+            if self.config.runner.observability_provider:
+                manager.agent_role.llm.observability = get_observability_provider(
+                    self.config.runner.observability_provider
+                )
         else:
             manager.logger.error("Invalid role assigned; cannot initialize agent.")
             raise ValueError("Invalid role for agent initialization.")
