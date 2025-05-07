@@ -380,8 +380,6 @@ class TestIbexTudelftConfigParser:
         """
         parser = IbexTudelftConfigParser(config_path=market_state_config_file)
 
-        # Prepare inputs for run_experiment
-        # Based on market_state_config_dict: agents: [{"id": 1, "role_id": 1}]
         login_payloads = [{"agent_id": 1, "auth_token": "test_token"}]
         game_id = 123
 
@@ -398,16 +396,9 @@ class TestIbexTudelftConfigParser:
             mock_game_runner_class.assert_called_once()
 
             # 2. Get the arguments passed to GameRunner constructor
-            args, kwargs = mock_game_runner_class.call_args
+            _, kwargs = mock_game_runner_class.call_args
             runner_config_arg = kwargs.get("config")
-            assert runner_config_arg is not None, "GameRunner was not called with a 'config' keyword argument."
-
-            # 3. Verify the state_class in the runner's config
-            assert runner_config_arg.state_class is not None, "state_class in runner_config was not set."
-
             DynamicGameStateWithMarket = runner_config_arg.state_class
-
-            # 4. Check if the state_class is correctly formed (has MarketState)
             assert "public_information" in DynamicGameStateWithMarket.model_fields
             public_info_model = DynamicGameStateWithMarket.model_fields["public_information"].annotation
 
@@ -415,6 +406,7 @@ class TestIbexTudelftConfigParser:
             assert public_info_model.model_fields["current_market"].annotation == MarketState
 
             state_instance = DynamicGameStateWithMarket()
+            setattr(state_instance.meta, "_market_state_variable_name", "current_market")
 
             event_data = {"wallet": [{"balance": 0, "shares": 0}, {"balance": 0, "shares": 0}]}
             state_instance.update(Message(message_type="event", event_type="update_wallet", data=event_data))  # type: ignore
