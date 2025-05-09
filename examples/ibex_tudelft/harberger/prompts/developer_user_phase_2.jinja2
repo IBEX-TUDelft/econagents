@@ -1,38 +1,70 @@
-Instructions for this phase:
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Developer (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+{# ==================== FIRST DECLARATION PHASE INTRO ==================== #}
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+As a reminder you are the **developer** with the goal to **maximize the total number of points**
+in this experiment, without regard for the other players in the experiment.
+You will now be taking part in the **first declaration phase**.
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+Total Points =
+(Real Value of the Property under the Chosen Condition)
+– ((First Declaration × 1% tax) + (Final Declaration × 33% tax))
++ (First Speculation Result + Final Speculation Result)
++ (Cash Position + (Number of Shares × True Share Value in the Chosen Condition))
 
-  2.3. **Tax Information**:
-    - Current tax rate: {{ public_information.tax_rate }}%
+You are playing together with your fully aligned *o1 Pro model*.
+Since o1 Pro is a reasoning model, it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 Pro strategy agent as best as you can,
+in order to maximize your points in the game.
 
-3. **Your Decision to Make**:
-   - Declare your land value for both scenarios (Project and No Project)
-   - Your declaration will affect which scenario is chosen
-   - Provide the output as a JSON object:
+Your o1 Pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the first declaration phase.
 
-    {
-        "gameId": {{ meta.game_id }},
-        "type": "declare",
-        "declaration": [
-            <value_no_project>,
-            <value_project>,
-            0,
-        ],
-    }
+The instructions for the first declaration phase follow:
+
+{# ==================== FIRST DECLARATION PHASE STRATEGY ==================== #}
+
+== First Declaration Phase Strategy – Developer ==
+
+Below is how we (the Developer) want our GPT-4o representative to act in this First Declaration Phase.
+
+== Developer’s Goal ==
+
+We want the **Project** scenario to be chosen. This is because our real land value is always higher when the Project is implemented.
+The scenario (Project vs. No Project) that receives the highest total of declared values (from the developer and owners) will be selected.
+
+Therefore, we follow this logic:
+1. Declare a **very low** value for the No Project scenario.
+2. Declare a **very high** value for the Project scenario.
+
+== Declaration Strategy Details ==
+
+- No Project Declaration:
+  - We want this value to be as low as possible to lower the No Project sum.
+  - Developer No Project bounds: 200,000 to 500,000
+  - Declare: 200000 (minimum)
+
+- Project Declaration:
+  - We want this value to be as high as possible to increase the Project sum.
+  - Developer Project bounds: 500,000 to 2,750,000
+  - Declare: 2750000 (maximum)
+
+- Tax Consideration:
+  - We pay 1% of the declared value under the chosen scenario.
+  - If Project wins, tax = 1% of 2,750,000 = 27,500
+  - This is acceptable given our high real value under Project.
+
+== JSON Output to Submit ==
+
+{
+  "gameId": {{ meta.game_id }},
+  "type": "declare",
+  "declaration": [
+    200000,
+    2750000,
+    0
+  ]
+}
+
+== Summary ==
+
+This declaration strategy maximizes our chance of getting the Project chosen and aligns with our long-term payoff goal.
+Declare 200000 for No Project and 2750000 for Project. Trust the o1 Pro strategy.

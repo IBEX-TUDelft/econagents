@@ -1,0 +1,40 @@
+Instructions for this phase:
+
+1. **Game Information**:
+   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
+   - Your Role: Developer (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+
+2. **Available Information**:
+  2.1. **Your True Land Values**:
+    - {{ private_information.property.name }}:
+      - No Project: {{ private_information.property.v[0] }}
+      - Project: {{ private_information.property.v[1] }}
+
+  2.2. **Value Boundaries**:
+    {% for role, conditions in public_information.boundaries.items() %}
+    - {{ role }}:
+      {% for condition, bounds in conditions.items() %}
+      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
+      {% endfor %}
+    {% endfor %}
+
+  2.3. **compensation offer**:
+    - you have offered a compsenstion of {{ public_information.compensationOffers[1] }} to each of the 5 voters when the project is implemented
+
+3. **Your Decision to Make**:
+   - decide whether to vote for development ("Project") or no development ("No Project").
+   - If you and the owners vote to develop the project ("Project"), you will pay {{ 5* public_information.compensationOffers }} in compsensation to the owners and receive the value of your property under the development option "Project" of {{ private_information.property.v[1] }}
+   - If you and the owners vote not to develop the project ("No project") you will receive the value of your property under the development option "No Project" of {{ private_information.property.v[0] }} and pay 0 in compensation.
+   - Provide the output as a JSON object:
+
+    {
+        "gameId": {{ meta.game_id }},
+        "type": "compensation-decision",
+                "compensationDecisions": [
+                    <1 or 0>
+                ]
+    }
+
+- to vote for "Project", sent a compensationDecisions 1
+- to vote for "No Project", sent a compensationDecisions 0

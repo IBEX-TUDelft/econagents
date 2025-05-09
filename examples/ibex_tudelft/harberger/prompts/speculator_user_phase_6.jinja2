@@ -1,0 +1,113 @@
+{#
+As a reminder you are the Speculator with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **market phase**.
+
+*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
+
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
+
+Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
+
+Your o1 pro strategy agent will give you the strategies to strictly follow as a speculator in the experiment for the market phase.
+
+The instructions for the market phase follow;
+#}
+
+{#
+Market Phase Strategy – GPT-4o Speculator Agent Instructions
+#}
+
+## 1. Understand the Share Value Drivers
+
+1. **Public Signal (S_public)**:
+   - Based on initial declarations.
+   - Represents the value if all players repeat their initial declarations in the final phase.
+   - Likely to be **too high** due to under-declaration at the final phase.
+
+2. **Private Signal (S_private)**:
+   - Based on true property values with small noise.
+   - Approximates the value if everyone declares truthfully.
+
+3. **Estimated Share Value (v̂)**:
+   - Combine signals and discount:
+     \[
+       \hat{v} = rac{ S_{public} + S_{private} }{ 2 } 	imes \delta
+     \]
+   - Choose a discount factor \(\delta\) between 0.85 and 0.95 to reflect anticipated under-declaration.
+
+---
+
+## 2. Decide Whether to Buy or Sell
+
+1. **Buy if**:
+   - Best *ask* < \(\hat{v}\)
+   - You have enough cash
+   - Action: post bid with `"now": true`
+
+2. **Sell if**:
+   - Best *bid* > \(\hat{v}\)
+   - You have shares
+   - Action: post ask with `"now": true`
+
+3. **No good trades?** Post limit orders:
+   - Buy: post bid < best ask, close to \(\hat{v}\)
+   - Sell: post ask > best bid, close to \(\hat{v}\)
+
+4. **If time is short**, cancel unfilled orders or do nothing.
+
+---
+
+## 3. Output Formats
+
+### Post a New Order
+```json
+{
+  "gameId": <GAME_ID>,
+  "type": "post-order",
+  "order": {
+    "price": <number>,
+    "quantity": 1,
+    "type": <"ask" or "bid">,
+    "now": <true or false>,
+    "condition": <WINNING_CONDITION>
+  }
+}
+```
+
+### Cancel an Order
+```json
+{
+  "gameId": <GAME_ID>,
+  "type": "cancel-order",
+  "order": {
+    "id": <ORDER_ID>,
+    "condition": <WINNING_CONDITION>
+  }
+}
+```
+
+### Do Nothing
+```json
+{}
+```
+
+---
+
+## 4. Putting It All Together
+
+1. Estimate \(\hat{v}\)
+2. Check best ask/bid
+3. Buy if ask < \(\hat{v}\); sell if bid > \(\hat{v}\)
+4. If not: post smart limit orders
+5. Adjust or cancel orders as needed
+6. If market is stale or time is short: do nothing
+
+---
+
+## Final Reminder to GPT-4o
+
+- Track cash and shares
+- Avoid overbuying or overselling
+- Watch the clock
+- Maximize value from every trade
+
+#}
