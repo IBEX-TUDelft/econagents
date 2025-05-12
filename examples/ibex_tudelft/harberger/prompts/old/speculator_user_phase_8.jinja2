@@ -1,0 +1,42 @@
+Instructions for this phase:
+
+1. **Game Information**:
+   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
+   - Your Role: Speculator (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+
+2. **Available Information**:
+  2.1. **Declarations**:
+    - Winning Condition: {{ public_information.winning_condition_description }} ({{ public_information.winning_condition }})
+    {% set key = "projectA" if public_information.winning_condition == 1 else "noProject" %}
+    {% for declaration in private_information.declarations %}
+      {% set role_name = "Speculator" if declaration["role"] == 1 else "Developer" if declaration["role"] == 2 else "Owner" %}
+      {% set declared_value = declaration["d"][public_information.winning_condition] %}
+      {% if declaration["role"] == 2 %}
+        {% set min_value = public_information.boundaries["developer"][key]["low"] %}
+        {% set max_value = public_information.boundaries["developer"][key]["high"] %}
+      {% else %}
+        {% set min_value = public_information.boundaries["owner"][key]["low"] %}
+        {% set max_value = public_information.boundaries["owner"][key]["high"] %}
+      {% endif %}
+      {% set percentile = ((declared_value - min_value) / (max_value - min_value) * 100) | round(2) %}
+      - Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value }}, percentile: {{ percentile }}%
+    {% endfor %}
+
+  2.2. **Real Value Boundaries**:
+    {% for role, conditions in public_information.boundaries.items() %}
+    - {{ role }}:
+      {% for condition, bounds in conditions.items() %}
+      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
+      {% endfor %}
+    {% endfor %}
+
+3. **Your Decision to Make**:
+   - Decide which properties to purchase based on their declared values and your assessment of true value
+   - You should provide the id of the player you want to trade with
+   - Provide the output as a JSON object:
+    {
+      "gameId": {{ meta.game_id }},
+      "type": "done-speculating",
+      "snipe": [<player_id>, <player_id>, <player_id>],
+    }

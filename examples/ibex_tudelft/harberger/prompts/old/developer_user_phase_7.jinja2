@@ -1,0 +1,39 @@
+Instructions for this phase:
+
+1. **Game Information**:
+   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
+   - Your Role: Developer (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+
+2. **Available Information**:
+  2.1. **Your True Land Values**:
+    - {{ private_information.property.name }}:
+      - No Project: {{ private_information.property.v[0] }}
+      - Project: {{ private_information.property.v[1] }}
+
+  2.2. **Winning Condition**:
+    - {{ public_information.winning_condition_description }} ({{ public_information.winning_condition }})
+
+  2.3. **Your Initial Declaration**:
+    - Declared Value: {{ private_information.declarations[meta.player_number-1].declared_value }}
+    - Percentile: {{ private_information.declarations[meta.player_number-1].percentile }}%
+
+  2.4. **Tax Information**:
+    - Current tax rate: {{ public_information.tax_rate }}%
+
+  2.4. **Market Signals**:
+    - Public Signal: {{ public_information.public_signal[public_information.winning_condition] }}
+    - Your Private Signal: {{ private_information.value_signals[public_information.winning_condition] }}
+
+3. **Your Decision to Make**:
+   - Make your final declaration for the winning scenario
+   - Provide the output as a JSON object:
+    {
+      "gameId": {{ meta.game_id }},
+      "type": "declare",
+      "declaration": [
+          <value_no_project>,
+          <value_project>,
+          0,
+      ],
+    }

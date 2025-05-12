@@ -23,7 +23,7 @@ Event-Driven Updates
 
 State updates are driven by events, which are processed through:
 
-* **Property Mappings**: Automatic mapping of event data to state properties 
+* **Property Mappings**: Automatic mapping of event data to state properties
 * **Custom Event Handlers**: Game-specific logic for handling complex events
 
 EventField System

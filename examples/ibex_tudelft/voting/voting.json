@@ -1,0 +1,88 @@
+{
+  "title": "voting simulation",
+  "tax_rate": {
+      "initial": 1,
+      "final": 33
+  },
+  "signal": {
+      "low": 0.95,
+      "high": 1.05,
+      "generate": false
+  },
+  "speculators": {
+      "count": 0,
+      "balance": 50000,
+      "shares": 5,
+      "max_lot_purchases": 3,
+      "cash_for_snipers": 250000,
+      "base_points": 0,
+      "reward_scale_factor": 1
+  },
+  "developers": {
+      "count": 1,
+      "balance": 300000,
+      "shares": 30,
+      "base_points": 500000,
+      "reward_scale_factor": 50000,
+      "profit": {
+          "no_project": {
+              "low": 200000,
+              "fixed": 350000,
+              "high": 500000
+          },
+          "project_a": {
+              "low": 500000,
+              "fixed": 1150000,
+              "high": 2750000
+          },
+          "project_b": {
+              "low": 1500000,
+              "fixed": 1750000,
+              "high": 2000000
+          }
+      }
+  },
+  "owners": {
+      "count": 2,
+      "balance": 60000,
+      "shares": 6,
+      "base_points": 0,
+      "reward_scale_factor": 20000,
+      "profit": {
+          "no_project": {
+              "low": 350000,
+              "fixed": 425000,
+              "high": 600000
+          },
+          "project_a": {
+              "low": 150000,
+              "fixed": 275000,
+              "high": 350000
+          },
+          "project_b": {
+              "low": 100000,
+              "fixed": 150000,
+              "high": 200000
+          }
+      }
+  },
+  "timers": {
+      "phase_0": null,
+      "phase_1": "15",
+      "phase_2": "180",
+      "phase_3": "120",
+      "phase_4": "120",
+      "phase_5": "120",
+      "phase_6": "60",
+      "phase_7": "15"
+  },
+  "round_count": "1",
+  "agents_only": false,
+  "game_type": "voting",
+  "practice": false,
+  "minutes_for_trading": 10,
+  "minutes_for_sniping": 2,
+  "session_number": 1,
+  "seconds_for_deliberation": 120,
+  "show_up_fee": 5
+}
