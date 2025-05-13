@@ -1574,15 +1574,15 @@ files = [
 
 [[package]]
 name = "langfuse"
-version = "2.60.3"
+version = "2.60.4"
 description = "A client library for accessing langfuse"
 optional = true
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 markers = "extra == \"all\" or extra == \"langfuse\""
 files = [
-    {file = "langfuse-2.60.3-py3-none-any.whl", hash = "sha256:2b866c44f24d5f06b617d7f14f75a2e42577538b530e4e26dc6ad770d6d1399e"},
-    {file = "langfuse-2.60.3.tar.gz", hash = "sha256:171c0caf07a26282bd0403c6c15886ef1f447def42d6570684c94d6d9ae61d6e"},
+    {file = "langfuse-2.60.4-py3-none-any.whl", hash = "sha256:458e685d9c924addca6a268ab01369e32777e6514694325a6dd1578a0c1e6fa6"},
+    {file = "langfuse-2.60.4.tar.gz", hash = "sha256:1fb6f1228dd6ed8ce49ffeba92eae1209bd46f0bd67fc0c6a5ec881af60ea68a"},
 ]
 
 [package.dependencies]
@@ -4084,4 +4084,4 @@ standard = ["langsmith", "openai"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4"
-content-hash = "48a0780115d294e27902f43eaa1b461002cfe10ae466650a7507985512e252ee"
+content-hash = "afaa9fb2407c5087119c64ae8f211c24b097a8a69c833b3eabf04725f406c324"
