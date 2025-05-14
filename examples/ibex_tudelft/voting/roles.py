@@ -12,7 +12,7 @@ class Developer(AgentRole):
     name = "Developer"
     llm = ChatOpenAI()
     # These are the phases where the agent will perform an action
-    task_phases = [2, 4, 5, 6]
+    task_phases = [2, 4, 5]
 
 
 class Owner(AgentRole):

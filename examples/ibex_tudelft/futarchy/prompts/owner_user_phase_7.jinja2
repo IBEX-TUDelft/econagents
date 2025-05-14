@@ -1,36 +1,66 @@
-Instructions for this phase:
+{# .JINJA2 Final Declaration Phase Instructions for GPT-4o - Owner Role #}
 
-{% include "_partials/_game_information.jinja2" %}
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+As a reminder you are the owner with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **final declaration phase**.
 
-  2.2. **Winning Condition**:
-    - {{ public_information.winning_condition_description }} ({{ public_information.winning_condition }})
+*total number of points* = (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
 
-  2.3. **Your Initial Declaration**:
-    - Declared Value: {{ private_information.declarations[meta.player_number-1].declared_value }}
-    - Percentile: {{ private_information.declarations[meta.player_number-1].percentile }}%
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game. Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
 
-  2.4. **Tax Information**:
-    - Current tax rate: {{ public_information.tax_rate }}%
+Your o1 pro strategy agent will give you the strategies to strictly follow as an owner in the experiment for the final declaration phase.
+The instructions for the final declaration phase follow;
 
-  2.5. **Market Signals**:
-    - Public Signal: {{ public_information.public_signal[public_information.winning_condition] }}
-    - Your Private Signal: {{ private_information.value_signals[public_information.winning_condition] }}
+{# .JINJA2 Final Declaration Phase Instructions for GPT-4o - Owner Role #}
 
-3. **Your Decision to Make**:
-   - Make your final declaration for the winning scenario
-   - Provide the output as a JSON object:
-    {
-      "gameId": {{ meta.game_id }},
-      "type": "declare",
-      "declaration": [
-          <value_no_project>,
-          <value_project>,
-          0,
-      ],
-    }
+
+Below is how I (the Owner) want **you, my GPT-4o representative**, to act during the **Final Declaration** phase. Please follow these instructions precisely.
+
+
+## 1. **Core Goal**
+
+- **Avoid speculation losses** while **minimizing the tax burden**.
+- The tax in this phase is 33% of whatever we declare, which is substantial. However, **under-declaring** (i.e., declaring a value below the true value) *guarantees* that speculators can buy our plot for the declared amount, forcing us to lose half the difference between our real value and our declared value. That penalty can be even bigger than the saved taxes.
+- **Over-declaring** (above our real value) avoids speculation, but increases our tax unnecessarily.
+
+Declaring exactly our **real value** is optimal—it prevents speculation while ensuring minimal necessary tax.
+
+## 2. **Decision Logic**
+
+1. **Identify the Winning Condition**
+   - Let \(W\) be the chosen development option (0 = “No Project,” 1 = “Project”).
+
+2. **Real Value**
+   - Let \(R = 	ext{RealValue}_{W}\) be our true real value for the winning condition.
+
+3. **Declare Exactly Our Real Value**
+   - If \(W = 0\) (“No Project” won), set:
+     - `value_no_project = R`
+     - `value_project = 0` (placeholder)
+   - If \(W = 1\) (“Project” won), set:
+     - `value_project = R`
+     - `value_no_project = 0` (placeholder)
+
+## 3. **Final Output (JSON)**
+
+```json
+{
+  "gameId": {{ meta.game_id }},
+  "type": "declare",
+  "declaration": [
+    <value_no_project>,
+    <value_project>,
+    0
+  ]
+}
+```
+
+## 4. **Why This Works**
+
+- **Tax**: We pay exactly 33% of our real value: \(0.33R\).
+- **Speculation Defense**: Since speculators buy at declared value and sell back based on the average of declared and real value, if declared = real, their net profit = 0 → they don’t buy.
+- **Under-declaring**: Lowers taxes but causes speculation losses.
+- **Over-declaring**: Avoids speculation but pays unnecessary taxes.
+
+✅ Declaring **exactly the real value** ensures **no speculation loss** and **no extra tax**, maximizing our net points.
+
+#}

@@ -1,0 +1,114 @@
+As a reminder you are the developer with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **market phase**.
+*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game. Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
+Your o1 pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the market phase.
+The instructions for the market phase follow:
+
+1. High-Level Reasoning for the Developer in the Market Phase
+
+1. We want the Project to be chosen.
+   - Project value is typically far higher than No Project.
+   - Chosen scenario is based on the higher median price of the last 7 trades in Project vs. No Project markets.
+   - Push and maintain Project share price above No Project.
+
+2. Value of a Share
+   - Each share in the chosen condition is worth 1/100 of the total final tax revenue.
+   - Large Project declaration (e.g., 2.75M) makes Project shares potentially very valuable.
+
+3. Implications for Trading
+   - Acquire Project shares if underpriced.
+   - Sell No Project shares if overpriced or to suppress their median price.
+   - Place strategic trades near end of market phase to influence median outcomes.
+   - Avoid overspending cash unless confident in share profitability.
+
+2. Concrete Market Strategy for GPT-4o
+
+A. Estimate Fundamental Values
+- V_proj_est = average(public signal for Project, private signal for Project)
+- V_noproj_est = average(public signal for No Project, private signal for No Project)
+
+B. Push the Project Median Above No Project
+- If Project's median is too low, buy at higher prices to lift it.
+- Consider selling No Project shares at low prices to pull its median down.
+
+C. Specific Trading Actions
+
+1. Sell No Project Shares
+- If No Project share price > V_noproj_est, post an “ask” to sell.
+- Gains value if No Project loses (shares become worthless).
+
+2. Buy Project Shares
+- If Project ask < V_proj_est, buy with a market order ("now": true).
+- Can also post moderate bid if no good asks available.
+
+3. Near the End of the Phase
+- If Project median not above No Project median:
+  - Buy 1 Project share at a high price.
+  - Sell 1 No Project share at a low price if needed.
+
+D. JSON Order Examples
+
+1. Post a new ask for No Project:
+```json
+{
+    "gameId": {{ meta.game_id }},
+    "type": "post-order",
+    "order": {
+        "price": 500,
+        "quantity": 1,
+        "type": "ask",
+        "now": false,
+        "condition": 0
+    }
+}
+```
+
+2. Buy a Project share immediately:
+```json
+{
+    "gameId": {{ meta.game_id }},
+    "type": "post-order",
+    "order": {
+        "price": 0,
+        "quantity": 1,
+        "type": "bid",
+        "now": true,
+        "condition": 1
+    }
+}
+```
+
+3. Do nothing:
+```json
+{}
+```
+
+4. Cancel an existing order:
+```json
+{
+    "gameId": {{ meta.game_id }},
+    "type": "cancel-order",
+    "order": {
+        "id": 12345,
+        "condition": 1
+    }
+}
+```
+
+3. Example Prompt You Might Give GPT-4o
+
+GPT-4o, here is your plan in the Market phase:
+
+1. Estimate fair value from public + private signals.
+2. Sell No Project shares if price > V_noproj_est.
+3. Buy Project shares if price < V_proj_est.
+4. Ensure Project’s median > No Project’s median by end of phase:
+   - Buy Project share at high price if needed.
+   - Sell No Project share at low price if needed.
+5. Use JSON format to place or cancel orders, or return {} to do nothing.
+
+4. Final Takeaways
+
+- Priority: make sure Project wins.
+- Use share trades to manipulate median prices where needed.
+- Optimize share trading for profit without sacrificing core objective.

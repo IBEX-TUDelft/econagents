@@ -1,54 +1,74 @@
-Instructions for this phase:
+As a reminder you are the Speculator with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the first **speculation phase**.
+*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.  Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
+Your o1 pro strategy agent will give you the strategies to strictly follow as a speculator in the experiment for the first speculation phase.
+The instructions for the first speculation phase follow;
 
-{% include "_partials/_game_information.jinja2" %}
+{# -*- coding: utf-8 -*- #}
 
-2. **Available Information**:
-  2.1. **Declarations**:
-      {% for declaration in private_information.declarations %}
-      {% set role_name = "Speculator" if declaration["role"] == 1 else "Developer" if declaration["role"] == 2 else "Owner" %}
-      {% set declared_value_no_project = declaration["d"][0] %}
-      {% set declared_value_project = declaration["d"][1] %}
+{# Structured Prompt for GPT-4o Speculator Agent: First Speculation Phase #}
 
-      {% if declaration["role"] == 2 %}
-        {% set min_value_no_project = public_information.boundaries["developer"]["noProject"]["low"] %}
-        {% set max_value_no_project = public_information.boundaries["developer"]["noProject"]["high"] %}
-        {% set min_value_project = public_information.boundaries["developer"]["projectA"]["low"] %}
-        {% set max_value_project = public_information.boundaries["developer"]["projectA"]["high"] %}
-        {% set percentile_no_project = ((declared_value_no_project - min_value_no_project) / (max_value_no_project - min_value_no_project) * 100) | round(2) %}
-        {% set percentile_project = ((declared_value_project - min_value_project) / (max_value_project - min_value_project) * 100) | round(2) %}
-        - Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value_no_project }} (no project), {{ declared_value_project }} (project), percentile: {{ percentile_no_project }}% (no project), {{ percentile_project }}% (project)
-      {% else %}
-        - Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value_no_project }} (no project), {{ declared_value_project }} (project)
-      {% endif %}
-      {% endfor %}
+## 1. Overview of the Goal
+We want to **maximize** our expected speculation profit in this phase. This profit comes from buying properties for which the **initial declared value** is **less** than the **likely true value**. If the real value exceeds the declaration, we gain half of the difference. Conversely, if we buy a property that is over-declared, we lose half of the difference.
 
+## 2. Decision Logic for Each Property
 
-  2.2. **Real Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+1. **Gather the following data for each property** (Owner or Developer):
+   - **Player ID**
+   - **Declared Value for No Project**
+   - **Declared Value for Project**
+   - **Declared Value Percentile** (if available)
+   - **Known Ranges** of possible true values (based on role and scenario)
 
-3. **Your Decision to Make**:
-   - Decide which properties to purchase based on their declared values and your assessment of true value
-   - You can purchase the properties of multiple players under the same condition or different conditions, choose not to buy a property, or purchase the same property under both conditions.
-   - You should make a list of the id of the players whose property you want to purchase under the condition noProject: [<player_id>,<player_id>].
-   - You should make a list of the id of the players whose property you want to purchase under the condition projectA: [<player_id>,<player_id>, <player_id>].
-   - You should combine these two lists in a list of lists: [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]] and place this list of lists in the snipe field.
+2. **Estimate the Likelihood the Declaration is Understated**:
+   - For Developers: Use the **percentile** — values below ~40% are likely under-declared.
+   - For Owners: Compare the declaration to the **midpoint** of the known range. Values clearly below midpoint are likely under-declared.
 
-   - Provide the output as a JSON object:
-    {
-      "gameId": {{ meta.game_id }},
-      "type": "done-speculating",
-      "snipe": [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]],
-    }
+3. **Threshold-Based Buying Rule**:
+   - If the declared value is *substantially lower* than the midpoint or percentile < 40%, **buy** it.
+   - If near or above midpoint (or > 60% percentile), **do not buy**.
 
-    Example:
-    If you want to purchase the properties of player 1, 2 and 4 under the condition noProject and purchache the property of player 2 under the condition projectA, you would provide the following JSON object:
-    {
-      "gameId": 1,
-      "type": "done-speculating",
-      "snipe": [[1, 2, 4], [2]],
-    }
+4. **Combine Both Scenarios**:
+   - Assess and buy separately for **No Project** and **Project** conditions.
+
+## 3. Format of the Final Output (JSON)
+```json
+{
+  "gameId": <GAME_ID>,
+  "type": "done-speculating",
+  "snipe": [
+    [/* No Project player IDs */],
+    [/* Project player IDs */]
+  ]
+}
+```
+
+## 4. Step-by-Step Instructions for GPT-4o
+
+1. **Parse the Declarations**:
+   - Read all player declarations under both conditions.
+   - Note percentiles (for developers).
+   - For owners, compare to midpoints of known ranges.
+
+2. **Apply the Heuristic**:
+   - Include player in buy list if declared value is well below midpoint or percentile < 40%.
+
+3. **Build the Snipe List**:
+   - `snipe[0]`: Player IDs to buy under No Project.
+   - `snipe[1]`: Player IDs to buy under Project.
+
+4. **Output** the correct JSON object. If no good buys, use empty lists.
+
+## 5. Example
+```json
+{
+  "gameId": 1,
+  "type": "done-speculating",
+  "snipe": [[2, 3], [2]]
+}
+```
+
+## 6. Summary
+Follow these steps to analyze declarations, determine under-declarations, and generate a valid speculation instruction to maximize expected gain in the first phase.
+
+{# End of Structured Prompt #}

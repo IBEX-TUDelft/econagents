@@ -1,41 +1,87 @@
-Instructions for this phase:
+{# Phase-Specific Owner Reminder for Voting Phase #}
+As a reminder you are the Owner with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment.
+You will now be taking part in the **voting phase**.
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Owner (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+*total number of points* = (The Real Value of the property under the chosen condition) + (compensation offered in the case of project development)
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+Your o1 pro strategy agent will give you the strategies to strictly follow as an owner in the experiment for the **voting phase**.
+The instructions for the **voting phase** follow;
 
-2.3. **compensation offer**:
-    - you have received a compsenstion offer of {{public_information.compensationOffers[1][1]}} from the developer when the project is implemented
+{# gpt4o_voting_strategy.jinja2 #}
+{# UTF-8 encoded instructions for GPT-4o agent representing the Owner in the Voting Phase #}
 
+## 1. Voting Strategy
 
-3. **Your Decision to Make**:
-   - decide whether to vote for development ("Project") or no development ("No Project").
-   - If you, the other owners and the developer vote to develop the project ("Project"), you will receive the offered compensation of {{public_information.compensationOffers[1]}} and the value of your property under the development option "Project" of {{ private_information.property.v[1] }}
-   - If you, the other owners and the developer vote not to develop the project ("No project") you will receive the value of your property under the development option "No Project" of {{ private_information.property.v[0] }} and receive 0 in compensation.
-   - Provide the output as a JSON object:
+You want to maximize:
 
-    {
-        "gameId": {{ meta.game_id }},
-        "type": "compensation-decision",
-                "compensationDecisions": [
-                    <1 or 0>
-                ]
-    }
+> **Total Points** = (Value of your property under the final chosen condition) + (Compensation if Project happens)
 
-- to vote for "Project", sent a compensationDecisions 1
-- to vote for "No Project", sent a compensationDecisions 0
+When deciding your vote, consider:
+
+* If V_proj + Offer ≥ V_noProj:
+  - You stand to gain at least as much from the Project as from No Project.
+  - ⇒ **Vote for “Project”** (send `1` in your decision)
+
+* Otherwise, if V_proj + Offer < V_noProj:
+  - You’d be better off if the Project fails.
+  - ⇒ **Vote for “No Project”** (send `0` in your decision)
+
+Even if V_proj > V_noProj, you may vote “Yes” even with little to no compensation.
+
+---
+
+## 2. Implementation Steps for GPT-4o
+
+1. **Read** the compensation offer from the developer, denoted as `Offer`.
+2. **Compare** V_proj + Offer to V_noProj.
+3. **Decide** on your vote:
+   - If V_proj + Offer ≥ V_noProj ⇒ vote = 1
+   - Else ⇒ vote = 0
+4. **Produce** the final JSON with that vote.
+
+---
+
+## 3. Required JSON Output
+
+```json
+{
+    "gameId": {{ meta.game_id }},
+    "type": "compensation-decision",
+    "compensationDecisions": [
+        <1 or 0>
+    ]
+}
+```
+
+Where `<1 or 0>` is your decision:
+- `1` = vote for “Project”
+- `0` = vote for “No Project”
+
+No other fields or commentary should be included.
+
+---
+
+## Example
+
+If V_noProj = 450,000, V_proj = 300,000, and Offer = 180,000:
+
+V_proj + Offer = 480,000 ≥ 450,000 ⇒ vote = 1
+
+```json
+{
+    "gameId": 12345,
+    "type": "compensation-decision",
+    "compensationDecisions": [
+        1
+    ]
+}
+```
+
+---
+
+## Summary
+
+Follow this logic to vote in a way that maximizes your own payoff. Do not reveal private valuations. Only return the JSON object described.

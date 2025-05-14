@@ -1,35 +1,74 @@
-Instructions for this phase:
+As a reminder you are the developer with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **first declaration phase**.
+*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game. Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
+Your o1 pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the first declaration phase.
+The instructions for the first declaration phase follow:
 
-{% include "_partials/_game_information.jinja2" %}
+1. High-Level Reasoning for the First Declaration
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+1. Avoid Speculation Losses
+   - If you declare a value lower than your true value, speculators can profit from buying your land (you lose half the difference).
+   - If you declare a value higher than or equal to your real value, speculators would lose if they tried to buy, so they typically won’t buy at all.
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+2. Encourage the Project to Win
+   - Market selects Project or No Project based on the median of recent trades.
+   - Public signals (influenced by initial declarations) sway share price expectations.
+   - Declare near the upper bound (2,750,000) to influence the Project's perceived value upward.
 
-  2.3. **Tax Information**:
-    - Current tax rate: {{ public_information.tax_rate }}%
+3. Net Effect of Declaring Higher Values
+   - Higher declarations increase 1% tax, but you recoup some cost via your 30 tax shares.
+   - High Project declaration discourages speculators and favors the Project being chosen.
+   - No Project declaration should be just above your real value to avoid speculation losses.
 
-3. **Your Decision to Make**:
-   - Declare your land value for both scenarios (Project and No Project)
-   - Your declaration will affect which scenario is chosen
-   - Provide the output as a JSON object:
+2. Concrete “First Declaration” Strategy for GPT-4o
 
-    {
-        "gameId": {{ meta.game_id }},
-        "type": "declare",
-        "declaration": [
-            <value_no_project>,
-            <value_project>,
-            0,
-        ],
-    }
+Given:
+- Your True Land Values:
+  - No Project: realNoProject
+  - Project: realProject
+
+- Known Boundaries (Developer):
+  - No Project: 200,000 to 500,000
+  - Project: 500,000 to 2,750,000
+
+Strategy:
+1. No Project Declaration
+   - Declare min(realNoProject + 1, 500000)
+
+2. Project Declaration
+   - Declare 2,750,000
+
+3. Output JSON:
+```json
+{
+  "gameId": {{ meta.game_id }},
+  "type": "declare",
+  "declaration": [
+    <DECLARED_VALUE_NO_PROJECT>,
+    <DECLARED_VALUE_PROJECT>,
+    0
+  ]
+}
+```
+
+3. Example Prompt to GPT-4o
+
+GPT-4o, here is your strategy for the “Declaration” phase:
+
+- Let realNoProj = your true land value under No Project
+- Let realProj = your true land value under Project
+- Compute declNoProj = min(realNoProj + 1, 500000)
+- Set declProj = 2750000
+- Output them in the required JSON format:
+```json
+{
+  "gameId": <the game id>,
+  "type": "declare",
+  "declaration": [
+    declNoProj,
+    declProj,
+    0
+  ]
+}
+```
+This ensures we avoid speculation losses and strongly encourage the Project to be chosen.

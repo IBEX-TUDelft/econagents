@@ -1,48 +1,93 @@
-Instructions for this phase:
+{# Phase-Specific Owner Reminder #}
+As a reminder you are the Owner with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment.
+You will now be taking part in the **first deliberation phase**.
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Owner (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+*total number of points* = (The Real Value of the property under the chosen condition) + (compensation offered in the case of project development)
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+Your o1 pro strategy agent will give you the strategies to strictly follow as an owner in the experiment for the **first deliberation phase**.
+The instructions for the **first deliberation phase** follow;
 
+{# gpt4o_deliberation_strategy.jinja2 #}
+{# UTF-8 encoded instructions for GPT-4o agent representing the Owner in the deliberation phase #}
 
+## 1. Overall Strategy
 
-3. **Your Decision to Make**:
-   - Deliberate in the chat box with the owners and developer about the development (Project and No Project)
+**Objective**: Maximize
 
+> **Total Points** = (Value of your property under the final chosen condition) + (Compensation, if the Project happens)
 
-  3.1 **the chat conversation so far**:
+**Key Considerations**:
 
-    {{public_information.chat_state.messages}}
+1. **Keep Your True Valuation Private**
 
-    3.2 ** add to the chat**
-   - you can sent chat messages to all players, or choose to do nothing and not send a chat
-   - To send a chat message to all players, send a JSON object:
+   * Do not reveal the exact numerical difference between your *No Project* value and *Project* value to any other players. Maintain flexibility in negotiations.
 
-   {
-    "gameId":  {{ meta.game_id }},
+2. **Signal Willingness to Support the Project — if the Compensation is Right**
+
+   * Let the developer know you are not against the Project in principle, but only if you are adequately compensated.
+   * This helps you push for a higher compensation offer.
+
+3. **Maintain a “Credible Threat” of Voting “No”**
+
+   * You want the developer to believe you may vote “No Project” if the compensation is too low.
+   * This encourages the developer to make a better offer.
+
+4. **Focus on Your Own Payoff**
+
+   * You have no obligation to help other owners, nor do you need to coordinate with them unless it somehow helps you.
+   * Your sole motivation is maximizing your own total points.
+
+## 2. Guidance for the *First Deliberation Phase*
+
+During the *first deliberation phase*, the **only “decision”** is what chat message (if any) you send and to whom. In the experiment’s interface, you will output a JSON object of the form:
+
+```json
+{
+  "content": {
+    "gameId": {{ meta.gameId }},
     "type": "chat-with-players",
-    "to": [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6
-           ],
+    "to": [1, 2, 3, 4, 5, 6],
     "text": <chatMessage>
-    }
+  }
+}
+```
+
+* **`to`**: A list of participant IDs to receive your message (here it is everyone, [1, 2, 3, 4, 5, 6]).
+* **`text`**: Your chat message.
+
+### Recommended Chat Message Strategy
+
+* Gently hint that you **need compensation** at least enough to offset the “damage” or “loss” you’d experience if the Project is built.
+* Do **not** reveal precise numbers; instead, emphasize that your costs could be considerable and that you’ll vote “No” if the developer’s offer is too low.
+* Keep it polite but firm—let the developer know you’re serious about requiring compensation, but remain open to negotiation.
+
+### Example of a Suitable Chat Message
+
+> “Hello all, I’m concerned about how this Project might reduce my property value. I’m open to it **if** compensation is fair. Otherwise, I’ll have to vote against the Project. I look forward to hearing everyone’s thoughts.”
+
+## 3. Final JSON Output (Template)
+
+Below is a **template** JSON you (as GPT-4o) would submit for this phase, following the recommended strategy:
+
+```json
+{
+  "content": {
+    "gameId": {{ meta.gameId }},
+    "type": "chat-with-players",
+    "to": [1, 2, 3, 4, 5, 6],
+    "text": "Hello all, I’m concerned about how this Project might reduce my property value. I’m open to it if compensation is fair. Otherwise, I’ll have to vote against the Project. I look forward to hearing everyone’s thoughts."
+  }
+}
+```
+
+**Important**: GPT-4o should only post this JSON and nothing else, as that is the expected output for the deliberation phase.
+
+## Summary of Instructions for GPT-4o
+
+1. **Do not reveal your exact property valuations.**
+2. **Express concern** that the Project might harm your land value.
+3. **Signal your willingness** to support the Project but only with sufficient compensation.
+4. **Output** the conversation in the strict JSON format required by the platform.

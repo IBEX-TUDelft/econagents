@@ -43,7 +43,7 @@
       }
   },
   "owners": {
-      "count": 2,
+      "count": 5,
       "balance": 60000,
       "shares": 6,
       "base_points": 0,
@@ -69,18 +69,18 @@
   "timers": {
       "phase_0": null,
       "phase_1": "15",
-      "phase_2": "180",
+      "phase_2": "120",
       "phase_3": "120",
       "phase_4": "120",
       "phase_5": "120",
       "phase_6": "60",
       "phase_7": "15"
   },
-  "round_count": "1",
+  "round_count": "6",
   "agents_only": false,
   "game_type": "voting",
   "practice": false,
-  "minutes_for_trading": 10,
+  "minutes_for_trading": 5,
   "minutes_for_sniping": 2,
   "session_number": 1,
   "seconds_for_deliberation": 120,

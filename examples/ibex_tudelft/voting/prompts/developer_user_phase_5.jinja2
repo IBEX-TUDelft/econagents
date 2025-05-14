@@ -1,52 +1,82 @@
-Instructions for this phase:
+{# -*- coding: utf-8 -*- #}
+{#
+As a reminder you are the Developer with the goal to maximize the total number of points in this experiment,
+without regard for the other players in the experiment. You will now be taking part in the **second deliberation phase**.
+*total number of points* = (The Real Value of property under the chosen condition) - ((compensation offer*5) in case of project development))
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Developer (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+You are playing together with your fully aligned *o1 Pro model*.
+Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can,
+as to maximize the number of points in the game.
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+Your o1 pro strategy agent will give you the strategies to strictly follow as a developer in the experiment
+for the **second deliberation phase**. The instructions for the **second deliberation phase** follow;
+#}
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+{# -*- coding: utf-8 -*- #}
+{# Strategy for GPT-4o (Developer Role) in the Second Deliberation Phase #}
 
-   2.2. **Compensation Offer**:
-        - compensation offer made: {{public_information.compensationOffers[1]}}
+{#
+At this stage, the compensation offer is already locked in. The goal is to persuade at least 3 of the 5 owners to vote "yes" so the Project proceeds.
+#}
 
-3.
+SecondDeliberationStrategy:
 
-3. **Your Decision to Make**:
-   - Deliberate in the chat box with the owners and developer about the development (Project and No Project)
+  Step1_ReiterateOffer:
+    - PublicAcknowledgment: "As you can see, I’ve offered X points to each owner if the Project goes through."
+    - Clarify: The offer is uniform for all owners.
 
+  Step2_PersuadeOwners:
+    - VoteTarget: At least 3 of 5 owners must vote "yes"
+    - MessagingPoints:
+        - UpsideReminder:
+            - "With my offer, you each get X on top of your Project land value."
+            - "No Project = No compensation"
+        - Reassurance:
+            - Express follow-through intentions
+            - Imply rejecting the offer could result in no compensation and no Project
+        - CounterHighExpectations:
+            - "This is the final offer this round."
+            - Suggest that if owners vote "no", the Project might not happen
 
-  3.1 **the chat conversation so far**:
+  Step3_MultipleMessagesOption:
+    - PublicChat: Summarize offer and ask for a "yes" vote
+    - PrivateChat: Reassure high-demand owners individually
+    - WrapUpChat: Final nudge before the voting phase ends
 
-    {{public_information.chat_state.messages}}
+  Step4_SampleMessages:
+    - PublicGroupMessage: |
+        {
+          "content": {
+            "gameId": {{ meta.gameId }},
+            "type": "chat-with-players",
+            "to": [1, 2, 3, 4, 5, 6],
+            "text": "I’ve made an offer of X points per owner if the Project is approved. This is our best chance to get it done. No approval means no compensation. I believe the Project plus my offered compensation should be beneficial for most of you. Let me know if you have any remaining concerns."
+          }
+        }
 
-   3.2 ** add to the chat**
+    - PrivateMessageHighRequester: |
+        {
+          "content": {
+            "gameId": {{ meta.gameId }},
+            "type": "chat-with-players",
+            "to": [3],
+            "text": "I understand you requested a higher amount, but this current offer is what I'm prepared to give. If the Project is rejected, you end up with zero compensation. Consider voting 'yes' to lock in that payment."
+          }
+        }
 
-   - you can sent chat messages to all players
-   - Provide the output as a JSON object:
+    - FinalGroupWrapUp: |
+        {
+          "content": {
+            "gameId": {{ meta.gameId }},
+            "type": "chat-with-players",
+            "to": [1, 2, 3, 4, 5, 6],
+            "text": "Time is almost up, everyone. Please vote for the Project to secure the compensation. It's a fair offer considering the project benefits and the overall costs. I hope we can count on your 'yes' vote."
+          }
+        }
 
-   {
-    "gameId":  {{ meta.game_id }},
-    "type": "chat-with-players",
-    "to": [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6
-           ],
-    "text": <chatMessage>
-    }
+  FinalReminder:
+    - This is your last chance to influence the vote this round
+    - Securing 3 "yes" votes ensures the Project proceeds
+    - Maximizing points:
+        Payoff = Project Value - (Offer × 5)

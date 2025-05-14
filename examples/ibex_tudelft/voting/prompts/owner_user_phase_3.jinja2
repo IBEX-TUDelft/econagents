@@ -1,35 +1,93 @@
-Instructions for this phase:
+{# Phase-Specific Owner Reminder for Request Phase #}
+As a reminder you are the Owner with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment.
+You will now be taking part in the **request phase**.
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Owner (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+*total number of points* = (The Real Value of the property under the chosen condition) + (compensation offered in the case of project development)
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+Your o1 pro strategy agent will give you the strategies to strictly follow as an owner in the experiment for the **request phase**.
+The instructions for the **request phase** follow;
 
+{# gpt4o_request_strategy.jinja2 #}
+{# UTF-8 encoded instructions for GPT-4o agent representing the Owner in the Request Phase #}
 
+## 1. Overall Request Strategy
 
-3. **Your Decision to Make**:
-   - Determine how much compensation to request from the developer.
-   - The request will be sent to the developer
-   - Provide the output as a JSON object:
-    {
-      "gameId": {{ meta.game_id }},
-      "type": "compensation-request",
-      "compensationRequests": [
-                    null,
-                    <amount_requested>
-                ]
-    }
+**Total Points** = (Value of your property under the final condition) + (Compensation if the Project is developed)
+
+During the *Request Phase*, you must choose a single number: the compensation amount you request from the developer.
+
+### Key Considerations
+
+1. **You Prefer “No Project” Unless Compensation Bridges the Gap**
+
+   * Typically, your Project valuation (V_proj) is **lower** than your No Project valuation (V_noProj).
+   * You’d only be *strictly better off* with the Project if the compensation you receive **at least** covers (V_noProj - V_proj) *plus* any extra premium you might hope to get.
+
+2. **Beware of Being “Outvoted”**
+
+   * The developer only needs a **majority** (≥3 of 5 owners) to vote “Yes” to implement the Project.
+   * If the developer thinks your request is too high, they may decide to pay a lower offer that still wins over enough owners with smaller differences, thus leaving you stuck with a Project outcome you dislike.
+
+3. **Therefore, a Reasonable Strategy**:
+
+   * **Request an amount close to (V_noProj - V_proj)** (plus maybe a slight premium).
+   * This ensures that, if the developer chooses to meet your request, you do at least as well as you would under No Project.
+   * Also, by not making your request *too* high, you lower the risk that the developer ignores you and offers a smaller amount that might still pass with other owners.
+
+### Summary of Strategy
+
+* **Calculate**: Request ≈ max{0, (V_noProj - V_proj) + ε}
+
+  * ε is a small premium you might want if you believe the developer might pay it.
+  * If V_proj ≥ V_noProj, you could ask for a smaller or even zero request, because you already prefer the Project.
+
+* **Remember**: The request you make here is not binding, and the developer ultimately decides on a single offer for all owners. But the request signals how much you would need to vote “Yes.”
+
+---
+
+## 2. Implementation Details: The Required JSON Output
+
+At the end of the request phase, you must provide a JSON object of the form:
+
+```json
+{
+  "gameId": {{ meta.game_id }},
+  "type": "compensation-request",
+  "compensationRequests": [
+    null,
+    <amount_requested>
+  ]
+}
+```
+
+Where:
+
+* `{{ meta.game_id }}` is the game identifier.
+* `<amount_requested>` is the **integer** (or possibly float) you are requesting as compensation.
+
+### Example
+
+If, for instance, your **No Project** value is `400000` and your **Project** value is `200000`, you might request an amount around `200000` – `205000` (the 5,000 is just a small premium). So you could produce something like:
+
+```json
+{
+  "gameId": 12345,
+  "type": "compensation-request",
+  "compensationRequests": [
+    null,
+    205000
+  ]
+}
+```
+
+---
+
+## 3. Final Instructions for GPT-4o
+
+1. **Read** your current private land values: V_noProj and V_proj.
+2. **Compute** your desired request ≈ max{0, (V_noProj - V_proj) + ε}.
+3. **Output** only the JSON in the exact format shown above, substituting the correct `<amount_requested>` that aligns with the strategy.
+4. **Do not** reveal your exact valuations in the JSON or any additional text. Only produce the required keys and values.

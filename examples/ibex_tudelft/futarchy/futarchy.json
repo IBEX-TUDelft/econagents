@@ -10,7 +10,7 @@
     "generate": false
   },
   "speculators": {
-    "count": 1,
+    "count": 6,
     "balance": 50000,
     "shares": 5,
     "max_lot_purchases": 3,
@@ -43,7 +43,7 @@
     }
   },
   "owners": {
-    "count": 4,
+    "count": 5,
     "balance": 60000,
     "shares": 6,
     "base_points": 200000,
@@ -68,22 +68,22 @@
   },
   "timers": {
     "phase_0": null,
-    "phase_1": 10,
-    "phase_2": 20,
-    "phase_3": 20,
+    "phase_1": 15,
+    "phase_2": 90,
+    "phase_3": 120,
     "phase_4": 3,
     "phase_5": 3,
-    "phase_6": 60,
-    "phase_7": 20,
-    "phase_8": 20,
-    "phase_9": 2
+    "phase_6": 270,
+    "phase_7": 60,
+    "phase_8": 90,
+    "phase_9": 15
   },
-  "round_count": "1",
+  "round_count": "6",
   "game_type": "futarchy",
   "practice": false,
-  "minutes_for_trading": 10,
+  "minutes_for_trading": 4.5,
   "minutes_for_sniping": 2,
   "session_number": 1,
-  "seconds_for_deliberation": 30,
+  "seconds_for_deliberation": 120,
   "show_up_fee": 5
 }

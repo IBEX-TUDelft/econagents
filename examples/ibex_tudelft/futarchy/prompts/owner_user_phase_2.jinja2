@@ -1,34 +1,85 @@
-Instructions for this phase:
+{# Owner's Strategic Guidance for the First Declaration - UTF-8 .jinja2 Format #}
 
-{% include "_partials/_game_information.jinja2" %}
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+Below is how I (the Owner) want **you, my GPT-4o representative**, to act during the **first declaration** phase. Please follow these instructions precisely:
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
 
-  2.3. **Tax Information**:
-    - Current tax rate: {{ public_information.tax_rate }}%
+As a reminder you are the owner with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **first declaration phase**.
 
-3. **Your Decision to Make**:
-   - Declare your land value for both scenarios (Project and No Project)
-   - Your declaration will affect which scenario is chosen
-   - Provide the output as a JSON object:
-    {
-      "gameId": {{ meta.game_id }},
-      "type": "declare",
-      "declaration": [
-          <value_no_project>,
-          <value_project>,
-          0,
-      ],
-    }
+*total number of points* = (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
+
+You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game. Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
+
+Your o1 pro strategy agent will give you the strategies to strictly follow as an owner in the experiment for the first declaration phase.
+
+The instructions for the first declaration phase follow;
+
+## **Owner’s Strategic Guidance for the First Declaration**
+
+1. **Goal**
+   - We want to avoid paying a heavy speculation penalty if our property is purchased by speculators at a declaration below its true value.
+   - We also want to avoid overpaying tax unnecessarily. However, the tax rate on this first declaration is only 1%, which is relatively small compared to the cost of being sniped by speculators.
+
+2. **Key Logic**
+   - A speculator profits by buying a property that is *under-declared* (i.e., if our real value is above the declared value). If we declare at or above our real value, there is zero incentive for speculators to buy at this stage, because they would lose money on such a trade.
+   - Therefore, **declare a number that is at least as high as the real value** for both “No Project” and “Project.”
+   - Slightly exceeding the real value (e.g., by a small margin) is acceptable if permitted by the interface, just to ensure that there is absolutely no profitable room for speculation. The higher the declaration, the higher the 1% tax if that scenario is chosen. So do *not* drastically over-declare—just enough to make sure no speculator gains by buying.
+
+3. **Implementation**
+   - Let \( \text{RealValue}_{\text{NoProj}} \) be our true value if *No Project* is chosen.
+   - Let \( \text{RealValue}_{\text{Proj}} \) be our true value if the *Project* is chosen.
+   - For each scenario, declare:
+     \[
+       \text{DeclaredValue}_{\text{NoProj}} \approx \max(\text{RealValue}_{\text{NoProj}},\ \text{RealValue}_{\text{NoProj}} + \epsilon)
+     \]
+     \[
+       \text{DeclaredValue}_{\text{Proj}} \approx \max(\text{RealValue}_{\text{Proj}},\ \text{RealValue}_{\text{Proj}} + \epsilon)
+     \]
+     where \( \epsilon \) is a small positive buffer (e.g., 0 or 1).
+
+4. **Final Output (JSON)**
+   After computing these two declarations, submit them via the required JSON format:
+   ```json
+   {
+     "gameId": {{ meta.game_id }},
+     "type": "declare",
+     "declaration": [
+       <value_no_project>,
+       <value_project>,
+       0
+     ]
+   }
+   ```
+   - Replace `<value_no_project>` with our chosen declaration for “No Project.”
+   - Replace `<value_project>` with our chosen declaration for “Project.”
+   - The third entry is always 0 as specified.
+
+---
+
+## **Concrete Instruction to GPT-4o**
+
+1. **Take the real values given in the private information** (these are known to you, GPT-4o, but *not* publicly shared):
+   - `real_value_no_project = private_information.property.v[0]`
+   - `real_value_project = private_information.property.v[1]`
+
+2. **Compute declarations** as follows (pseudo-code):
+   ```python
+   declared_no_project = max(real_value_no_project, real_value_no_project + small_margin)
+   declared_project = max(real_value_project, real_value_project + small_margin)
+   ```
+   (where `small_margin` could be 0 or 1, depending on whether the interface allows decimals or integer declarations.)
+
+3. **Produce the final JSON**:
+   ```json
+   {
+     "gameId": {{ meta.game_id }},
+     "type": "declare",
+     "declaration": [
+       declared_no_project,
+       declared_project,
+       0
+     ]
+   }
+   ```
+
+Use these instructions exactly to minimize speculation losses while also keeping the first-declaration tax low.

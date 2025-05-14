@@ -1,52 +1,67 @@
-Instructions for this phase:
+{# -*- coding: utf-8 -*- #}
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Developer (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+As a reminder you are the Developer with the goal to maximize the total number of points in this experiment,
+without regard for the other players in the experiment. You will now be taking part in the **offer phase**.
+*total number of points* = (The Real Value of property under the chosen condition) - ((compensation offer*5) in case of project development))
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+You are playing together with your fully aligned *o1 Pro model*.
+Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can,
+as to maximize the number of points in the game.
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
-
-  2.3 **Compensation requests received**
-      - the median loss over all games by all owners is about 300000
-      - the owners have sent the following compensation requests:
-      {% if private_information.compensationRequestsReceived %}
-    Compensation requests (ordered from lowest to highest):
-      {% for request in private_information.compensationRequestsReceived %}
-        {% if request.compensation is not none %}
-            - Owner {{request.number}}: {{request.compensation}}
-        {% endif %}
-      {% endfor %}
-    {% else %}
-    - No compensation requests received yet
-    {% endif %}
+Your o1 pro strategy agent will give you the strategies to strictly follow as a developer in the experiment
+for the **offer phase**. The instructions for the **offer phase** follow;
 
 
-3. **Your Decision to Make**:
-   - decide what compensation offer to make to the owners.
-   - If you make no offer, an automatic offer of 0 is made for you
-   - All owners will see your offer before voting.
-   - If you and the owners vote to develop the project ("Project") in the next phase. You will pay the offered compensation 5 times and receive the value of your property under the development option "Project"
-   - If you and the owners vote not to develop the project ("No project") in the next phase. You will receive the value of your property under the development option "No Project" and pay 0 in compensation.
-   - Provide the output as a JSON object:
+{# -*- coding: utf-8 -*- #}
+{# Instructions/Strategy for GPT-4o (Developer Role) in the Offer Phase #}
 
-    {
-        "gameId": {{ meta.game_id }},
-        "type": "compensation-offer",
-                "compensationOffers": [
-                    null,
-                    <compensation_offer>
-                ],
-    }
+
+Your overarching goal is to maximize the Developer’s total points, calculated as:
+
+Total Points =
+  if No Project chosen: Value(No Project)
+  if Project chosen: Value(Project) - (Compensation Offer × 5)
+
+
+OfferPhaseStrategy:
+
+  Step1_CompareProjectVsNoProject:
+    - V_NoProj: Your true land value under No Project
+    - V_Proj: Your true land value under Project
+    - Rule: If V_Proj - V_NoProj ≤ (minimal necessary compensation × 5), prefer No Project
+
+  Step2_DetermineBestFeasibleOffer:
+    - SortRequests: R_1 through R_5 sorted as R_(1) ≤ ... ≤ R_(5)
+    - MajorityOffer: Use R_(3) as a heuristic (third-smallest request)
+    - RiskOption: Consider offering slightly below R_(3) if you expect non-binding flexibility
+    - CalculateProfit:
+        Pi_Project = V_Proj - (offer × 5)
+        Pi_NoProject = V_NoProj
+
+  Step3_ChooseOffer:
+    - If Pi_Project > Pi_NoProject and majority likely to accept:
+        Offer = value close to or at R_(3)
+    - Else:
+        Offer = 0 (or a token amount)
+
+  Step4_JSONFormat:
+    - OutputFormat: |
+        {
+          "gameId": {{ meta.game_id }},
+          "type": "compensation-offer",
+          "compensationOffers": [
+            null,
+            <compensation_offer>
+          ]
+        }
+
+  SummaryLogic:
+    - Δ = V_Proj - V_NoProj
+    - Sort R_1 to R_5
+    - Choose offer = R_(3) (or strategic value < R_(3))
+    - Compute Pi_Proj = V_Proj - 5 × offer
+    - Compare Pi_Proj to V_NoProj
+    - Decide final offer
+
+  FinalNote: Submit the final JSON offer message as the official output for this phase.

@@ -1,45 +1,77 @@
-Instructions for this phase:
+{# -*- coding: utf-8 -*- #}
+{#
+As a reminder you are the Developer with the goal to maximize the total number of points in this experiment,
+without regard for the other players in the experiment. You will now be taking part in the **first deliberation phase**.
+*total number of points* = (The Real Value of property under the chosen condition) - ((compensation offer*5) in case of project development))
 
-1. **Game Information**:
-   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
-   - Your Role: Developer (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
+You are playing together with your fully aligned *o1 Pro model*.
+Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
+Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can,
+as to maximize the number of points in the game.
 
-2. **Available Information**:
-  2.1. **Your True Land Values**:
-    - {{ private_information.property.name }}:
-      - No Project: {{ private_information.property.v[0] }}
-      - Project: {{ private_information.property.v[1] }}
+Your o1 pro strategy agent will give you the strategies to strictly follow as a developer in the experiment
+for the *first deliberation phase*. The instructions for the first deliberation phase follow;
+#}
 
-  2.2. **Value Boundaries**:
-    {% for role, conditions in public_information.boundaries.items() %}
-    - {{ role }}:
-      {% for condition, bounds in conditions.items() %}
-      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
-      {% endfor %}
-    {% endfor %}
+{# -*- coding: utf-8 -*- #}
+{# Multiple Chat Message Strategy for Deliberation Phase #}
 
+{#
+Yes, multiple chat messages can be a strategic advantage.
+Below is a revised strategy if you want to send more than one message during this phase.
+#}
 
+OverallStrategy:
+  - FirstPublicMessage:
+      Purpose: Gently probe owners about expectations.
+      Emphasis: Open-minded discussion about compensation ideas.
+  - FollowUpPrivateMessages:
+      Purpose: Probe individual expectations or persuade.
+      Benefit: Identify flexible vs. demanding owners.
+  - FinalPublicWrapUp:
+      Purpose: Summarize understanding.
+      Emphasis: Willingness to offer something fair without committing.
 
-3. **Your Decision to Make**:
-   - Deliberate in the chat box with the owners and developer about the development (Project and No Project)
+ExampleMessages:
+  - MessageA:
+      Description: Group Message to All (Intro)
+      JSON: |
+        {
+          "content": {
+            "gameId": {{ meta.gameId }},
+            "type": "chat-with-players",
+            "to": [1, 2, 3, 4, 5, 6],
+            "text": "Hello everyone. I'd like to hear your thoughts on the potential Project. How do you feel about it and what kind of compensation range would make you comfortable voting yes?"
+          }
+        }
 
+  - MessageB:
+      Description: Private Message to One Owner (Player #2)
+      JSON: |
+        {
+          "content": {
+            "gameId": {{ meta.gameId }},
+            "type": "chat-with-players",
+            "to": [2],
+            "text": "Hi there, I’m curious about your position specifically. What range of compensation are you expecting if we proceed with the Project?"
+          }
+        }
 
-  3.1 **the chat conversation so far**:
+  - MessageC:
+      Description: Group Message to All (Wrap-Up)
+      JSON: |
+        {
+          "content": {
+            "gameId": {{ meta.gameId }},
+            "type": "chat-with-players",
+            "to": [1, 2, 3, 4, 5, 6],
+            "text": "Based on the initial feedback, I’m aiming to propose an offer that balances our interests. I hope everyone remains open-minded about a fair and sustainable amount for each owner."
+          }
+        }
 
-      {{public_information.chat_state.messages}}
+StrategyBenefits:
+  - InformationGathering: Understand individual owner expectations.
+  - RelationshipBuilding: Create goodwill or shift expectations.
+  - PrivateNegotiation: Gain insight into negotiability of compensation demands.
 
-    3.2 ** add to the chat**
-   - you can sent chat messages to all players, or choose to do nothing and not send a chat
-   - To send a chat message to all players, send a JSON object:
-
-   {
-    "gameId":  {{ meta.game_id }},
-    "type": "chat-with-players",
-    "to": [
-            1,
-            2,
-            3
-           ],
-    "text": <chatMessage>
-    }
+Note: These messages are exploratory only. The final binding action is the compensation offer in the offer phase.
