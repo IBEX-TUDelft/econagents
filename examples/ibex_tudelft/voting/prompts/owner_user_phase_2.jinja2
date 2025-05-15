@@ -47,7 +47,7 @@ During the *first deliberation phase*, the **only “decision”** is what chat 
 ```json
 {
   "content": {
-    "gameId": {{ meta.gameId }},
+    "gameId": {{ meta.game_id }},
     "type": "chat-with-players",
     "to": [1, 2, 3, 4, 5, 6],
     "text": <chatMessage>
@@ -75,7 +75,7 @@ Below is a **template** JSON you (as GPT-4o) would submit for this phase, follow
 ```json
 {
   "content": {
-    "gameId": {{ meta.gameId }},
+    "gameId": {{ meta.game_id }},
     "type": "chat-with-players",
     "to": [1, 2, 3, 4, 5, 6],
     "text": "Hello all, I’m concerned about how this Project might reduce my property value. I’m open to it if compensation is fair. Otherwise, I’ll have to vote against the Project. I look forward to hearing everyone’s thoughts."
