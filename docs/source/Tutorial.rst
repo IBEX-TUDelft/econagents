@@ -224,7 +224,7 @@ Once the server is running, you can start the game with AI agents. The game runn
 3. Handle the turn-based game flow
 4. Log interactions for analysis
 
-To run the game:
+To run the game, **open a new terminal** and run:
 
 .. code-block:: bash
 
@@ -233,6 +233,8 @@ To run the game:
 
     # Run the game
     python run_game.py
+
+This will start the game runner, which will connect to the server and start the game. You should run this in a new terminal, and keep the server running in the other terminal.
 
 Behind the scenes, here's what happens:
 
