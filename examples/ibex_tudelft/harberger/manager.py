@@ -26,10 +26,13 @@ class HLAgentManager(HybridPhaseManager):
         super().__init__(
             state=HLGameState(game_id=game_id),
             auth_mechanism_kwargs=auth_mechanism_kwargs,
+            phase_transition_event="phase-transition",
+            phase_identifier_key="phase",
         )
         self.game_id = game_id
         self.register_event_handler("assign-name", self._handle_name_assignment)
         self.register_event_handler("assign-role", self._handle_role_assignment)
+        self.register_phase_handler(0, self._handle_phase_0)
 
     # this is needed because the current server implementation requires
     # the agent to be initialized after the role is assigned
@@ -65,3 +68,11 @@ class HLAgentManager(HybridPhaseManager):
         role = message.data.get("role", "")
         self.logger.info(f"Role assigned: {role}")
         self._initialize_agent(role)
+
+    async def _handle_phase_0(self, phase: int, state: HLGameState) -> dict[str, Any]:
+        """Handle phase 0 start by resetting state and sending ready message."""
+        # Reset the state
+        state.reset()
+
+        # Send ready message
+        return {"gameId": self.game_id, "type": "player-is-ready"}
