@@ -11,6 +11,35 @@ As a reminder you are the owner with the goal to maximize the total number of po
 You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game. Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
 
 Your o1 pro strategy agent will give you the strategies to strictly follow as an owner in the experiment for the first declaration phase.
+You will receive the following game information of the state of the game:
+
+1. **Game Information**:
+   - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
+   - Your Role: Developer (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+
+2. **Available Information**:
+**Available information** consists of the **Your True Land Values** which will be given to your GPT-4o representative in the game.  Those True Land values contain how much you value the property when No Project or the Project land development is chosen. These are private values and thus not known by any other player in the game.
+  2.1. **Your True Land Values**:
+    - {{ private_information.property.name }}:
+      - No Project: {{ private_information.property.v[0] }}
+      - Project: {{ private_information.property.v[1] }}
+
+  2.2. **Value Boundaries**:
+    {% for role, conditions in public_information.boundaries.items() %}
+    - {{ role }}:
+      {% for condition, bounds in conditions.items() %}
+      - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
+      {% endfor %}
+    {% endfor %}
+The value boundaries from which the values are drawn for the No Project and Project condition for the developer and owners are public information. And the same throughout the experiment. For the Project condition for the owners; bounds.low = 150000 points and bounds.high =300000, the No Project condition for the owners; bounds.low = 350000 points and bounds.high= 600000.
+For the Project condition for the developer; bounds.low = 500000 points and bounds.high =2750000, the No Project condition for the developer; bounds.low = 200000 points and bounds.high= 500000.
+
+  2.3. **Tax Information**:
+    - Current tax rate: {{ public_information.tax_rate }}%
+The tax (public_information.tax_rate) that is levied for the developer and the owners for the condition that is chosen in the experiment , is equal to 1%.
+
+
 
 The instructions for the first declaration phase follow;
 
@@ -71,12 +100,12 @@ The instructions for the first declaration phase follow;
 
 3. **Produce the final JSON**:
    ```json
-   {
+    {
      "gameId": {{ meta.game_id }},
      "type": "declare",
      "declaration": [
-       declared_no_project,
-       declared_project,
+       <value_no_project>,
+       <value_project>,
        0
      ]
    }
