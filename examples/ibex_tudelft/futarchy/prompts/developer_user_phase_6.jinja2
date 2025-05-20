@@ -2,6 +2,26 @@ As a reminder you are the developer with the goal to maximize the total number o
 *total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
 You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game. Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
 Your o1 pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the market phase.
+You have access to the following information:
+
+1. **Game Information**:
+   - Phase: Phase {{ meta.phase }}
+   - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+   - Your Wallet:
+     - Tax Shares conditional on project development: {{ private_information.wallet[0].shares }}
+     - Balance of cash conditional on project development: {{ private_information.wallet[0].balance }}
+     - Tax Shares conditional on no project development: {{ private_information.wallet[1].shares }}
+     - Balance of cash conditional on no project development: {{ private_information.wallet[1].balance }}
+Your GPT-4o representative also has access to market information during the market phase:
+
+2. **Market Information**:
+   - Received public value signal (of tax shares) conditional on project development: {{ public_information.public_signal[0] }}
+   - Received private value signal (of tax shares) conditional on project development: {{ private_information.value_signals[0] }}
+   - Received public value signal (of tax shares) conditional on no project development: {{ public_information.public_signal[1] }}
+   - Received private value signal (of tax shares) conditional on no project development: {{ private_information.value_signals[1] }}
+   - Current market information and open Orders: {{ public_information.market_state.order_book }}
+
 The instructions for the market phase follow:
 
 1. High-Level Reasoning for the Developer in the Market Phase
@@ -46,54 +66,33 @@ C. Specific Trading Actions
   - Buy 1 Project share at a high price.
   - Sell 1 No Project share at a low price if needed.
 
-D. JSON Order Examples
+Your GPT-4o representative will have  decisions to make **Your Decision Options**:  Provide the output (one of these options) as a JSON object for each action you make:
+   A. Post a new order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "post-order",
+       "order": {
+           "price": <number>, # if now=true, put 0 (will be ignored)
+           "quantity": 1,
+           "type": <"ask" or "bid">,
+           "now": <true or false>,
+           "condition": <0 or 1>
+       },
+   }
 
-1. Post a new ask for No Project:
-```json
-{
-    "gameId": {{ meta.game_id }},
-    "type": "post-order",
-    "order": {
-        "price": 500,
-        "quantity": 1,
-        "type": "ask",
-        "now": false,
-        "condition": 0
-    }
-}
-```
+   B. Cancel an existing order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "cancel-order",
+       "order": {
+           "id": <order_id>,
+           "condition": <0 or 1>
+       },
+   }
 
-2. Buy a Project share immediately:
-```json
-{
-    "gameId": {{ meta.game_id }},
-    "type": "post-order",
-    "order": {
-        "price": 0,
-        "quantity": 1,
-        "type": "bid",
-        "now": true,
-        "condition": 1
-    }
-}
-```
+   C. Do nothing:
+   {}
 
-3. Do nothing:
-```json
-{}
-```
-
-4. Cancel an existing order:
-```json
-{
-    "gameId": {{ meta.game_id }},
-    "type": "cancel-order",
-    "order": {
-        "id": 12345,
-        "condition": 1
-    }
-}
-```
 
 3. Example Prompt You Might Give GPT-4o
 

@@ -8,11 +8,32 @@ As a reminder you are the owner with the goal to maximize the total number of po
 You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game. Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
 
 Your o1 pro strategy agent will give you the strategies to strictly follow as an owner in the experiment for the market phase.
+
+You have access to the following information:
+
+1. **Game Information**:
+   - Phase: Phase {{ meta.phase }}
+   - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+   - Your Wallet:
+     - Tax Shares conditional on project development: {{ private_information.wallet[0].shares }}
+     - Balance of cash conditional on project development: {{ private_information.wallet[0].balance }}
+     - Tax Shares conditional on no project development: {{ private_information.wallet[1].shares }}
+     - Balance of cash conditional on no project development: {{ private_information.wallet[1].balance }}
+Your GPT-4o representative also has access to market information during the market phase:
+
+2. **Market Information**:
+   - Received public value signal (of tax shares) conditional on project development: {{ public_information.public_signal[0] }}
+   - Received private value signal (of tax shares) conditional on project development: {{ private_information.value_signals[0] }}
+   - Received public value signal (of tax shares) conditional on no project development: {{ public_information.public_signal[1] }}
+   - Received private value signal (of tax shares) conditional on no project development: {{ private_information.value_signals[1] }}
+   - Current market information and open Orders: {{ public_information.market_state.order_book }}
+
+
+
 The instructions for the market phase follow;
 
-
 {# .JINJA2 Market Phase Instructions for GPT-4o - Owner Role #}
-
 
 Below is how I (the Owner) want **you, my GPT-4o representative**, to act during this **first Market** phase. Please follow these instructions precisely.
 
@@ -64,37 +85,33 @@ Below is how I (the Owner) want **you, my GPT-4o representative**, to act during
 
 ## 4. **Possible JSON Outputs**
 
-1. **Post a New Order**:
-```json
-{
-    "gameId": {{ meta.game_id }},
-    "type": "post-order",
-    "order": {
-        "price": <number>,
-        "quantity": 1,
-        "type": "<ask or bid>",
-        "now": <true or false>,
-        "condition": <0 or 1>
-    }
-}
-```
+Your GPT-4o representative will have  decisions to make **Your Decision Options**:  Provide the output (one of these options) as a JSON object for each action you make:
+   A. Post a new order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "post-order",
+       "order": {
+           "price": <number>, # if now=true, put 0 (will be ignored)
+           "quantity": 1,
+           "type": <"ask" or "bid">,
+           "now": <true or false>,
+           "condition": <0 or 1>
+       },
+   }
 
-2. **Cancel an Existing Order**:
-```json
-{
-    "gameId": {{ meta.game_id }},
-    "type": "cancel-order",
-    "order": {
-        "id": <order_id>,
-        "condition": <0 or 1>
-    }
-}
-```
+   B. Cancel an existing order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "cancel-order",
+       "order": {
+           "id": <order_id>,
+           "condition": <0 or 1>
+       },
+   }
 
-3. **Do Nothing**:
-```json
-{}
-```
+   C. Do nothing:
+   {}
+
 
 ## 5. **Example Scenarios**
 
