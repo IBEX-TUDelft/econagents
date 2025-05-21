@@ -39,18 +39,19 @@ class FAgentManager(HybridPhaseManager):
         """
         Create and cache the agent instance based on the assigned role.
         """
+
         if role == 1:
             self.agent_role = Speculator()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Speculator"
+            self.state.meta.role = "Speculator"  # type: ignore
         elif role == 2:
             self.agent_role = Developer()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Developer"
+            self.state.meta.role = "Developer"  # type: ignore
         elif role == 3:
             self.agent_role = Owner()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Owner"
+            self.state.meta.role = "Owner"  # type: ignore
         else:
             self.logger.error("Invalid role assigned; cannot initialize agent.")
             raise ValueError("Invalid role for agent initialization.")
@@ -70,8 +71,8 @@ class FAgentManager(HybridPhaseManager):
 
     async def _handle_phase_0(self, phase: int, state: FGameState) -> dict[str, Any]:
         """Handle phase 0 start by resetting state and sending ready message."""
-        # Reset the state
-        state.reset()
-
-        # Send ready message
+        self.state.meta.round += 1  # type: ignore
+        if self.state.meta.round > 1:  # type: ignore
+            self.state.reset()
+            self.state.meta.game_id = self.game_id
         return {"gameId": self.game_id, "type": "player-is-ready"}

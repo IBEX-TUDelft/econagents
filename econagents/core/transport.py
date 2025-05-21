@@ -100,10 +100,8 @@ class WebSocketTransport(LoggerMixin):
             try:
                 message_str = await self.ws.recv()
                 if self.on_message_callback:
-                    # Call the callback, supporting both sync and async functions
-                    self.logger.debug(f"<-- Transport received: {message_str}")
+                    self.logger.info(f"<-- Transport received: {message_str}")
                     result = self.on_message_callback(message_str)
-                    # If the callback is a coroutine function, await it
                     if asyncio.iscoroutine(result):
                         asyncio.create_task(result)
             except ConnectionClosed:
@@ -118,7 +116,7 @@ class WebSocketTransport(LoggerMixin):
         """Send a raw string message to the WebSocket."""
         if self.ws:
             try:
-                self.logger.debug(f"--> Transport sending: {message}")
+                self.logger.info(f"--> Transport sending: {message}")
                 await self.ws.send(message)
             except Exception:
                 self.logger.exception("Error sending message.")
