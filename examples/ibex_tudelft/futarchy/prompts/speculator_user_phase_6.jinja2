@@ -1,81 +1,50 @@
-As a reminder you are the Speculator with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **market phase**. 
-*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
-You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.  Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
-Your o1 pro strategy agent will give you the strategies to strictly follow as a speculator in the experiment for the market phase.
-You have access to the following information:
+Instructions for this phase:
 
 1. **Game Information**:
    - Phase: Phase {{ meta.phase }}
    - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
    - Name: {{ meta.player_name }}
    - Your Wallet:
-     - Tax Shares conditional on project development: {{ private_information.wallet[0].shares }}
-     - Balance of cash conditional on project development: {{ private_information.wallet[0].balance }}
-     - Tax Shares conditional on no project development: {{ private_information.wallet[1].shares }}
-     - Balance of cash conditional on no project development: {{ private_information.wallet[1].balance }}
-Your GPT-4o representative also has access to market information during the market phase:
+     - Tax Shares conditional on Project (Condition 1) development: {{ private_information.wallet[0].shares }}
+     - Balance of cash conditional on Project (Condition 1) development: {{ private_information.wallet[0].balance }}
+     - Tax Shares conditional on No Project (Condition 0) development: {{ private_information.wallet[1].shares }}
+     - Balance of cash conditional on No Project (Condition 0) development: {{ private_information.wallet[1].balance }}
 
 2. **Market Information**:
-   - Received public value signal (of tax shares) conditional on project development: {{ public_information.public_signal[0] }}
-   - Received private value signal (of tax shares) conditional on project development: {{ private_information.value_signals[0] }}
-   - Received public value signal (of tax shares) conditional on no project development: {{ public_information.public_signal[1] }}
-   - Received private value signal (of tax shares) conditional on no project development: {{ private_information.value_signals[1] }}
-   - Current market information and open Orders: {{ public_information.market_state.order_book }}
+   - Received public value signal (of tax shares) conditional on Project (Condition 1) development: {{ public_information.public_signal[1] }}
+   - Received private value signal (of tax shares) conditional on Project (Condition 1) development: {{ private_information.value_signals[1] }}
+   - Received public value signal (of tax shares) conditional on No Project (Condition 0) development: {{ public_information.public_signal[0] }}
+   - Received private value signal (of tax shares) conditional on No Project (Condition 0) development: {{ private_information.value_signals[0] }}
+   - Orders: 
 
+{{ public_information.market_state.order_book }}
 
+3.1 **Trading decisions when there are trades available in the market**
 
-The instructions for the market phase follow;
+{% if not public_information.market_state.market_prices[0] and not public_information.market_state.market_prices[1] %}
 
-{# -*- coding: utf-8 -*- #}
+- No trades have been made yet.
 
-{# Revised Market Phase Strategy for GPT-4o Speculator Agent #}
+{% else %}
 
-## 1. Main Objective in the Market Phase
+- If price of ask ({{ public_information.market_state.market_prices[0] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
+- If price of bid ({{ public_information.market_state.market_prices[0] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
 
-1. Only the **chosen** condition’s shares and cash matter.
-2. **Maximize** your holdings in the condition you believe will yield the best **real share value**.
-3. Avoid overpaying due to **inflated public signals**.
+- If price of ask ({{ public_information.market_state.market_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
+- If price of bid ({{ public_information.market_state.market_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
 
-## 2. Inputs & Limitations
+{% endif %}
 
-### Public Signals
-- Possibly inflated by owners (No Project) or developer (Project).
-- Might not reflect **final values** (post 33% tax).
+3.2 **If no bids or asks outstanding in the No Project (Condition 0) market**
+- Post a bid with a price < {{ private_information.value_signals[0] }}
+- Post an ask with a price > {{ private_information.value_signals[0] }}
 
-### Private Signals
-- Closer to real expected share values.
-- Trust your **private signal** more than the public one.
+3.3 **If no bids or asks outstanding in the Project (Condition 1) market**:
+- Post a bid with a price < {{ private_information.value_signals[1] }} 
+- Post an ask with a price > {{ private_information.value_signals[1] }} 
 
-### Order Book
-- Shows real-time bids and asks.
-- Watch for strategic behavior.
-
-## 3. Strategy Steps
-
-### Step A: Conservative Fair Value Estimate
-- Base this on **private signals**.
-- Adjust downward if the public signal seems inflated.
-
-### Step B: Choose Preferred Condition
-- Compare real values, gains from earlier speculation, etc.
-- Favor the condition with better payoff prospects.
-
-### Step C: Trading Decisions
-- **Buy** if ask < your fair value.
-- **Sell** if bid > your fair value.
-- Use **market orders** to buy/sell immediately, or **limit orders** for precise control.
-
-### Step D: Influence Median Trade Price
-- Final choice depends on median of last 7 trades.
-- Slightly raise bids in preferred market (if needed and safe).
-
-### Step E: Stay Flexible
-- Watch for market swings or crowd movements.
-- Shift strategy if conditions change.
-
-## 4. JSON Format for Decisions
-
-3. Your GPT-4o representative will have  decisions to make **Your Decision Options**:  Provide the output (one of these options) as a JSON object for each action you make:
+4. **Your Decision Options**:
+   Provide the output (one of these options) as a JSON object:
    A. Post a new order:
    {
        "gameId": {{ meta.game_id }},
@@ -86,7 +55,7 @@ The instructions for the market phase follow;
            "type": <"ask" or "bid">,
            "now": <true or false>,
            "condition": <0 or 1>
-       },
+       }
    }
 
    B. Cancel an existing order:
@@ -96,19 +65,16 @@ The instructions for the market phase follow;
        "order": {
            "id": <order_id>,
            "condition": <0 or 1>
-       },
+       }
    }
 
    C. Do nothing:
    {}
 
-
-## 5. Summary
-- Suspect **over-declarations** in public signals.
-- Trust **private signals**.
-- Estimate fair values.
-- Trade accordingly.
-- Push median price (carefully).
-- Don’t chase overpriced shares.
-
-{# End of Market Phase Strategy #}
+Remember:
+- You can only trade one share at a time
+- You have limited time to trade
+- Setting "now": true will execute at the best available price
+- Orders can be canceled before they are fulfilled
+- setting the condition to 0 means that the order is for No Project (Condition 0) development
+- setting the condition to 1 means that the order is for Project (Condition 1) development

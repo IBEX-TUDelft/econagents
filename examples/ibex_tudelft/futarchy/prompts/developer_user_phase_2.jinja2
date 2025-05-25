@@ -10,7 +10,6 @@ You will receive the following game information of the state of the game:
    - Name: {{ meta.player_name }}
 
 2. **Available Information**:
-**Available information** consists of the **Your True Land Values** which will be given to your GPT-4o representative in the game.  Those True Land values contain how much you value the property when No Project or the Project land development is chosen. These are private values and thus not known by any other player in the game.
   2.1. **Your True Land Values**:
     - {{ private_information.property.name }}:
       - No Project: {{ private_information.property.v[0] }}
@@ -49,7 +48,7 @@ The instructions for the first declaration phase follow:
    - High Project declaration discourages speculators and favors the Project being chosen.
    - No Project declaration should be just above your real value to avoid speculation losses.
 
-2. Concrete “First Declaration” Strategy for GPT-4o
+2. Concrete “First Declaration” 
 
 Given:
 - Your True Land Values:

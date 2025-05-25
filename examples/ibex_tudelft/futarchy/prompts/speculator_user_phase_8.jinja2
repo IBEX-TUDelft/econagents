@@ -1,9 +1,5 @@
-As a reminder you are the Speculator with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the final **speculation phase**.
-*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
-You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.  Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
-Your o1 pro strategy agent will give you the strategies to strictly follow as a speculator in the final speculation phase.
+Instructions for this phase:
 
-You are presented with the following information:
 1. **Game Information**:
    - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
    - Your Role: Speculator (Player #{{ meta.player_number }})
@@ -33,38 +29,19 @@ You are presented with the following information:
       {% endfor %}
     {% endfor %}
 
-The instructions for the final speculation phase follow;
+3. **Decision Logic**
 
-{# -*- coding: utf-8 -*- #}
+3.1. **Gather the following data for each property for winning condition (Project or No Project) ** (Owner or Developer):
+   - **Player ID** for winning condition (Project or No Project)**
+   - **Value Percentile for winning condition (Project or No Project)** 
+   - **Known Ranges** for winning condition of possible true values (Project or No Project)
 
-{# Structured Prompt for GPT-4o Speculator Agent: Final Speculation Phase #}
+3.2. **Threshold-Based Buying Rule**:
+   - If the declared value is < 40% than **buy** it.
+   - If declared value is >40% than **do not buy**.
 
-## 1. Key Reminders About Final Speculation
 
-1. The **winning condition** (Project or No Project) is now fixed.
-2. Each property’s **final declared value** is paired with a **percentile** within its known distribution.
-3. Profit occurs if the real value > declared value (gain = half the difference). Loss if declared > real value.
-
-## 2. Decision Logic
-
-1. **Compare Final Declaration to Range**:
-   - Use the **percentile**: lower percentiles (e.g. < 40%) suggest under-declaration.
-   - High percentiles (e.g. > 60%) suggest risk of over-declaration.
-
-2. **Heuristic**:
-   - **Buy** if percentile < 40–50% → likely undervalued.
-   - **Do not buy** if percentile > 50–60% → riskier.
-
-3. **Tie-Breakers**:
-   - Multiple low percentiles? Consider buying all.
-   - Suspected under-declaration due to tax avoidance? Even better.
-
-4. **Skip Buying**:
-   - All percentiles high? Don’t buy anything.
-
-## 3. Constructing the “Snipe” List
-
-3. Your GPT-4o representative will have  a decision to make **Your Decision to Make**::
+4. **Your Decision to Make**::
    - Decide which transactions to make based on the available information
    - You should provide the id of the player you want to trade with
    - Provide the output as a JSON object:
@@ -73,20 +50,3 @@ The instructions for the final speculation phase follow;
       "type": "done-speculating",
       "snipe": [<player_id>, <player_id>, <player_id>],
     }
-
-
-### Steps:
-1. **Initialize**: `snipe = []`
-2. **Loop** through all final declarations:
-   - If percentile is low → `snipe.push(player_id)`
-3. **Return** the JSON
-
-
-## 5. Summary for GPT-4o
-
-1. **Read** final declarations and percentiles.
-2. **Target** those below your threshold.
-3. **Build** the `snipe` array.
-4. **Submit** the JSON object.
-
-{# End of Final Speculation Strategy #}

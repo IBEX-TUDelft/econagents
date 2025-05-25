@@ -1,13 +1,5 @@
-As a reminder you are the Speculator with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the first **speculation phase**.
-*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
-You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.  Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
-Your o1 pro strategy agent will give you the strategies to strictly follow as a speculator in the experiment for the first speculation phase.
-The instructions for the first speculation phase follow;
+Instructions for this phase:
 
-{# -*- coding: utf-8 -*- #}
-
-{# Structured Prompt for GPT-4o Speculator Agent: First Speculation Phase #}
-You will receive the following game information of the state of the game:
 1. **Game Information**:
    - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
    - Your Role: Speculator (Player #{{ meta.player_number }})
@@ -16,21 +8,21 @@ You will receive the following game information of the state of the game:
 2. **Available Information**:
   2.1. **Declarations**:
       {% for declaration in private_information.declarations %}
-      {% set role_name = "Speculator" if declaration["role"] == 1 else "Developer" if declaration["role"] == 2 else "Owner" %}
-      {% set declared_value_no_project = declaration["d"][0] %}
-      {% set declared_value_project = declaration["d"][1] %}
+        {% set role_name = "Speculator" if declaration["role"] == 1 else "Developer" if declaration["role"] == 2 else "Owner" %}
+        {% set declared_value_no_project = declaration["d"][0] %}
+        {% set declared_value_project = declaration["d"][1] %}
 
-      {% if declaration["role"] == 2 %}
-        {% set min_value_no_project = public_information.boundaries["developer"]["noProject"]["low"] %}
-        {% set max_value_no_project = public_information.boundaries["developer"]["noProject"]["high"] %}
-        {% set min_value_project = public_information.boundaries["developer"]["projectA"]["low"] %}
-        {% set max_value_project = public_information.boundaries["developer"]["projectA"]["high"] %}
-        {% set percentile_no_project = ((declared_value_no_project - min_value_no_project) / (max_value_no_project - min_value_no_project) * 100) | round(2) %}
-        {% set percentile_project = ((declared_value_project - min_value_project) / (max_value_project - min_value_project) * 100) | round(2) %}
-        - Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value_no_project }} (no project), {{ declared_value_project }} (project), percentile: {{ percentile_no_project }}% (no project), {{ percentile_project }}% (project)
-      {% else %}
-        - Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value_no_project }} (no project), {{ declared_value_project }} (project)
-      {% endif %}
+        {% if declaration["role"] == 2 %}
+          {% set min_value_no_project = public_information.boundaries["developer"]["noProject"]["low"] %}
+          {% set max_value_no_project = public_information.boundaries["developer"]["noProject"]["high"] %}
+          {% set min_value_project = public_information.boundaries["developer"]["projectA"]["low"] %}
+          {% set max_value_project = public_information.boundaries["developer"]["projectA"]["high"] %}
+          {% set percentile_no_project = ((declared_value_no_project - min_value_no_project) / (max_value_no_project - min_value_no_project) * 100) | round(2) %}
+          {% set percentile_project = ((declared_value_project - min_value_project) / (max_value_project - min_value_project) * 100) | round(2) %}
+          - Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value_no_project }} (no project), {{ declared_value_project }} (project), percentile: {{ percentile_no_project }}% (no project), {{ percentile_project }}% (project)
+        {% else %}
+          - Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value_no_project }} (no project), {{ declared_value_project }} (project)
+        {% endif %}
       {% endfor %}
 
   2.2. **Real Value Boundaries**:
@@ -42,54 +34,31 @@ You will receive the following game information of the state of the game:
     {% endfor %}
 
 The declarations from the owners and developer as well as the value percentiles are shown to all the speculators for both the No Project and the Project condition ;
-Player #{{ declaration["number"] }} ({{ role_name }}), declared value: {{ declared_value_no_project }} (no project), {{ declared_value_project }} (project), percentile: {{ percentile_no_project }}% (no project), {{ percentile_project }}% (project)
 
+3. ** decision steps**
 
-## 1. Overview of the Goal
-We want to **maximize** our expected speculation profit in this phase. This profit comes from buying properties for which the **initial declared value** is **less** than the **likely true value**. If the real value exceeds the declaration, we gain half of the difference. Conversely, if we buy a property that is over-declared, we lose half of the difference.
-
-## 2. Decision Logic for Each Property
-
-1. **Gather the following data for each property** (Owner or Developer):
+3.1. **Gather the following data for each property** (Owner or Developer):
    - **Player ID**
    - **Declared Value for No Project**
    - **Declared Value for Project**
    - **Declared Value Percentile** (if available)
    - **Known Ranges** of possible true values (based on role and scenario)
 
-2. **Estimate the Likelihood the Declaration is Understated**:
-   - For Developers: Use the **percentile** — values below ~40% are likely under-declared.
-   - For Owners: Compare the declaration to the **midpoint** of the known range. Values clearly below midpoint are likely under-declared.
+3.2. **Threshold-Based Buying Rule**:
+   - If the declared value is < 40% than **buy** it.
+   - If declared value is >40% than **do not buy**.
 
-3. **Threshold-Based Buying Rule**:
-   - If the declared value is *substantially lower* than the midpoint or percentile < 40%, **buy** it.
-   - If near or above midpoint (or > 60% percentile), **do not buy**.
-
-4. **Combine Both Scenarios**:
+3.3. **Combine Both Scenarios**:
    - Assess and buy separately for **No Project** and **Project** conditions.
 
-3. Your GPT-4o representative will have  a decision to make **Your Decision to Make**::
+3. **Your Decision to Make**:
    - You can purchase the properties of multiple players under the same condition or different conditions, choose not to buy a property, or purchase the same property under both conditions.
    - You should make a list of the id of the players whose property you want to purchase under the condition noProject: [<player_id>,<player_id>].
-   - You should make a list of the id of the players whose property you want to purchase under the condition projectA: [<player_id>,<player_id>, <player_id>].
+   - You should make a list of the id of the players whose property you want to purchase under the condition project: [<player_id>,<player_id>, <player_id>].
    - You should combine these two lists in a list of lists: [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]] and place this list of lists in the snipe field.
-
    - Provide the output as a JSON object:
     {
       "gameId": {{ meta.game_id }},
       "type": "done-speculating",
-      "snipe": [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]],
+      "snipe": [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]]
     }
-    Example:
-    If you want to purchase the properties of player 1, 2 and 4 under the condition noProject and purchase the property of player 2 under the condition projectA, you would provide the following JSON object:
-    {
-      "gameId": {{ meta.game_id }},
-      "type": "done-speculating",
-      "snipe": [[1, 2, 4], [2]],
-    }
-
-
-## 6. Summary
-Follow these steps to analyze declarations, determine under-declarations, and generate a valid speculation instruction to maximize expected gain in the first phase.
-
-{# End of Structured Prompt #}

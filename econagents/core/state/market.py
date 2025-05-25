@@ -34,18 +34,60 @@ class MarketState(BaseModel):
 
     @computed_field
     def order_book(self) -> str:
-        asks = sorted(
-            [order for order in self.orders.values() if order.type == "ask"],
-            key=lambda x: x.price,
-            reverse=True,
-        )
-        bids = sorted(
-            [order for order in self.orders.values() if order.type == "bid"],
-            key=lambda x: x.price,
-            reverse=True,
-        )
-        sorted_orders = asks + bids
-        return "\n".join([str(order) for order in sorted_orders])
+        """
+        Represents the order book, grouping orders by condition if multiple conditions exist.
+        Within each condition, orders are grouped by type (ask/bid) and sorted by price.
+        """
+        if not self.orders:
+            return "No active orders"
+
+        # Get all unique conditions
+        conditions = set(order.condition for order in self.orders.values())
+
+        # If only one condition, use the original format
+        if len(conditions) == 1:
+            asks = sorted(
+                [order for order in self.orders.values() if order.type == "ask"],
+                key=lambda x: x.price,
+                reverse=True,
+            )
+            bids = sorted(
+                [order for order in self.orders.values() if order.type == "bid"],
+                key=lambda x: x.price,
+                reverse=True,
+            )
+            sorted_orders = asks + bids
+            return "\n".join([str(order) for order in sorted_orders])
+
+        # Multiple conditions: group by condition
+        result_lines = []
+        for condition in sorted(conditions):
+            result_lines.append(f"=== Condition {condition} ===")
+
+            # Get orders for this condition
+            condition_orders = [order for order in self.orders.values() if order.condition == condition]
+
+            # Sort asks and bids separately
+            asks = sorted(
+                [order for order in condition_orders if order.type == "ask"],
+                key=lambda x: x.price,
+                reverse=True,
+            )
+            bids = sorted(
+                [order for order in condition_orders if order.type == "bid"],
+                key=lambda x: x.price,
+                reverse=True,
+            )
+
+            # Add asks first, then bids
+            for order in asks + bids:
+                result_lines.append(str(order))
+
+            # Add empty line between conditions (except for the last one)
+            if condition != max(conditions):
+                result_lines.append("")
+
+        return "\n".join(result_lines)
 
     def process_event(self, event_type: str, data: dict):
         """
@@ -67,6 +109,22 @@ class MarketState(BaseModel):
     def get_orders_from_player(self, player_id: int) -> list[Order]:
         """Get all orders from a specific player."""
         return [order for order in self.orders.values() if order.sender == player_id]
+
+    @computed_field
+    def market_prices(self) -> list[Optional[float]]:
+        """
+        Calculates market prices based on the median of the last recorded trade for each condition.
+
+        Returns:
+            A list of prices for each condition. Returns None for conditions that have not had any trades.
+        """
+        prices_condition_0 = [trade.price for trade in self.trades if trade.condition == 0]
+        prices_condition_1 = [trade.price for trade in self.trades if trade.condition == 1]
+
+        return [
+            prices_condition_0[-1] if prices_condition_0 else None,
+            prices_condition_1[-1] if prices_condition_1 else None,
+        ]
 
     def _on_add_order(self, order_data: dict):
         """
