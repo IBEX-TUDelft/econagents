@@ -5,18 +5,16 @@ from dotenv import load_dotenv
 
 from econagents.core.events import Message
 from econagents.core.manager.phase import HybridPhaseManager
+from econagents.llm.observability import get_observability_provider
 from examples.ibex_tudelft.futarchy.roles import Developer, Owner, Speculator
 from examples.ibex_tudelft.futarchy.state import FGameState
 
 load_dotenv()
 
-# This manages the interactions between the server and the agents
-# It is a turn-based manager with continuous-time phases. It assumes that the server sends messages in the following format:
-# {"message_type": <game_id>, "type": <event_type>, "data": <event_data>}
-# It can be initialized with or without a role. In this case, it uses custom logic to get the role from the server.
-
 
 class FAgentManager(HybridPhaseManager):
+    state: FGameState
+
     def __init__(
         self,
         game_id: int,
@@ -43,15 +41,18 @@ class FAgentManager(HybridPhaseManager):
         if role == 1:
             self.agent_role = Speculator()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Speculator"  # type: ignore
+            self.state.meta.role = "Speculator"
+            self.agent_role.llm.observability = get_observability_provider("langsmith")
         elif role == 2:
             self.agent_role = Developer()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Developer"  # type: ignore
+            self.state.meta.role = "Developer"
+            self.agent_role.llm.observability = get_observability_provider("langsmith")
         elif role == 3:
             self.agent_role = Owner()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Owner"  # type: ignore
+            self.state.meta.role = "Owner"
+            self.agent_role.llm.observability = get_observability_provider("langsmith")
         else:
             self.logger.error("Invalid role assigned; cannot initialize agent.")
             raise ValueError("Invalid role for agent initialization.")
@@ -69,10 +70,16 @@ class FAgentManager(HybridPhaseManager):
         self.logger.info(f"Role assigned: {role}")
         self._initialize_agent(role)
 
+    # This is required by the server
     async def _handle_phase_0(self, phase: int, state: FGameState) -> dict[str, Any]:
         """Handle phase 0 start by resetting state and sending ready message."""
-        self.state.meta.round += 1  # type: ignore
-        if self.state.meta.round > 1:  # type: ignore
+
+        self.state.meta.round += 1
+        if self.state.meta.round > 1:
+            old_meta = self.state.meta.model_copy(deep=True)
             self.state.reset()
+
+            self.state.meta = old_meta
             self.state.meta.game_id = self.game_id
+            self.state.meta.phase = 0
         return {"gameId": self.game_id, "type": "player-is-ready"}

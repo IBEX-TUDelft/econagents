@@ -1,7 +1,7 @@
 As a reminder you are the developer with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **first declaration phase**.
+
 *total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
-You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game. Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
-Your o1 pro strategy agent will give you the strategies to strictly follow as a developer in the experiment for the first declaration phase.
+
 You will receive the following game information of the state of the game:
 
 1. **Game Information**:
@@ -22,13 +22,15 @@ You will receive the following game information of the state of the game:
       - {{ condition }}: {{ bounds.low }} to {{ bounds.high }}
       {% endfor %}
     {% endfor %}
+
 The value boundaries from which the values are drawn for the No Project and Project condition for the developer and owners are public information. And the same throughout the experiment. For the Project condition for the owners; bounds.low = 150000 points and bounds.high =300000, the No Project condition for the owners; bounds.low = 350000 points and bounds.high= 600000.
+
 For the Project condition for the developer; bounds.low = 500000 points and bounds.high =2750000, the No Project condition for the developer; bounds.low = 200000 points and bounds.high= 500000.
 
   2.3. **Tax Information**:
     - Current tax rate: {{ public_information.tax_rate }}%
-The tax (public_information.tax_rate) that is levied for the developer and the owners for the condition that is chosen in the experiment , is equal to 1%.
 
+The tax ({{ public_information.tax_rate }}) that is levied for the developer and the owners for the condition that is chosen in the experiment, is equal to 1%.
 
 The instructions for the first declaration phase follow:
 
