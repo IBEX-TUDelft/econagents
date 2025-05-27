@@ -58,15 +58,15 @@ Given:
   - Project: realProject
 
 - Known Boundaries (Developer):
-  - No Project: 200,000 to 500,000
-  - Project: 500,000 to 2,750,000
+  - No Project: {{ public_information.boundaries["developer"]["noProject"]["low"] }} to {{ public_information.boundaries["developer"]["noProject"]["high"] }}
+  - Project: {{ public_information.boundaries["developer"]["projectA"]["low"] }} to {{ public_information.boundaries["developer"]["projectA"]["high"] }}
 
 Strategy:
 1. No Project Declaration
-   - Declare min(realNoProject + 1, 500000)
+   - Declare min(realNoProject + 1, {{ public_information.boundaries["developer"]["noProject"]["high"] }})
 
 2. Project Declaration
-   - Declare 2,750,000
+   - Declare {{ public_information.boundaries["developer"]["projectA"]["high"] }}
 
 3. **Your Decision to Make**:
    - Declare your land value for both scenarios (Project and No Project)
