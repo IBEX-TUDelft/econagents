@@ -100,19 +100,21 @@ class WebSocketTransport(LoggerMixin):
             try:
                 message_str = await self.ws.recv()
                 if self.on_message_callback:
-                    # Call the callback, supporting both sync and async functions
                     self.logger.debug(f"<-- Transport received: {message_str}")
                     result = self.on_message_callback(message_str)
-                    # If the callback is a coroutine function, await it
                     if asyncio.iscoroutine(result):
                         asyncio.create_task(result)
+            except asyncio.CancelledError:
+                self.logger.debug("WebSocket listening task cancelled.")
+                break
             except ConnectionClosed:
-                self.logger.info("WebSocket connection closed by remote.")
+                self.logger.debug("WebSocket connection closed by remote.")
                 break
             except Exception:
                 self.logger.exception("Error in receive loop.")
                 break
         self._running = False
+        self.logger.debug("WebSocket start_listening loop finished.")
 
     async def send(self, message: str):
         """Send a raw string message to the WebSocket."""
@@ -125,8 +127,14 @@ class WebSocketTransport(LoggerMixin):
 
     async def stop(self):
         """Gracefully close the WebSocket connection."""
-        self._running = False
+        self._running = False  # Signal to stop listening loop immediately
         if self.ws:
-            await self.ws.close()
-            self.logger.info("WebSocketTransport: connection closed.")
-            self.ws = None  # Set ws to None after closing
+            try:
+                await self.ws.close()
+                self.logger.info("WebSocketTransport: connection closed.")
+            except Exception as e:
+                self.logger.error(f"WebSocketTransport: error closing connection: {e}")
+            finally:
+                self.ws = None  # Set ws to None after closing attempt
+        else:
+            self.logger.info("WebSocketTransport: no active connection to close.")

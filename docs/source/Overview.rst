@@ -218,6 +218,7 @@ Here's an sample of how to run a game using the `GameRunner` class:
         hostname="localhost",
         port=8765,
         path="wss",
+        max_game_duration=300,
     )
     agents = [
         PDManager(

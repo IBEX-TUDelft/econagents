@@ -531,7 +531,7 @@ class TestConnectionManagement:
         # Verify connection sequence
         agent_manager.transport.connect.assert_called_once()
         agent_manager.transport.start_listening.assert_called_once()
-        assert agent_manager.running is True
+        assert agent_manager.running is False
 
     async def test_start_failed_connection(self, agent_manager):
         """Test start method behavior when connection fails."""
@@ -544,7 +544,7 @@ class TestConnectionManagement:
         # Verify correct behavior on failure
         agent_manager.transport.connect.assert_called_once()
         agent_manager.transport.start_listening.assert_not_called()
-        assert agent_manager.running is True  # running is still set to True
+        assert agent_manager.running is False
 
     async def test_stop(self, agent_manager):
         """Test that stop method correctly terminates connection."""

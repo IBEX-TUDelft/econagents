@@ -83,6 +83,7 @@ Game Runner
 -----------
 
 The GameRunner is the main class that connects the game server to the LLM agents. It uses the AgentManager to manage the websocket connections with the game server and the isolated connections with the individual LLMs.
+It can be configured with a `max_game_duration` to automatically stop the game and agents if it runs longer than the specified time.
 
 Prompt Structure
 ----------------
