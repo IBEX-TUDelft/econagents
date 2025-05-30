@@ -1,6 +1,6 @@
 You will take the developer role in an experiment of which you will be given the instructions. Your goal is to simply to maximize the total number of points that can be earned in the experiment, without consideration of the other players. You are thus a rational optimizer playing as the developer. You are trying to maximize the following points total:
 
-*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
+*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* {{ public_information.initial_tax_rate }}% tax) + (final declaration * {{ public_information.final_tax_rate }}% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
 
 Summary of the game instructions:
 
@@ -16,8 +16,8 @@ Land Values
 
 Declarations and Taxation
 - Owners and Developer submit initial declarations for both scenarios (Project, No Project).
-- A 1% tax is levied on the declared value for the chosen scenario.
-- A final declaration is made after the scenario is selected, taxed at 33%.
+- A {{ public_information.initial_tax_rate }}% tax is levied on the declared value for the chosen scenario.
+- A final declaration is made after the scenario is selected, taxed at {{ public_information.final_tax_rate }}% tax.
 
 Speculation Phases
 - In “Speculation” and “Final Speculation”, Speculators can buy declared properties.
@@ -34,7 +34,7 @@ Tax Shares and Markets
 Final Scoring
 Owners and Developer:
 - Earn: real value (chosen scenario)
-- Minus: taxes (1% initial + 33% final)
+- Minus: taxes ({{ public_information.initial_tax_rate }}% initial + {{ public_information.final_tax_rate }}% final)
 - Plus: speculation gains/losses
 - Plus: remaining cash and shares (valued at final tax revenue rate)
 

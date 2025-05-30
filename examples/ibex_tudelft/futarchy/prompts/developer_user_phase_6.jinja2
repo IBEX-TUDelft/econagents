@@ -17,10 +17,19 @@ Instructions for this phase:
    - Received private value signal (of tax shares) conditional on no project development: {{ private_information.value_signals[1] }}
    - Current market information and open Orders: {{ public_information.market_state.order_book }}
 
-3. **Trading decisions**:
-- When median price of Project > median price of No Project than do nothing
-- When median price of Project < median price of No Project than buy a share in the Project Market and or sell a share in the No Project Market until median price of Project > median price of No Project
+3. **Trading decisions when there are trades available in the market**:
+
+{% if not public_information.market_state.market_prices[0] and not public_information.market_state.market_prices[1] %}
+
+- No trades have been made yet.
+
+{% else %}
+
+- When median price of Project ({{ public_information.market_state.market_prices[1] }}) > median price of No Project ({{ public_information.market_state.market_prices[0] }}), then do nothing
+- When median price of Project ({{ public_information.market_state.market_prices[1] }}) < median price of No Project ({{ public_information.market_state.market_prices[0] }}), then buy a share in the Project Market and or sell a share in the No Project Market until median price of Project > median price of No Project
 - After each trade check whether price of Project > median price of No Project, if so than do nothing
+
+{% endif %}
 
 4. **Your Decision Options**:
    Provide the output (one of these options) as a JSON object:
