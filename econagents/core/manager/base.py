@@ -217,20 +217,36 @@ class AgentManager(LoggerMixin):
             else:
                 raise ValueError("URL must be set before starting the agent manager")
 
-        self.running = True
-        connected = await self.transport.connect()
-        if connected:
-            self.logger.info("Connected to WebSocket server. Receiving messages...")
-            await self.transport.start_listening()
-        else:
-            self.logger.error("Failed to connect to WebSocket server")
+        try:
+            self.running = True
+            connected = await self.transport.connect()
+            if connected:
+                self.logger.info("Connected to WebSocket. Listening...")
+                await self.transport.start_listening()
+                self.logger.debug("transport.start_listening() returned.")
+            else:
+                self.logger.error("Failed to connect.")
+                self.running = False
+        except asyncio.CancelledError:
+            self.logger.info("Start task was cancelled.")
+            await self.stop()
+            raise
+        except Exception as e:
+            self.logger.exception(f"Error during start: {e}")
+            await self.stop()
+            raise
+        finally:
+            if self.running:
+                self.logger.warning("Start method exited but manager still marked as running.")
+                self.running = False
+            self.logger.debug(f"Start method fully exited. Running: {self.running}")
 
     async def stop(self):
         """Stop the agent manager and close the connection."""
         self.running = False
         if self.transport:
             await self.transport.stop()
-            self.logger.info("Agent manager stopped and connection closed.")
+        self.logger.info("Agent manager stopped and connection closed.")
 
     async def on_event(self, message: Message):
         """

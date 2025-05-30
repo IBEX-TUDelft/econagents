@@ -4,7 +4,7 @@ import queue
 from contextvars import ContextVar
 from logging.handlers import QueueHandler, QueueListener
 from pathlib import Path
-from typing import Literal, Optional, Type
+from typing import Literal, Optional, Type, List
 
 from pydantic import BaseModel, Field
 
@@ -62,6 +62,11 @@ class GameRunnerConfig(BaseModel):
     # Observability configuration
     observability_provider: Optional[Literal["langsmith", "langfuse"]] = None
     """Name of the observability provider to use. Options: 'langsmith' or 'langfuse'"""
+
+    max_game_duration: int = Field(
+        default=600,
+        description="Maximum game duration in seconds. Default is 600 (10 minutes). Set to 0 or a negative value to disable the timeout.",
+    )
 
     # Agent stop configuration
     end_game_event: str = "game-over"
@@ -340,8 +345,6 @@ class GameRunner:
             agent_id (int): Agent identifier
         """
         agent_logger = self.get_agent_logger(agent_id, self.config.game_id)
-        ctx_agent_id.set(str(agent_id))  # Convert int to str for context variable
-
         agent_manager.logger = agent_logger
 
     async def spawn_agent(self, agent_manager: PhaseManager, agent_id: int) -> None:
@@ -352,31 +355,138 @@ class GameRunner:
             agent_manager (PhaseManager): Agent manager to spawn
             agent_id (int): Agent identifier
         """
+        token = ctx_agent_id.set(str(agent_id))
         try:
             self._inject_agent_logger(agent_manager, agent_id)
             self._inject_default_config(agent_manager)
 
             agent_manager.logger.info(f"Connecting to WebSocket URL: {agent_manager.url}")
             await agent_manager.start()
+            agent_manager.logger.debug("manager.start() completed.")
+        except asyncio.CancelledError:
+            agent_manager.logger.info(f"Agent {agent_id} spawn_agent task was cancelled.")
+            raise
         except Exception:
             agent_manager.logger.exception(f"Error in game for Agent {agent_id}")
             raise
+        finally:
+            agent_manager.logger.info(
+                f"Agent {agent_id} spawn_agent task finished. Agent running state: {agent_manager.running}"
+            )
+            ctx_agent_id.reset(token)
+
+    async def _timeout_watchdog(self, game_logger: logging.Logger, agent_tasks: List[asyncio.Task]) -> None:
+        """
+        Timeout watchdog that monitors game duration and initiates shutdown when exceeded.
+
+        Args:
+            game_logger: Logger instance for the game
+            agent_tasks: List of agent tasks to cancel if timeout occurs
+        """
+        try:
+            await asyncio.sleep(self.config.max_game_duration)
+            game_logger.warning(
+                f"Game {self.config.game_id} reached maximum duration of {self.config.max_game_duration}s. Initiating shutdown."
+            )
+
+            stop_agent_manager_tasks = []
+            for idx, ag_mgr in enumerate(self.agents):
+                if ag_mgr.running:
+                    game_logger.info(f"Timeout: Stopping agent {idx + 1} for game {self.config.game_id}.")
+                    stop_agent_manager_tasks.append(
+                        asyncio.create_task(ag_mgr.stop(), name=f"TimeoutStopAgent-{self.config.game_id}-{idx + 1}")
+                    )
+            if stop_agent_manager_tasks:
+                await asyncio.gather(*stop_agent_manager_tasks, return_exceptions=True)
+
+            game_logger.info(f"Timeout: Checking for lingering agent tasks for game {self.config.game_id}.")
+            for agent_task_instance in agent_tasks:
+                if not agent_task_instance.done():
+                    game_logger.warning(
+                        f"Timeout: Agent task {agent_task_instance.get_name()} still running. Cancelling."
+                    )
+                    agent_task_instance.cancel()
+                    # Await the cancellation to ensure it's processed
+                    try:
+                        await agent_task_instance
+                    except asyncio.CancelledError:
+                        game_logger.info(f"Agent task {agent_task_instance.get_name()} cancelled by timeout watchdog.")
+                    except Exception as e_cancel:
+                        game_logger.error(
+                            f"Error awaiting cancelled agent task {agent_task_instance.get_name()}: {e_cancel}"
+                        )
+
+        except asyncio.CancelledError:
+            game_logger.info(f"Timeout watchdog for game {self.config.game_id} was cancelled.")
+            raise
+        except Exception as e_watchdog:
+            game_logger.exception(f"Error in timeout watchdog for game {self.config.game_id}: {e_watchdog}")
 
     async def run_game(self) -> None:
         """Run a game using provided game data."""
 
         game_logger = self.get_game_logger(self.config.game_id)
-        game_logger.info(f"Running game with ID: {self.config.game_id}")
+        game_logger.info(f"Running game with ID: {self.config.game_id}. Max duration: {self.config.max_game_duration}s")
+
+        agent_tasks: List[asyncio.Task] = []
+        timeout_monitor_task: Optional[asyncio.Task] = None
 
         try:
-            tasks = []
-            game_logger.info("Starting game")
-            for i, agent_manager in enumerate(self.agents, start=1):
-                tasks.append(self.spawn_agent(agent_manager, i))
-            await asyncio.gather(*tasks)
-        except Exception as e:
-            game_logger.exception(f"Failed to run game: {e}")
+            game_logger.info("Configuring and starting agents...")
+            for i, agent_manager_instance in enumerate(self.agents, start=1):
+                task = asyncio.create_task(
+                    self.spawn_agent(agent_manager_instance, i), name=f"AgentTask-{self.config.game_id}-{i}"
+                )
+                agent_tasks.append(task)
+
+            if self.config.max_game_duration is not None and self.config.max_game_duration > 0:
+                timeout_monitor_task = asyncio.create_task(
+                    self._timeout_watchdog(game_logger, agent_tasks), name=f"TimeoutWatchdog-{self.config.game_id}"
+                )
+
+            if agent_tasks:
+                results = await asyncio.gather(*agent_tasks, return_exceptions=True)
+                for i, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        game_logger.error(f"Agent task {agent_tasks[i].get_name()} failed with: {result}")
+            else:
+                game_logger.debug("No agent tasks to run.")
+
+        except Exception as e_run_game:
+            game_logger.exception(f"GameRunner.run_game failed: {e_run_game}")
             raise
         finally:
-            game_logger.info("Game over")
+            game_logger.debug(f"Game {self.config.game_id}: run_game finally block executing.")
+            if timeout_monitor_task and not timeout_monitor_task.done():
+                game_logger.debug(
+                    f"Game {self.config.game_id} finished or errored before timeout. Cancelling timeout watchdog."
+                )
+                timeout_monitor_task.cancel()
+                try:
+                    await timeout_monitor_task
+                except asyncio.CancelledError:
+                    game_logger.debug(
+                        f"Timeout watchdog for game {self.config.game_id} successfully cancelled in finally block."
+                    )
+                except Exception as e_finally_watchdog:
+                    game_logger.error(
+                        f"Error awaiting cancelled timeout watchdog in finally for game {self.config.game_id}: {e_finally_watchdog}"
+                    )
+
+            game_logger.info(f"Game {self.config.game_id}: Final cleanup - ensuring all agents are stopped.")
+            final_stop_tasks = []
+            for idx, agent_manager_instance in enumerate(self.agents):
+                if agent_manager_instance.running:
+                    game_logger.info(f"Final cleanup: Stopping agent {idx + 1} for game {self.config.game_id}.")
+                    final_stop_tasks.append(
+                        asyncio.create_task(
+                            agent_manager_instance.stop(), name=f"FinalStopAgent-{self.config.game_id}-{idx + 1}"
+                        )
+                    )
+
+            if final_stop_tasks:
+                await asyncio.gather(*final_stop_tasks, return_exceptions=True)
+                game_logger.info(f"Game {self.config.game_id}: Final agent stop tasks completed.")
+
             self.cleanup_logging()
+            game_logger.info(f"Game {self.config.game_id} finished and cleaned up.")
