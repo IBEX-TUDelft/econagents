@@ -32,14 +32,13 @@ The tax (public_information.tax_rate) that is levied for the developer and the o
    - `real_value_project = {{ private_information.property.v[1] }}`
 
 3.2 **Compute declarations** as follows (pseudo-code):
-   
+
    declared_no_project = max(real_value_no_project, real_value_no_project + small_margin)
    declared_project = max(real_value_project, real_value_project + small_margin)
 
 
 4. **Final Output (JSON)**
    After computing these two declarations, submit them via the required JSON format:
-
    {
      "gameId": {{ meta.game_id }},
      "type": "declare",

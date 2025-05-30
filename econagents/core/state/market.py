@@ -22,6 +22,11 @@ class Trade(BaseModel):
     median: Optional[float] = None
 
 
+class BestPrices(BaseModel):
+    best_ask: float = Field(default=float("inf"))
+    best_bid: float = Field(default=float("-inf"))
+
+
 class MarketState(BaseModel):
     """
     Represents the current state of the market:
@@ -105,6 +110,19 @@ class MarketState(BaseModel):
 
         elif event_type == "contract-fulfilled":
             self._on_contract_fulfilled(data)
+
+    @computed_field
+    def best_prices_from_orders(self) -> list[BestPrices]:
+        """Get the best ask and bid prices for each condition."""
+        best_prices: list[BestPrices] = [BestPrices(), BestPrices()]
+        for order in self.orders.values():
+            if order.type == "ask":
+                if order.price < best_prices[order.condition].best_ask:
+                    best_prices[order.condition] = BestPrices(best_ask=order.price)
+            elif order.type == "bid":
+                if order.price > best_prices[order.condition].best_bid:
+                    best_prices[order.condition].best_bid = order.price
+        return best_prices
 
     def get_orders_from_player(self, player_id: int) -> list[Order]:
         """Get all orders from a specific player."""

@@ -15,7 +15,13 @@ Instructions for this phase:
    - Received private value signal (of tax shares) conditional on project development: {{ private_information.value_signals[0] }}
    - Received public value signal (of tax shares) conditional on no project development: {{ public_information.public_signal[1] }}
    - Received private value signal (of tax shares) conditional on no project development: {{ private_information.value_signals[1] }}
-   - Current market information and open Orders: {{ public_information.market_state.order_book }}
+   - Best ask price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_ask"] }}
+   - Best ask price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_ask"] }}
+   - Best bid price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}
+   - Best bid price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_bid"] }}
+   - Current market information and open Orders: 
+   
+{{ public_information.market_state.order_book }}
 
 3. **Trading decisions when there are trades available in the market**:
 

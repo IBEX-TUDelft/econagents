@@ -19,11 +19,10 @@ Instructions for this phase:
       - Current tax rate: {{ public_information.tax_rate }}%
 
 3.**Your Decision to Make**:
-    - Identify winning condition (0 = No Project, 1 = Project)
-    - Retrieve your real land value (R) for that condition
+    - You should declare the value of the land for the winning condition, and 0 for the other condition.
     - Declare:
-      - R in the slot for the winning condition
-      - 0 in the other slot
+      - {{ private_information.property.v[0] }} in the slot for the No Project condition and 0 for the Project condition if the winning condition is No Project
+      - {{ private_information.property.v[1] }} in the slot for the Project condition and 0 for the No Project condition if the winning condition is Project
    - Provide the output as a JSON object:
     {
       "gameId": {{ meta.game_id }},

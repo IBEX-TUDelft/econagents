@@ -28,10 +28,10 @@ Instructions for this phase:
 
 3. **Declare Exactly Our Real Value**
    - If \(W = 0\) (“No Project” won), set:
-     - `value_no_project = R`
+     - `value_no_project = {{ private_information.property.v[0] }}`
      - `value_project = 0` (placeholder)
    - If \(W = 1\) (“Project” won), set:
-     - `value_project = R`
+     - `value_project = {{ private_information.property.v[1] }}`
      - `value_no_project = 0` (placeholder)
 
 4. **Your Decision to Make**:

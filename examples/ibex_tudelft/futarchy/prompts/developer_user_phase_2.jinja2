@@ -23,14 +23,10 @@ You will receive the following game information of the state of the game:
       {% endfor %}
     {% endfor %}
 
-The value boundaries from which the values are drawn for the No Project and Project condition for the developer and owners are public information. And the same throughout the experiment. For the Project condition for the owners; bounds.low = 150000 points and bounds.high =300000, the No Project condition for the owners; bounds.low = 350000 points and bounds.high= 600000.
-
-For the Project condition for the developer; bounds.low = 500000 points and bounds.high =2750000, the No Project condition for the developer; bounds.low = 200000 points and bounds.high= 500000.
-
   2.3. **Tax Information**:
     - Current tax rate: {{ public_information.tax_rate }}%
 
-The tax ({{ public_information.tax_rate }}) that is levied for the developer and the owners for the condition that is chosen in the experiment, is equal to 1%.
+The tax levied for the developer and the owners for the condition that is chosen in the experiment, is equal to {{ public_information.tax_rate }}%.
 
 The instructions for the first declaration phase follow:
 
@@ -54,8 +50,8 @@ The instructions for the first declaration phase follow:
 
 Given:
 - Your True Land Values:
-  - No Project: realNoProject
-  - Project: realProject
+  - No Project: {{ private_information.property.v[0] }}
+  - Project: {{ private_information.property.v[1] }}
 
 - Known Boundaries (Developer):
   - No Project: {{ public_information.boundaries["developer"]["noProject"]["low"] }} to {{ public_information.boundaries["developer"]["noProject"]["high"] }}
@@ -63,10 +59,10 @@ Given:
 
 Strategy:
 1. No Project Declaration
-   - Declare min(realNoProject + 1, {{ public_information.boundaries["developer"]["noProject"]["high"] }})
+   - Declare min({{ private_information.property.v[0] + 1 }}, {{ public_information.boundaries["developer"]["noProject"]["high"] }})
 
 2. Project Declaration
-   - Declare {{ public_information.boundaries["developer"]["projectA"]["high"] }}
+   - Declare min({{ private_information.property.v[1] + 1 }}, {{ public_information.boundaries["developer"]["projectA"]["high"] }})
 
 3. **Your Decision to Make**:
    - Declare your land value for both scenarios (Project and No Project)

@@ -15,9 +15,14 @@ Instructions for this phase:
    - Received private value signal (of tax shares) conditional on Project (Condition 1) development: {{ private_information.value_signals[1] }}
    - Received public value signal (of tax shares) conditional on No Project (Condition 0) development: {{ public_information.public_signal[0] }}
    - Received private value signal (of tax shares) conditional on No Project (Condition 0) development: {{ private_information.value_signals[0] }}
+   - Best ask price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_ask"] }}
+   - Best ask price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_ask"] }}
+   - Best bid price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_bid"] }}
+   - Best bid price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}
    - Orders: 
 
 {{ public_information.market_state.order_book }}
+
 
 3.1 **Trading decisions when there are trades available in the market**
 
@@ -33,15 +38,16 @@ Instructions for this phase:
 - If price of ask ({{ public_information.market_state.market_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
 - If price of bid ({{ public_information.market_state.market_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
 
+
 {% endif %}
 
 3.2 **If no bids or asks outstanding in the No Project (Condition 0) market**
-- Post a bid with a price < {{ private_information.value_signals[0] }}
-- Post an ask with a price > {{ private_information.value_signals[0] }}
+- Post a bid with a price < {{ private_information.value_signals[0] }} that is equal to 95% of {{ private_information.value_signals[0] }} 
+- Post an ask with a price > {{ private_information.value_signals[0] }} that is equal to 105% of {{ private_information.value_signals[0] }}
 
 3.3 **If no bids or asks outstanding in the Project (Condition 1) market**:
-- Post a bid with a price < {{ private_information.value_signals[1] }} 
-- Post an ask with a price > {{ private_information.value_signals[1] }} 
+- Post a bid with a price < {{ private_information.value_signals[1] }} that is equal to 95% of {{ private_information.value_signals[1] }}
+- Post an ask with a price > {{ private_information.value_signals[1] }} that is equal to 105% of {{ private_information.value_signals[1] }}
 
 4. **Your Decision Options**:
    Provide the output (one of these options) as a JSON object:
