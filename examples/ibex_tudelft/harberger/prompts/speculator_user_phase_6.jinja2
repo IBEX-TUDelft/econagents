@@ -1,113 +1,72 @@
-{#
-As a reminder you are the Speculator with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **market phase**.
+Instructions for this phase:
 
-*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* 1% tax) + (final declaration*33% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
+1. **Game Information**:
+   - Phase: Phase {{ meta.phase }}
+   - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
+   - Name: {{ meta.player_name }}
+   - Your Wallet:
+     - Tax Shares: {{ private_information.wallet[public_information.winning_condition].shares }}
+     - Balance: {{ private_information.wallet[public_information.winning_condition].balance }}
 
-You are playing together with your fully aligned *o1 Pro model*. Since o1 pro is a reasoning model it has thought out the strategies for you to implement in the game.
+2. **Market Information**:
+   - Received public value signal (of tax shares): {{ public_information.public_signal[public_information.winning_condition] }}
+   - Received private value signal (of tax shares): {{ private_information.value_signals[public_information.winning_condition] }}
+   - Orders:
 
-Your job is to strictly follow the instructions given by your o1 pro strategy agent as best as you can, as to maximize the number of points in the game.
+{{ public_information.market_state.order_book }}
 
-Your o1 pro strategy agent will give you the strategies to strictly follow as a speculator in the experiment for the market phase.
+3.1 **Trading decisions when there are trades available in the winning market**
 
-The instructions for the market phase follow;
-#}
+{% if public_information.winning_condition == 0 %}
+-If price of ask ({{ public_information.market_state.market_prices[0] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
+-If price of bid ({{ public_information.market_state.market_prices[0] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
+{% else %}
+-If price of ask ({{ public_information.market_state.market_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
+-If price of bid ({{ public_information.market_state.market_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
+{% endif %}
 
-{#
-Market Phase Strategy – GPT-4o Speculator Agent Instructions
-#}
 
-## 1. Understand the Share Value Drivers
+3.2 **If no bids or asks outstanding in the winning market**
 
-1. **Public Signal (S_public)**:
-   - Based on initial declarations.
-   - Represents the value if all players repeat their initial declarations in the final phase.
-   - Likely to be **too high** due to under-declaration at the final phase.
+{% if public_information.winning_condition == 0 %}
+- Post a bid with a price < {{ private_information.value_signals[0] }} that is equal to 95% of {{ private_information.value_signals[0] }} 
+- Post an ask with a price > {{ private_information.value_signals[0] }} that is equal to 105% of {{ private_information.value_signals[0] }}
+{% else %}
+- Post a bid with a price < {{ private_information.value_signals[1] }} that is equal to 95% of {{ private_information.value_signals[1] }} 
+- Post an ask with a price > {{ private_information.value_signals[1] }} that is equal to 105% of {{ private_information.value_signals[1] }}
+{% endif %}
 
-2. **Private Signal (S_private)**:
-   - Based on true property values with small noise.
-   - Approximates the value if everyone declares truthfully.
+4. **Your Decision output**:
+   Provide the output (one of these options) as a JSON object:
+   A. Post a new order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "post-order",
+       "order": {
+           "price": <number>, # if now=true, put 0 (will be ignored)
+           "quantity": 1,
+           "type": <"ask" or "bid">,
+           "now": <true or false>,
+           "condition": {{ public_information.winning_condition }}
+       },
+   }
 
-3. **Estimated Share Value (v̂)**:
-   - Combine signals and discount:
-     \[
-       \hat{v} = rac{ S_{public} + S_{private} }{ 2 } 	imes \delta
-     \]
-   - Choose a discount factor \(\delta\) between 0.85 and 0.95 to reflect anticipated under-declaration.
+   B. Cancel an existing order:
+   {
+       "gameId": {{ meta.game_id }},
+       "type": "cancel-order",
+       "order": {
+           "id": <order_id>,
+           "condition": {{ public_information.winning_condition }}
+       },
+   }
 
----
+   C. Do nothing:
+   {}
 
-## 2. Decide Whether to Buy or Sell
-
-1. **Buy if**:
-   - Best *ask* < \(\hat{v}\)
-   - You have enough cash
-   - Action: post bid with `"now": true`
-
-2. **Sell if**:
-   - Best *bid* > \(\hat{v}\)
-   - You have shares
-   - Action: post ask with `"now": true`
-
-3. **No good trades?** Post limit orders:
-   - Buy: post bid < best ask, close to \(\hat{v}\)
-   - Sell: post ask > best bid, close to \(\hat{v}\)
-
-4. **If time is short**, cancel unfilled orders or do nothing.
-
----
-
-## 3. Output Formats
-
-### Post a New Order
-```json
-{
-  "gameId": <GAME_ID>,
-  "type": "post-order",
-  "order": {
-    "price": <number>,
-    "quantity": 1,
-    "type": <"ask" or "bid">,
-    "now": <true or false>,
-    "condition": <WINNING_CONDITION>
-  }
-}
-```
-
-### Cancel an Order
-```json
-{
-  "gameId": <GAME_ID>,
-  "type": "cancel-order",
-  "order": {
-    "id": <ORDER_ID>,
-    "condition": <WINNING_CONDITION>
-  }
-}
-```
-
-### Do Nothing
-```json
-{}
-```
-
----
-
-## 4. Putting It All Together
-
-1. Estimate \(\hat{v}\)
-2. Check best ask/bid
-3. Buy if ask < \(\hat{v}\); sell if bid > \(\hat{v}\)
-4. If not: post smart limit orders
-5. Adjust or cancel orders as needed
-6. If market is stale or time is short: do nothing
-
----
-
-## Final Reminder to GPT-4o
-
-- Track cash and shares
-- Avoid overbuying or overselling
-- Watch the clock
-- Maximize value from every trade
-
-#}
+Remember:
+- You can only trade one share at a time
+- You have limited time to trade
+- Setting "now": true will execute at the best available price
+- Orders can be canceled before they are fulfilled
+- trade using the private signal in the winning market since the public signal is likely distorted
