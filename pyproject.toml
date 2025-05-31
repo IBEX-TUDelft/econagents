@@ -33,7 +33,7 @@ econagents = "econagents.cli:run_cli"
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
 python = ">=3.10,<4"
-pydantic = "^2.11.4"
+pydantic = "^2.11.5"
 requests = "^2.32.3"
 websockets = "^15.0"
 openai = {version = "^1.82.1", optional = true}
