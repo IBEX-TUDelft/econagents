@@ -41,17 +41,14 @@ class HLAgentManager(HybridPhaseManager):
         if role == 1:
             self.agent_role = Speculator()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Speculator"
             self.agent_role.llm.observability = get_observability_provider("langsmith")
         elif role == 2:
             self.agent_role = Developer()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Developer"
             self.agent_role.llm.observability = get_observability_provider("langsmith")
         elif role == 3:
             self.agent_role = Owner()
             self.agent_role.logger = self.logger
-            self.state.meta.role = "Owner"
             self.agent_role.llm.observability = get_observability_provider("langsmith")
         else:
             self.logger.error("Invalid role assigned; cannot initialize agent.")
