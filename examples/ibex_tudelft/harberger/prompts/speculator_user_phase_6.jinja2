@@ -15,16 +15,21 @@ Instructions for this phase:
 
 {{ public_information.market_state.order_book }}
 
-3.1 **Trading decisions when there are trades available in the winning market**
+3.1 **Trading decisions when there are orders available in the market**
+
+{% if public_information.market_state.order_book == "No active orders" %}
+- No orders have been made yet.
+{% else %}
 
 {% if public_information.winning_condition == 0 %}
--If price of ask ({{ public_information.market_state.market_prices[0] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
--If price of bid ({{ public_information.market_state.market_prices[0] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
+-If price of ask ({{ public_information.market_state.best_prices_from_orders[0]["best_ask"] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
+-If price of bid ({{ public_information.market_state.best_prices_from_orders[0]["best_bid"] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
 {% else %}
--If price of ask ({{ public_information.market_state.market_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
--If price of bid ({{ public_information.market_state.market_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
+-If price of ask ({{ public_information.market_state.best_prices_from_orders[1]["best_ask"] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
+-If price of bid ({{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
 {% endif %}
 
+{% endif %}
 
 3.2 **If no bids or asks outstanding in the winning market**
 

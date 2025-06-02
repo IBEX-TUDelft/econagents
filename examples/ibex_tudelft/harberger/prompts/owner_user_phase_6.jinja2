@@ -17,13 +17,13 @@ Instructions for this phase:
 3.1 **Trading decisions when there are trades available in the winning market**
 {% if public_information.winning_condition == 0 %}
 
-- If price of ask ({{ public_information.market_state.market_prices[0] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
-- If price of bid ({{ public_information.market_state.market_prices[0] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
+- If price of ask ({{ public_information.market_state.median_prices[0] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
+- If price of bid ({{ public_information.market_state.median_prices[0] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
 
 {% else %}
 
-- If price of ask ({{ public_information.market_state.market_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
-- If price of bid ({{ public_information.market_state.market_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
+- If price of ask ({{ public_information.market_state.median_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
+- If price of bid ({{ public_information.market_state.median_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
 
 {% endif %}
 

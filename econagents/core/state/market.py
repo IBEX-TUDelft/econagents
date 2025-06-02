@@ -129,7 +129,7 @@ class MarketState(BaseModel):
         return [order for order in self.orders.values() if order.sender == player_id]
 
     @computed_field
-    def market_prices(self) -> list[Optional[float]]:
+    def median_prices(self) -> list[Optional[float]]:
         """
         Calculates market prices based on the median of the last recorded trade for each condition.
 

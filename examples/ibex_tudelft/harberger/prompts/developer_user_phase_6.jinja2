@@ -12,22 +12,24 @@ Instructions for this phase:
    - Received public value signal (of tax shares): {{ public_information.public_signal[public_information.winning_condition] }}
    - Received private value signal (of tax shares): {{ private_information.value_signals[public_information.winning_condition] }}
    - Orders:
-   {{ public_information.market_state.order_book }}
+
+{{ public_information.market_state.order_book }}
 
 3.1 **Trading decisions when there are trades available in the winning market**
-{% if not public_information.market_state.market_prices[0] and not public_information.market_state.market_prices[1] %}
+
+{% if not public_information.market_state.median_prices[0] and not public_information.market_state.median_prices[1] %}
 - No trades have been made yet.
 {% endif %}
 
 {% if public_information.winning_condition == 0 %}
 
-- If price of ask ({{ public_information.market_state.market_prices[0] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
-- If price of bid ({{ public_information.market_state.market_prices[0] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
+- If price of ask ({{ public_information.market_state.median_prices[0] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
+- If price of bid ({{ public_information.market_state.median_prices[0] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
 
 {% else %}
 
-- If price of ask ({{ public_information.market_state.market_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
-- If price of bid ({{ public_information.market_state.market_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
+- If price of ask ({{ public_information.market_state.median_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
+- If price of bid ({{ public_information.market_state.median_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
 
 {% endif %}
 
