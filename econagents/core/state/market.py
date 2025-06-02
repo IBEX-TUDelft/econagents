@@ -136,8 +136,8 @@ class MarketState(BaseModel):
         Returns:
             A list of prices for each condition. Returns None for conditions that have not had any trades.
         """
-        prices_condition_0 = [trade.price for trade in self.trades if trade.condition == 0]
-        prices_condition_1 = [trade.price for trade in self.trades if trade.condition == 1]
+        prices_condition_0 = [trade.median for trade in self.trades if trade.condition == 0]
+        prices_condition_1 = [trade.median for trade in self.trades if trade.condition == 1]
 
         return [
             prices_condition_0[-1] if prices_condition_0 else None,
