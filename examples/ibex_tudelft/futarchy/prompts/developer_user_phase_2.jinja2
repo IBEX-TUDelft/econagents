@@ -1,8 +1,4 @@
-As a reminder you are the developer with the goal to maximize the total number of points in this experiment, without regard for the other players in the experiment. You will now be taking part in the **first declaration phase**.
-
-*total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration * {{ public_information.initial_tax_rate }}% tax) + (final declaration * {{ public_information.final_tax_rate }}% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
-
-You will receive the following game information of the state of the game:
+This is your information about the state of the game and instructions for this phase:
 
 1. **Game Information**:
    - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
@@ -28,41 +24,32 @@ You will receive the following game information of the state of the game:
 
 The tax levied for the developer and the owners for the condition that is chosen in the experiment, is equal to {{ public_information.tax_rate }}%.
 
-The instructions for the first declaration phase follow:
+**The instructions for the first declaration phase follow:**
 
-1. High-Level Reasoning for the First Declaration
+High-Level Reasoning for the First Declaration
 
-1. Avoid Speculation Losses
-   - If you declare a value lower than your true value, speculators can profit from buying your land (you lose half the difference).
-   - If you declare a value higher than or equal to your real value, speculators would lose if they tried to buy, so they typically won’t buy at all.
+   A. Avoid Speculation Losses
+      - If you declare a value lower than your true value, speculators can profit from buying your land (you lose half the difference).
+      - If you declare a value higher than or equal to your real value, speculators would lose if they tried to buy, so they typically won’t buy at all.
 
-2. Encourage the Project to Win
-   - Market selects Project or No Project based on the median of recent trades.
-   - Public signals (influenced by initial declarations) sway share price expectations.
-   - Declare near the upper bound ({{ public_information.boundaries["developer"]["projectA"]["high"] }}) to influence the Project's perceived value upward.
+   B. Encourage the Project to Win
+      - Market selects Project or No Project based on the median of recent trades.
+      - Public signals (influenced by initial declarations) sway share price expectations.
+      - Declare near the upper bound ({{ public_information.boundaries["developer"]["projectA"]["high"] }}) to influence the Project's perceived value upward.
 
-3. Net Effect of Declaring Higher Values
-   - Higher declarations increase {{ public_information.initial_tax_rate }}% tax, but you recoup some cost via your 30 tax shares.
-   - High Project declaration discourages speculators and favors the Project being chosen.
-   - No Project declaration should be just above your real value to avoid speculation losses.
+   C. Net Effect of Declaring Higher Values
+      - Higher declarations increase {{ public_information.initial_tax_rate }}% tax, but you recoup some cost via your 30 tax shares.
+      - High Project declaration discourages speculators and favors the Project being chosen.
+      - No Project declaration should be just above your real value to avoid speculation losses.
 
-2. Concrete “First Declaration” 
+Specific “First Declaration” instructions
 
-Given:
-- Your True Land Values:
-  - No Project: {{ private_information.property.v[0] }}
-  - Project: {{ private_information.property.v[1] }}
-
-- Known Boundaries (Developer):
-  - No Project: {{ public_information.boundaries["developer"]["noProject"]["low"] }} to {{ public_information.boundaries["developer"]["noProject"]["high"] }}
-  - Project: {{ public_information.boundaries["developer"]["projectA"]["low"] }} to {{ public_information.boundaries["developer"]["projectA"]["high"] }}
-
-Strategy:
-1. No Project Declaration
+No Project Declaration
    - Declare min({{ private_information.property.v[0] + 1 }}, {{ public_information.boundaries["developer"]["noProject"]["high"] }})
 
-2. Project Declaration
+Project Declaration
    - Declare min({{ private_information.property.v[1] + 1 }}, {{ public_information.boundaries["developer"]["projectA"]["high"] }})
+
 
 3. **Your Decision to Make**:
    - Declare your land value for both scenarios (Project and No Project)
@@ -79,4 +66,9 @@ Strategy:
         ],
     }
 
-This ensures we avoid speculation losses and strongly encourage the Project to be chosen.
+   - Replace `<value_no_project>` with our chosen declaration for “No Project.”
+   - Replace `<value_project>` with our chosen declaration for “Project.”
+   - The third entry is always 0 as specified.
+
+
+Use these instructions exactly to minimize speculation losses while also keeping the first-declaration tax low.

@@ -1,4 +1,4 @@
-Instructions for this phase:
+This is your information about the state of the game and instructions for this phase:
 
 1. **Game Information**:
    - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
@@ -45,6 +45,7 @@ The declarations from the owners and developer as well as the value percentiles 
    - **Known Ranges** of possible true values (based on role and scenario)
 
 3.2. **Threshold-Based Buying Rule**:
+ For each individual property under both conditions, make a decision to buy or not as follows:
    - If the declared value is less than percentile 40%, then **buy** it.
    - If declared value is greater than percentile 40%, then **do not buy**.
 
@@ -53,8 +54,8 @@ The declarations from the owners and developer as well as the value percentiles 
 
 3. **Your Decision to Make**:
    - You can purchase the properties of multiple players under the same condition or different conditions, choose not to buy a property, or purchase the same property under both conditions.
-   - You should make a list of the id of the players whose property you want to purchase under the condition noProject: [<player_id>,<player_id>].
-   - You should make a list of the id of the players whose property you want to purchase under the condition project: [<player_id>,<player_id>, <player_id>].
+   - You should make a list of the id of the players whose property you want to purchase under the condition No Project: [<player_id>,<player_id>].
+   - You should make a list of the id of the players whose property you want to purchase under the condition Project: [<player_id>,<player_id>, <player_id>].
    - You should combine these two lists in a list of lists: [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]] and place this list of lists in the snipe field.
    - Provide the output as a JSON object:
     {

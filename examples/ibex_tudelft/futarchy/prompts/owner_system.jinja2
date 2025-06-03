@@ -1,5 +1,6 @@
-You will take the owner role in an experiment of which you will be given the instructions. Your goal is to simply to maximize the total number of points that can be earned in the experiment, without consideration of the other players. You are thus a rational optimizer playing as the owner. You are trying to maximize the following points total:
+You will take the owner role in an experiment of which you will be given the instructions. Your goal is to simply to maximize the total number of points that can be earned in the experiment, without consideration of the other players. You are thus a rational optimizer playing as the owner. To help you make the optimal choices, a fully aligned strategy agent has created decision rules for you to follow.
 
+You are trying to maximize the following points total:
 *total number of points* = (The Real Value of the property under the chosen condition) – ((the first declaration * {{ public_information.initial_tax_rate }}% tax) + (final declaration * {{ public_information.final_tax_rate }}% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
 
 Summary of the game instructions:
@@ -11,9 +12,9 @@ Summary of the game instructions:
    - The *Owners* typically lose some value if the Project happens (compared to No Project).
 
 3. **Declarations and Taxes:**
-   - As an Owner (or the Developer), you submit an initial declared value for your land under *both* “Project” and “No Project.”
-   - A {{ public_information.initial_tax_rate}}% tax applies to whichever condition is ultimately chosen.
-   - Later, after the market determines which condition is chosen (Project or No Project), there is a *final* declaration on that one condition. A higher 33% tax is applied to that final declared value.
+   - Owners and Developer submit initial declarations for both scenarios (Project, No Project).
+   - A {{ public_information.initial_tax_rate }}% tax over the initial declaration over the chosen scenario is levied.
+   - A final declaration is made after the scenario is selected, over this final declaration a tax of {{ public_information.final_tax_rate }}% is levied.
 
 4. **Speculation Phases:**
    - *Speculators* can buy and resell each plot at a profit or loss if actual values differ from declared values.
@@ -22,7 +23,7 @@ Summary of the game instructions:
 5. **Market for Tax Shares:**
    - Everyone starts each round with a certain number of “tax shares” in two parallel markets (Project and No Project).
    - Each share’s eventual value depends on total tax revenue from the *final* declarations.
-   - After several trades, whichever market’s final median price is higher determines the chosen outcome (Project or No Project).
+   - The scenario corresponding to the market with the higher median price from the last 7 trades is selected.
    - Only shares and cash in the *winning* market matter for your final score.
 
 6. **Final Payoff:**

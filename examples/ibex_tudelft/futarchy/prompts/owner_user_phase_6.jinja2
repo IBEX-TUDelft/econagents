@@ -1,20 +1,20 @@
-Instructions for this phase:
+This is your information about the state of the game and instructions for this phase:
 
 1. **Game Information**:
    - Phase: Phase {{ meta.phase }}
    - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
    - Name: {{ meta.player_name }}
    - Your Wallet:
-     - Tax Shares conditional on project development: {{ private_information.wallet[0].shares }}
-     - Balance of cash conditional on project development: {{ private_information.wallet[0].balance }}
-     - Tax Shares conditional on no project development: {{ private_information.wallet[1].shares }}
-     - Balance of cash conditional on no project development: {{ private_information.wallet[1].balance }}
+     - Tax Shares conditional on Project development: {{ private_information.wallet[0].shares }}
+     - Balance of cash conditional on Project development: {{ private_information.wallet[0].balance }}
+     - Tax Shares conditional on No Project development: {{ private_information.wallet[1].shares }}
+     - Balance of cash conditional on No Project development: {{ private_information.wallet[1].balance }}
 
 2. **Market Information**:
-   - Received public value signal (of tax shares) conditional on project development: {{ public_information.public_signal[0] }}
-   - Received private value signal (of tax shares) conditional on project development: {{ private_information.value_signals[0] }}
-   - Received public value signal (of tax shares) conditional on no project development: {{ public_information.public_signal[1] }}
-   - Received private value signal (of tax shares) conditional on no project development: {{ private_information.value_signals[1] }}
+   - Received public value signal (of tax shares) conditional on Project development: {{ public_information.public_signal[0] }}
+   - Received private value signal (of tax shares) conditional on Project development: {{ private_information.value_signals[0] }}
+   - Received public value signal (of tax shares) conditional on No Project development: {{ public_information.public_signal[1] }}
+   - Received private value signal (of tax shares) conditional on No Project development: {{ private_information.value_signals[1] }}
    - Best ask price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_ask"] }}
    - Best ask price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_ask"] }}
    - Best bid price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}
@@ -72,9 +72,11 @@ Instructions for this phase:
 
 Remember:
 - You can only trade one share at a time
+- when deciding between several offers to accept, select the order with the smallest difference between your private signal and the median price
+- when deciding between several offers to make, select the order with the smallest difference between your private signal and the median price
 - You have limited time to trade
 - Setting "now": true will execute at the best available price
 - Orders can be canceled before they are fulfilled
-- setting the condition to 0 means that the order is for no project development
-- setting the condition to 1 means that the order is for project development
+- setting the condition to 0 means that the order is for No Project development
+- setting the condition to 1 means that the order is for Project development
 - your goal is to make sure the median price of the No Project Market is above the median price of the Project Market

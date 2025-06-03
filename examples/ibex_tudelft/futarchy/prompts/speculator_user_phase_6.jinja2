@@ -1,4 +1,4 @@
-Instructions for this phase:
+This is your information about the state of the game and instructions for this phase:
 
 1. **Game Information**:
    - Phase: Phase {{ meta.phase }}
@@ -23,7 +23,7 @@ Instructions for this phase:
 
 {{ public_information.market_state.order_book }}
 
-3.1 **Trading decisions when there are orders available in the market**
+3.1 **Trading decisions in the market**
 
 {% if public_information.market_state.order_book == "No active orders" %}
 
@@ -40,14 +40,16 @@ Instructions for this phase:
 {% endif %}
 
 
+3.2 **If you there are no shares you want to buy or sell in either market**
+If there are no shares you want to buy or sell in either market, then post a bid or ask in the market with the largerst difference between your private signal and the best ask or bid price
 
-3.2 **If no bids or asks outstanding in the No Project (Condition 0) market**
-- Post a bid with a price that is equal to 95% of {{ private_information.value_signals[0] }}
-- Post an ask with a price that is equal to 105% of {{ private_information.value_signals[0] }}
+For posting a bid or ask in the No Project, you can use the following price:
+- For a bid, post a price that is equal to 95% of {{ private_information.value_signals[0] }}
+- Por an ask, post a price that is equal to 105% of {{ private_information.value_signals[0] }}
 
-3.3 **If no bids or asks outstanding in the Project (Condition 1) market**:
-- Post a bid with a price that is equal to 95% of {{ private_information.value_signals[1] }}
-- Post an ask with a price that is equal to 105% of {{ private_information.value_signals[1] }}
+For posting a bid or ask in the No Project , you can use the following price:
+- For a bid, post a price that is equal to 95% of  {{ private_information.value_signals[1] }}
+- Por an ask, post a price that is equal to 105% of {{ private_information.value_signals[1] }}
 
 4. **Your Decision Options**:
    Provide the output (one of these options) as a JSON object:
@@ -79,7 +81,8 @@ Instructions for this phase:
 
 Remember:
 - You can only trade one share at a time,
-- if you have to choose between the two markets, then trade in the market with the largerst difference between your private signal and the best ask or bid price
+- when deciding between several offers to accept, select the order with the largest difference between your private signal and the best ask or bid price
+- when deciding between several offers to make, select the order with the largest difference between your price and the median price in that market
 - You have limited time to trade
 - Setting "now": true will execute at the best available price
 - Orders can be canceled before they are fulfilled

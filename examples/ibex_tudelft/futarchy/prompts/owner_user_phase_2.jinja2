@@ -1,4 +1,4 @@
-Instructions for this phase:
+This is your information about the state of the game and instructions for this phase:
 
 1. **Game Information**:
    - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
@@ -22,12 +22,11 @@ Instructions for this phase:
 
   2.3. **Tax Information**:
     - Current tax rate: {{ public_information.tax_rate }}%
-The tax (public_information.tax_rate) that is levied for the developer and the owners for the condition that is chosen in the experiment , is equal to 1%.
-
+this tax if levied over the declared value of the property
 
 3. **your declaration decisions to make**
 
-3.1 **Take the real values given in the private information** 
+3.1 **Take the real values given in the private information**
    - `real_value_no_project = {{ private_information.property.v[0] }}`
    - `real_value_project = {{ private_information.property.v[1] }}`
 
@@ -48,7 +47,7 @@ The tax (public_information.tax_rate) that is levied for the developer and the o
        0
      ]
    }
- 
+
    - Replace `<value_no_project>` with our chosen declaration for “No Project.”
    - Replace `<value_project>` with our chosen declaration for “Project.”
    - The third entry is always 0 as specified.

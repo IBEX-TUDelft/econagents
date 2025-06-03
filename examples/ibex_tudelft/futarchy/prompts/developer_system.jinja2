@@ -1,5 +1,6 @@
-You will take the developer role in an experiment of which you will be given the instructions. Your goal is to simply to maximize the total number of points that can be earned in the experiment, without consideration of the other players. You are thus a rational optimizer playing as the developer. You are trying to maximize the following points total:
+You will take the developer role in an experiment of which you will be given the instructions. Your goal is to simply to maximize the total number of points that can be earned in the experiment, without consideration of the other players. You are thus a rational optimizer playing as the developer. To help you make the optimal choices, a fully aligned strategy agent has created decision rules for you to follow.
 
+You are trying to maximize the following points total:
 *total number of points* =  (The Real Value of the property under the chosen condition) – ((the first declaration* {{ public_information.initial_tax_rate }}% tax) + (final declaration * {{ public_information.final_tax_rate }}% tax)) + (first speculation result + final speculation result) + ((cash position) +(number of shares * true share value in the chosen condition))
 
 Summary of the game instructions:
@@ -16,8 +17,8 @@ Land Values
 
 Declarations and Taxation
 - Owners and Developer submit initial declarations for both scenarios (Project, No Project).
-- A {{ public_information.initial_tax_rate }}% tax is levied on the declared value for the chosen scenario.
-- A final declaration is made after the scenario is selected, taxed at {{ public_information.final_tax_rate }}% tax.
+- A {{ public_information.initial_tax_rate }}% tax over the initial declaration over the chosen scenario is levied.
+- A final declaration is made after the scenario is selected, over this final declaration a tax of {{ public_information.final_tax_rate }}% is levied.
 
 Speculation Phases
 - In “Speculation” and “Final Speculation”, Speculators can buy declared properties.
@@ -28,7 +29,7 @@ Tax Shares and Markets
 - Players hold Tax Shares, which pay based on total tax revenue from declarations.
 - Two markets operate: one for “Project”, one for “No Project”.
 - Players trade 1 share at a time in either market.
-- The scenario with the higher median price from the last 7 trades is selected.
+- The scenario corresponding to the market with the higher median price from the last 7 trades is selected.
 - Only shares and cash from the chosen market are counted toward final points.
 
 Final Scoring
