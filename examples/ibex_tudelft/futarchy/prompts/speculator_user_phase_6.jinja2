@@ -19,33 +19,35 @@ Instructions for this phase:
    - Best ask price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_ask"] }}
    - Best bid price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_bid"] }}
    - Best bid price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}
-   - Orders: 
+   - Orders:
 
 {{ public_information.market_state.order_book }}
 
 3.1 **Trading decisions when there are orders available in the market**
 
-{% if public_information.market_state.oderd_book == "No active orders" %}
+{% if public_information.market_state.order_book == "No active orders" %}
 
 - No orders have been made yet.
 
 {% else %}
 
-- If price of ask ({{ public_information.market_state.best_prices_from_orders[0]["best_ask"] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
-- If price of bid ({{ public_information.market_state.best_prices_from_orders[0]["best_bid"] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
+- If price of the best ask in the no Project market < your private signal in the No Project condition, then buy a share in the No Project (Condition 0) market
+- If price of the best bid in the no Project market > your private signal in the No Project condition, then sell a share in the No Project (Condition 0) market
 
-- If price of ask ({{ public_information.market_state.best_prices_from_orders[1]["best_ask"] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
-- If price of bid ({{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
+- If price of ask in the Project market < your private signal in the Project condition, then buy a share in the Project (Condition 1) market
+- If price of bid in the Project market > your private signal in the Project condition, then sell a share in the Project (Condition 1) market
 
 {% endif %}
 
+
+
 3.2 **If no bids or asks outstanding in the No Project (Condition 0) market**
-- Post a bid with a price < {{ private_information.value_signals[0] }} that is equal to 95% of {{ private_information.value_signals[0] }} 
-- Post an ask with a price > {{ private_information.value_signals[0] }} that is equal to 105% of {{ private_information.value_signals[0] }}
+- Post a bid with a price that is equal to 95% of {{ private_information.value_signals[0] }}
+- Post an ask with a price that is equal to 105% of {{ private_information.value_signals[0] }}
 
 3.3 **If no bids or asks outstanding in the Project (Condition 1) market**:
-- Post a bid with a price < {{ private_information.value_signals[1] }} that is equal to 95% of {{ private_information.value_signals[1] }}
-- Post an ask with a price > {{ private_information.value_signals[1] }} that is equal to 105% of {{ private_information.value_signals[1] }}
+- Post a bid with a price that is equal to 95% of {{ private_information.value_signals[1] }}
+- Post an ask with a price that is equal to 105% of {{ private_information.value_signals[1] }}
 
 4. **Your Decision Options**:
    Provide the output (one of these options) as a JSON object:
@@ -76,7 +78,8 @@ Instructions for this phase:
    {}
 
 Remember:
-- You can only trade one share at a time
+- You can only trade one share at a time,
+- if you have to choose between the two markets, then trade in the market with the largerst difference between your private signal and the best ask or bid price
 - You have limited time to trade
 - Setting "now": true will execute at the best available price
 - Orders can be canceled before they are fulfilled
