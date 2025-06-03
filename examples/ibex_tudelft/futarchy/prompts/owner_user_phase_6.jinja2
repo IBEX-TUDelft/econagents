@@ -19,7 +19,10 @@ Instructions for this phase:
    - Best ask price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_ask"] }}
    - Best bid price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}
    - Best bid price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_bid"] }}
-   - Current market information and open Orders: 
+   - Project Market median price: {{ public_information.market_state.median_prices[1] }}
+   - No Project Market median price: {{ public_information.market_state.median_prices[0] }}
+
+   - Current market information and open Orders:
 
 {{ public_information.market_state.order_book }}
 
@@ -31,10 +34,14 @@ Instructions for this phase:
 
 {% else %}
 
-- When median price of Project ({{ public_information.market_state.median_prices[1] }}) < median price of No Project ({{ public_information.market_state.median_prices[0] }}) then do nothing
-- When median price of Project ({{ public_information.market_state.median_prices[1] }}) > median price of No Project ({{ public_information.market_state.median_prices[0] }}) then sell a share in the Project Market and/or buy a share in the No Project Market until median price of Project < median price of No Project
+- When median price of Project < median price of No Project then do nothing
+- When median price of Project > median price of No Project then sell a share in the Project Market and/or buy a share in the No Project Market
 
 {% endif %}
+
+
+
+
 
 4. **Your Decision Options**:
    Provide the output (one of these options) as a JSON object:
@@ -71,4 +78,3 @@ Remember:
 - setting the condition to 0 means that the order is for no project development
 - setting the condition to 1 means that the order is for project development
 - your goal is to make sure the median price of the No Project Market is above the median price of the Project Market
-
