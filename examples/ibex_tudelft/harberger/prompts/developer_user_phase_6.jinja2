@@ -1,4 +1,4 @@
-Instructions for this phase:
+This is your information about the state of the game and instructions for this phase:
 
 1. **Game Information**:
    - Phase: Phase {{ meta.phase }}
@@ -37,13 +37,13 @@ Instructions for this phase:
 
 {% if public_information.winning_condition == 0 %}
 
-- Post a bid with a price < {{ private_information.value_signals[0] }} that is equal to 95% of {{ private_information.value_signals[0] }} 
-- Post an ask with a price > {{ private_information.value_signals[0] }} that is equal to 105% of {{ private_information.value_signals[0] }} 
+- Post a bid that is equal to 95% of {{ private_information.value_signals[0] }}
+- Post an ask that is equal to 105% of {{ private_information.value_signals[0] }}
 
 {% else %}
 
--Post a bid with a price < {{ private_information.value_signals[1] }} that is equal to 95% of {{ private_information.value_signals[1] }} 
--Post an ask with a price > {{ private_information.value_signals[1] }} that is equal to 105% of {{ private_information.value_signals[1] }}
+-Post a bid that is equal to 95% of {{ private_information.value_signals[1] }}
+-Post an ask that is equal to 105% of {{ private_information.value_signals[1] }}
 
 {% endif %}
 

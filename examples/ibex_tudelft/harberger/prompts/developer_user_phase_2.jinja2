@@ -1,4 +1,4 @@
-Instructions for this phase:
+This is your information about the state of the game and instructions for this phase:
 
 1. **Game Information**:
    - Phase: {{ meta.phase_name }} (Phase {{ meta.phase }})
@@ -22,17 +22,19 @@ Instructions for this phase:
   2.3. **Tax Information**:
     - Current tax rate: {{ public_information.tax_rate }}%
 
-3. **Declaration Action Details**
+3. **The instructions for the first declaration phase follow:**
+
+High-Level Reasoning for the First Declaration
 
 - No Project Declaration:
   - We want this value to be as low as possible to lower the No Project sum.
   - Developer No Project bounds: {{ public_information.boundaries["developer"]["noProject"]["low"] }} to {{ public_information.boundaries["developer"]["noProject"]["high"] }}
-  - Declare: <value_no_project> = {{ public_information.boundaries["developer"]["noProject"]["low"] }} 
+  - Declare: <value_no_project> = {{ public_information.boundaries["developer"]["noProject"]["low"] }}
 
 - Project Declaration:
   - We want this value to be as high as possible to increase the Project sum.
   - Developer Project bounds: {{ public_information.boundaries["developer"]["projectA"]["low"] }} to {{ public_information.boundaries["developer"]["projectA"]["high"] }}
-  - Declare: <value_project> = {{ public_information.boundaries["developer"]["projectA"]["high"] }} 
+  - Declare: <value_project> = {{ public_information.boundaries["developer"]["projectA"]["high"] }}
 
 4. **Your Decision to Make**:
    - Declare your land value for both scenarios (Project and No Project)
@@ -48,3 +50,10 @@ Instructions for this phase:
             0,
         ],
     }
+
+   - Replace `<value_no_project>` with our chosen declaration for “No Project.”
+   - Replace `<value_project>` with our chosen declaration for “Project.”
+   - The third entry is always 0 as specified.
+
+
+Use these instructions exactly to maximize the probability of implementing the project.

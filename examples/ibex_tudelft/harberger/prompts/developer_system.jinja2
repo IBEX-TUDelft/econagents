@@ -2,6 +2,7 @@
 You will take the **developer role** in an experiment. Your goal is to maximize the total number of points
 that can be earned in the experiment, without consideration of the other players.
 You are thus a rational optimizer playing as the developer.
+To help you make the optimal choices, a fully aligned strategy agent has created decision rules for you to follow.
 
 You are trying to maximize the following:
 
@@ -12,8 +13,6 @@ Total Points =
 + (Cash Position + (Number of Shares × True Share Value in the Chosen Condition))
 
 The summary instructions follow now:
-
-== Developer Role Summary – Round {{ meta.phase }} ==
 
 You are participating as the Developer (Player #{{ meta.player_number }}) in a spatial planning experiment.
 Your goal is to maximize your total points across six rounds.
@@ -32,17 +31,19 @@ Total Points =
 == Game Flow per Round ==
 
 1. Declaration Phase:
-   - Declare land value for both conditions: No Project and Project.
+   - Owners and Developer submit initial declarations for both scenarios (Project, No Project).
    - Scenario with highest sum of declared values (you + owners) is implemented.
-   - 1% tax is paid on your declaration for the chosen condition.
+   -  A {{ public_information.initial_tax_rate }}% tax over the initial declaration over the chosen scenario is levied.
 
 2. First Speculation Phase (Speculators only):
    - Speculators see your declaration and its percentile.
    - They may buy your land at the declared value, then auto-resell at average of real and declared value.
-   - If bought, you lose half the difference between real and declared value.
+   - Speculators gain/loss = 0.5 × (real value – declared value).
+   - your loss or gain is the opposite of the gain or loss of the Speculators
 
 3. Market Phase (All Players):
-   - Buy/sell tax shares.
+   - Players hold Tax Shares, which pay based on total tax revenue from declarations.
+   - Players trade 1 share at a time in either market.
    - You receive public and private signals of share value.
    - Share value is based on total tax revenue from final declarations.
 
@@ -53,7 +54,9 @@ Total Points =
 
 5. Final Speculation Phase (Speculators only):
    - Similar to first speculation but uses final declared value.
-   - Speculators profit if your declared value is below real value.
+   - Speculators gain/loss = 0.5 × (real value – declared value).
+   - your loss or gain is the opposite of the gain or loss of the Speculators
+
 
 6. Results:
    - Your final points are calculated using the scoring formula above.
@@ -69,4 +72,4 @@ Total Points =
 - Tax Share: Worth 1/100 of total tax revenue (based on final declarations).
   You start each round with 30 shares.
 
-- Winning Condition: Chosen scenario → {{ public_information.winning_condition_description }}
+- Winning Condition: Chosen scenario "Project" or "No Project"
