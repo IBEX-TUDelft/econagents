@@ -37,12 +37,12 @@ This is your information about the state of the game and instructions for this p
 - When median price of Project  < median price of No Project, then increase the median price of the Project market or decrease the median price of No Project market
 
 Increasing the median price of the Project market can be done in two ways:
-    - if the best bid is higher than the median price in the Project market, you can accept the best bid in this market by sending an ask with the now option set to true.
-    - if the best bid is lower than the median price in the Project market, you can create a bid in the No Project market that is 10% above the median price in the No Project market
+    - if the best bid is higher than the median price in the Project market, you can accept the best bid in this market by sending an ask with 'now' set to true.
+    - if the best bid is lower than the median price in the Project market, you can create a bid in the Project market that is 10% above the median price in the No Project market
 
 Decreasing the median price in the No Project market can be done in two ways:
-    - if the best ask is lower than the median price in the No Project market, you can accept the best ask in this market by sending a bid with the now option set to true.
-    - if the best ask is higher than the median price in the No Project market, you can create a bid in the No Project market that is 10% below the median price in the No Project market
+    - if the best bid is lower than the median price in the No Project market, you can accept the best bid in this market by sending an ask with 'now' set to true.
+    - if the best bid is higher than the median price in the No Project market, you can create a bid in the No Project market that is 10% below the median price in the Project market
 
 
 {% endif %}
