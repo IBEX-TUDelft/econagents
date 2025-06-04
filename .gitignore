@@ -262,3 +262,4 @@ server_docs/
 .aider.chat.history.md
 .aider.tags.cache.v4/cache.db
 .aider.tags.cache.v4/cache.db-wal
+examples/ibex_tudelft/futarchy/futarchy.json

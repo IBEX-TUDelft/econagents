@@ -48,7 +48,7 @@ No Project Declaration
    - Declare min({{ private_information.property.v[0] + 1 }}, {{ public_information.boundaries["developer"]["noProject"]["high"] }})
 
 Project Declaration
-   - Declare min({{ private_information.property.v[1] + 1 }}, {{ public_information.boundaries["developer"]["projectA"]["high"] }})
+   - Declare max({{ private_information.property.v[1] + 1 }}, {{ public_information.boundaries["developer"]["projectA"]["high"] }})
 
 
 3. **Your Decision to Make**:
@@ -66,8 +66,8 @@ Project Declaration
         ],
     }
 
-   - Replace `<value_no_project>` with our chosen declaration for “No Project.”
-   - Replace `<value_project>` with our chosen declaration for “Project.”
+   - Replace `<value_no_project>` with your chosen declaration for “No Project.”
+   - Replace `<value_project>` with your chosen declaration for “Project.”
    - The third entry is always 0 as specified.
 
 
