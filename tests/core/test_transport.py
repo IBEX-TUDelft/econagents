@@ -21,7 +21,7 @@ def find_free_port():
         return s.getsockname()[1]
 
 
-class TestWebSocketServer:
+class MockWebSocketServer:
     """A lightweight WebSocket server for testing."""
 
     def __init__(self, host="localhost", port=None):
@@ -96,7 +96,7 @@ class TestWebSocketServer:
 @pytest_asyncio.fixture
 async def ws_server():
     """Provide a test WebSocket server."""
-    server = TestWebSocketServer()
+    server = MockWebSocketServer()
     await server.start()
     yield server
     await server.stop()
@@ -130,7 +130,7 @@ def transport(logger, login_payload, mock_callback):
     and messages is a list where received messages are stored.
     """
 
-    def on_message(message_str):
+    async def on_message(message_str):
         event, messages = mock_callback
         messages.append(message_str)
         event.set()
@@ -160,223 +160,331 @@ class TestWebSocketTransport:
         assert transport.ws is None
         assert transport._running is False
 
-    @pytest.mark.asyncio
-    async def test_connect_success(self, transport, login_payload, ws_server):
-        """Test successful connection to WebSocket server."""
-        # Update the transport URL to point to our test server
-        transport.url = ws_server.url
-
-        # Connect to the server
-        connected = await transport.connect()
-
-        # Verify connection was successful
-        assert connected is True
-        assert transport.ws is not None
-
-        # Verify login payload was sent to the server
-        await asyncio.sleep(0.2)  # Small delay to ensure message is processed
-        assert len(ws_server.received_messages) >= 1
-
-        # Check if any of the received messages match our login payload
-        login_found = False
-        for msg in ws_server.received_messages:
-            try:
-                msg_data = json.loads(msg)
-                if msg_data.get("type") == "login":
-                    login_found = True
-                    assert msg_data == login_payload
-                    break
-            except json.JSONDecodeError:
-                continue
-
-        assert login_found, "Login message not found in received messages"
-
-    @pytest.mark.asyncio
-    async def test_connect_failure(self, transport):
-        """Test failed connection to WebSocket server."""
-        # Set an invalid URL to force connection failure
-        transport.url = "ws://invalid-host:12345"
-
-        # Try to connect
-        connected = await transport.connect()
-
-        # Verify connection failed
-        assert connected is False
-        assert transport.ws is None
-
-    @pytest.mark.asyncio
-    async def test_auth_failure(self, transport, ws_server):
-        """Test authentication failure."""
-        # Update the transport URL to point to our test server
-        transport.url = ws_server.url
-
-        # Create a failing authentication mechanism
-        class FailingAuthMechanism(AuthenticationMechanism):
-            async def authenticate(self, transport, **kwargs) -> bool:
-                return False
-
-        transport.auth_mechanism = FailingAuthMechanism()
-
-        # Try to connect
-        connected = await transport.connect()
-
-        # Verify connection failed due to authentication
-        assert connected is False
-        assert transport.ws is None
-
-    @pytest.mark.asyncio
-    async def test_send_message(self, transport, ws_server):
-        """Test sending a message via WebSocket."""
-        # Connect to the server
-        transport.url = ws_server.url
-        await transport.connect()
-
-        # Clear received messages to start fresh
-        ws_server.received_messages = []
-
-        # Send a test message
-        test_message = json.dumps({"type": "test", "data": {"value": "test"}})
-        await transport.send(test_message)
-
-        # Verify the message was received by the server
-        await asyncio.sleep(0.2)  # Small delay to ensure message is processed
-
-        # Check if the test message is in the received messages
-        test_message_found = False
-        for msg in ws_server.received_messages:
-            try:
-                msg_data = json.loads(msg)
-                if msg_data.get("type") == "test":
-                    test_message_found = True
-                    assert msg_data == {"type": "test", "data": {"value": "test"}}
-                    break
-            except json.JSONDecodeError:
-                continue
-
-        assert test_message_found, "Test message not found in received messages"
-
-    @pytest.mark.asyncio
-    async def test_send_message_no_connection(self, transport):
-        """Test sending a message when no WebSocket connection exists."""
-        # Ensure WebSocket is None
-        transport.ws = None
-
-        # Send a test message (should not raise an exception)
-        await transport.send("Test message")
-        # No assertions needed - the test passes if no exception is raised
-
-    @pytest.mark.asyncio
-    async def test_receive_message(self, transport, ws_server, mock_callback):
-        """Test receiving a message from the server."""
-        event, messages = mock_callback
-
-        # Connect to the server
-        transport.url = ws_server.url
-        connected = await transport.connect()
-        assert connected is True
-
-        # Start listening for messages
+    async def _start_transport_and_wait_for_connection(self, transport, timeout=2.0):
+        """Helper method to start transport and wait for connection."""
+        # Start listening in background
         listen_task = asyncio.create_task(transport.start_listening())
 
-        # Wait for the connection to be established
-        await asyncio.sleep(0.2)
+        # Wait for connection to be established
+        start_time = asyncio.get_event_loop().time()
+        while (asyncio.get_event_loop().time() - start_time) < timeout:
+            if transport.ws is not None and transport._running:
+                return listen_task, True
+            await asyncio.sleep(0.1)
 
-        # Reset the event since it might have been set by the login response
-        event.clear()
-        messages.clear()
-
-        # Send a test event from the server
-        test_event = {"type": "event", "eventType": "test_event", "data": {"value": "test_data"}}
-        await ws_server.send_to_all(json.dumps(test_event))
-
-        # Wait for the message to be received (with timeout)
-        try:
-            await asyncio.wait_for(event.wait(), timeout=2.0)
-        except asyncio.TimeoutError:
-            pytest.fail("Timeout waiting for message to be received")
-
-        # Stop listening
-        transport._running = False
-        await transport.stop()
-
-        # Cancel the listen task
+        # Timeout - clean up
         listen_task.cancel()
         try:
             await listen_task
         except asyncio.CancelledError:
             pass
 
-        # Verify the message was received
-        assert len(messages) >= 1
-
-        # Check if the test event is in the received messages
-        event_found = False
-        for msg in messages:
-            try:
-                msg_data = json.loads(msg)
-                if msg_data.get("type") == "event" and msg_data.get("eventType") == "test_event":
-                    event_found = True
-                    assert msg_data == test_event
-                    break
-            except json.JSONDecodeError:
-                continue
-
-        assert event_found, "Test event not found in received messages"
+        return None, False
 
     @pytest.mark.asyncio
-    async def test_connection_closed(self, transport, ws_server, mock_callback):
-        """Test handling of connection closure."""
-        # Connect to the server
+    async def test_connect_success(self, transport, login_payload, ws_server):
+        """Test successful connection to WebSocket server."""
         transport.url = ws_server.url
-        await transport.connect()
 
-        # Start listening
-        listen_task = asyncio.create_task(transport.start_listening())
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport)
 
-        # Wait for a moment to ensure listening has started
-        await asyncio.sleep(0.2)
-
-        # Close the server
-        await ws_server.stop()
-
-        # Wait for the listening task to complete (it should detect the closed connection)
         try:
-            await asyncio.wait_for(listen_task, timeout=2.0)
-        except asyncio.TimeoutError:
-            listen_task.cancel()
-            try:
-                await listen_task
-            except asyncio.CancelledError:
-                pass
-            pytest.fail("Timeout waiting for listening task to complete after connection closed")
+            assert connected is True
+            assert transport.ws is not None
+            assert transport._running is True
 
-        # Verify running state is False after connection closed
-        assert transport._running is False
+            await asyncio.sleep(0.2)
+            assert len(ws_server.received_messages) >= 1
+
+            login_found = False
+            for msg in ws_server.received_messages:
+                try:
+                    msg_data = json.loads(msg)
+                    if msg_data.get("type") == "login":
+                        login_found = True
+                        assert msg_data == login_payload
+                        break
+                except json.JSONDecodeError:
+                    continue
+
+            assert login_found, "Login message not found in received messages"
+
+        finally:
+            # Clean up
+            await transport.stop()
+            if listen_task:
+                listen_task.cancel()
+                try:
+                    await listen_task
+                except asyncio.CancelledError:
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_connect_failure(self, transport):
+        """Test failed connection to WebSocket server."""
+        transport.url = "ws://invalid-host:12345"
+
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport, timeout=1.0)
+
+        assert connected is False
+        assert transport.ws is None
+
+    @pytest.mark.asyncio
+    async def test_auth_failure(self, transport, ws_server):
+        """Test authentication failure."""
+        transport.url = ws_server.url
+
+        class FailingAuthMechanism(AuthenticationMechanism):
+            async def authenticate(self, transport, **kwargs) -> bool:
+                return False
+
+        transport.auth_mechanism = FailingAuthMechanism()
+
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport, timeout=1.0)
+
+        assert connected is False
+        assert transport.ws is None
+
+    @pytest.mark.asyncio
+    async def test_send_message(self, transport, ws_server):
+        """Test sending a message via WebSocket."""
+        transport.url = ws_server.url
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport)
+
+        try:
+            assert connected is True
+
+            ws_server.received_messages = []
+
+            test_message = json.dumps({"type": "test", "data": {"value": "test"}})
+            await transport.send(test_message)
+
+            await asyncio.sleep(0.2)
+
+            test_message_found = False
+            for msg in ws_server.received_messages:
+                try:
+                    msg_data = json.loads(msg)
+                    if msg_data.get("type") == "test":
+                        test_message_found = True
+                        assert msg_data == {"type": "test", "data": {"value": "test"}}
+                        break
+                except json.JSONDecodeError:
+                    continue
+
+            assert test_message_found, "Test message not found in received messages"
+
+        finally:
+            await transport.stop()
+            if listen_task:
+                listen_task.cancel()
+                try:
+                    await listen_task
+                except asyncio.CancelledError:
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_send_message_no_connection(self, transport):
+        """Test sending a message when no WebSocket connection exists."""
+        transport.ws = None
+
+        await transport.send("Test message")
+
+    @pytest.mark.asyncio
+    async def test_receive_message(self, transport, ws_server, mock_callback):
+        """Test receiving a message from the server."""
+        event, messages = mock_callback
+
+        transport.url = ws_server.url
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport)
+
+        try:
+            assert connected is True
+
+            await asyncio.sleep(0.2)
+
+            event.clear()
+            messages.clear()
+
+            test_event = {"type": "event", "eventType": "test_event", "data": {"value": "test_data"}}
+            await ws_server.send_to_all(json.dumps(test_event))
+
+            try:
+                await asyncio.wait_for(event.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                pytest.fail("Timeout waiting for message to be received")
+
+            assert len(messages) >= 1
+
+            event_found = False
+            for msg in messages:
+                try:
+                    msg_data = json.loads(msg)
+                    if msg_data.get("type") == "event" and msg_data.get("eventType") == "test_event":
+                        event_found = True
+                        assert msg_data == test_event
+                        break
+                except json.JSONDecodeError:
+                    continue
+
+            assert event_found, "Test event not found in received messages"
+
+        finally:
+            await transport.stop()
+            if listen_task:
+                listen_task.cancel()
+                try:
+                    await listen_task
+                except asyncio.CancelledError:
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_unrecoverable_connection_closed(self, transport, ws_server, mock_callback):
+        """Test handling of connection closure."""
+        transport.url = ws_server.url
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport)
+
+        try:
+            assert connected is True
+
+            await asyncio.sleep(0.2)
+
+            original_ws = transport.ws
+
+            await ws_server.stop()
+
+            start_time = asyncio.get_event_loop().time()
+            while (asyncio.get_event_loop().time() - start_time) < 2.0:
+                if transport.ws != original_ws or transport._running is False:
+                    break
+                await asyncio.sleep(0.1)
+
+            assert transport.ws != original_ws or transport.ws is None or transport._running is False
+
+        finally:
+            await transport.stop()
+            if listen_task and not listen_task.done():
+                listen_task.cancel()
+                try:
+                    await listen_task
+                except asyncio.CancelledError:
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_recoverable_connection_closed(self, transport, ws_server, mock_callback):
+        """Test handling of recoverable connection closure."""
+        event, messages = mock_callback
+
+        transport.url = ws_server.url
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport)
+
+        try:
+            assert connected is True
+            initial_ws = transport.ws
+
+            messages.clear()
+            event.clear()
+
+            test_message_1 = {"type": "test", "message": "before_disconnect"}
+            await ws_server.send_to_all(json.dumps(test_message_1))
+
+            try:
+                await asyncio.wait_for(event.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                pytest.fail("Timeout waiting for initial message")
+
+            assert len(messages) >= 1
+
+            await ws_server.stop()
+
+            await asyncio.sleep(0.5)
+
+            await ws_server.start()
+
+            start_time = asyncio.get_event_loop().time()
+            reconnected = False
+            while (asyncio.get_event_loop().time() - start_time) < 5.0:
+                if transport.ws is not None and transport.ws != initial_ws and transport._running:
+                    reconnected = True
+                    break
+                await asyncio.sleep(0.2)
+
+            assert reconnected, "Transport did not reconnect after server restart"
+
+            messages.clear()
+            event.clear()
+
+            await transport.send(json.dumps({"type": "test", "message": "after_reconnect"}))
+            await asyncio.sleep(0.2)
+
+            reconnect_message_found = False
+            for msg in ws_server.received_messages:
+                try:
+                    msg_data = json.loads(msg)
+                    if msg_data.get("type") == "test" and msg_data.get("message") == "after_reconnect":
+                        reconnect_message_found = True
+                        break
+                except json.JSONDecodeError:
+                    continue
+
+            assert reconnect_message_found, "Message not received after reconnection"
+
+            test_message_2 = {"type": "test", "message": "server_to_client_after_reconnect"}
+            await ws_server.send_to_all(json.dumps(test_message_2))
+
+            try:
+                await asyncio.wait_for(event.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                pytest.fail("Timeout waiting for message after reconnection")
+
+            reconnect_event_found = False
+            for msg in messages:
+                try:
+                    msg_data = json.loads(msg)
+                    if msg_data.get("type") == "test" and msg_data.get("message") == "server_to_client_after_reconnect":
+                        reconnect_event_found = True
+                        break
+                except json.JSONDecodeError:
+                    continue
+
+            assert reconnect_event_found, "Message not received from server after reconnection"
+
+        finally:
+            await transport.stop()
+            if listen_task:
+                listen_task.cancel()
+                try:
+                    await listen_task
+                except asyncio.CancelledError:
+                    pass
 
     @pytest.mark.asyncio
     async def test_stop(self, transport, ws_server):
         """Test stopping the transport."""
-        # Connect to the server
         transport.url = ws_server.url
-        await transport.connect()
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport)
 
-        # Ensure it's running
-        transport._running = True
+        try:
+            assert connected is True
+            assert transport._running is True
 
-        # Stop the transport
-        await transport.stop()
+            await transport.stop()
 
-        # Verify running state is False
-        assert transport._running is False
-        # WebSocket should be closed (ws attribute might still exist but the connection is closed)
+            assert transport._running is False
+
+        finally:
+            if listen_task:
+                listen_task.cancel()
+                try:
+                    await listen_task
+                except asyncio.CancelledError:
+                    pass
 
     @pytest.mark.asyncio
     async def test_auth_mechanism_called(self, transport, ws_server, login_payload):
         """Test that the auth_mechanism's authenticate method is called with the correct parameters."""
-        # Update the transport URL to point to our test server
         transport.url = ws_server.url
 
-        # Replace the auth mechanism with a mock that tracks calls
         auth_called = False
         received_kwargs = {}
 
@@ -385,21 +493,26 @@ class TestWebSocketTransport:
                 nonlocal auth_called, received_kwargs
                 auth_called = True
                 received_kwargs = kwargs
-                # Still perform the authentication
                 auth_message = json.dumps(kwargs)
                 await transport_obj.send(auth_message)
                 return True
 
         transport.auth_mechanism = MockAuthMechanism()
 
-        # Connect to the server
-        connected = await transport.connect()
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport)
 
-        # Verify connection was successful
-        assert connected is True
+        try:
+            assert connected is True
 
-        # Verify auth mechanism was called
-        assert auth_called is True
+            assert auth_called is True
 
-        # Verify kwargs were passed correctly
-        assert received_kwargs == login_payload
+            assert received_kwargs == login_payload
+
+        finally:
+            await transport.stop()
+            if listen_task:
+                listen_task.cancel()
+                try:
+                    await listen_task
+                except asyncio.CancelledError:
+                    pass

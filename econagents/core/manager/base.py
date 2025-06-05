@@ -142,11 +142,11 @@ class AgentManager(LoggerMixin):
             auth_mechanism_kwargs=self._auth_mechanism_kwargs,
         )
 
-    def _raw_message_received(self, raw_message: str):
+    async def _raw_message_received(self, raw_message: str):
         """Process raw message from the transport layer"""
         msg = self._extract_message_data(raw_message)
         if msg:
-            asyncio.create_task(self.on_message(msg))
+            await self.on_message(msg)
         return None
 
     def _extract_message_data(self, raw_message: str) -> Optional[Message]:
@@ -218,12 +218,8 @@ class AgentManager(LoggerMixin):
                 raise ValueError("URL must be set before starting the agent manager")
 
         self.running = True
-        connected = await self.transport.connect()
-        if connected:
-            self.logger.info("Connected to WebSocket server. Receiving messages...")
-            await self.transport.start_listening()
-        else:
-            self.logger.error("Failed to connect to WebSocket server")
+        self.logger.info("Starting agent manager. Receiving messages...")
+        await self.transport.start_listening()
 
     async def stop(self):
         """Stop the agent manager and close the connection."""
