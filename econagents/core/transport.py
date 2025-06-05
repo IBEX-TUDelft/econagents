@@ -104,11 +104,8 @@ class WebSocketTransport(LoggerMixin):
                     result = self.on_message_callback(message_str)
                     if asyncio.iscoroutine(result):
                         asyncio.create_task(result)
-            except asyncio.CancelledError:
-                self.logger.debug("WebSocket listening task cancelled.")
-                break
-            except ConnectionClosed:
-                self.logger.debug("WebSocket connection closed by remote.")
+            except ConnectionClosed as e:
+                self.logger.info(f"WebSocket connection closed by remote: ({e.code}) {e.reason}")
                 break
             except Exception:
                 self.logger.exception("Error in receive loop.")
