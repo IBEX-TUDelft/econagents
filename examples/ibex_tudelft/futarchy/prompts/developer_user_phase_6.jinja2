@@ -5,10 +5,10 @@ This is your information about the state of the game and instructions for this p
    - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
    - Name: {{ meta.player_name }}
    - Your Wallet:
-     - Tax Shares conditional on project development: {{ private_information.wallet[0].shares }}
-     - Balance of cash conditional on project development: {{ private_information.wallet[0].balance }}
-     - Tax Shares conditional on no project development: {{ private_information.wallet[1].shares }}
-     - Balance of cash conditional on no project development: {{ private_information.wallet[1].balance }}
+     - Tax Shares conditional on Project development: {{ private_information.wallet[0].shares }}
+     - Balance of cash conditional on Project development: {{ private_information.wallet[0].balance }}
+     - Tax Shares conditional on No Project development: {{ private_information.wallet[1].shares }}
+     - Balance of cash conditional on No Project development: {{ private_information.wallet[1].balance }}
 
 2. **Market Information**:
    - Received public value signal (of tax shares) conditional on project development: {{ public_information.public_signal[0] }}
@@ -37,13 +37,10 @@ This is your information about the state of the game and instructions for this p
 - When median price of Project  < median price of No Project, then increase the median price of the Project market or decrease the median price of No Project market
 
 Increasing the median price of the Project market can be done in two ways:
-    - if the best bid is higher than the median price in the Project market, you can accept the best bid in this market by sending an ask with 'now' set to true.
-    - if the best bid is lower than the median price in the Project market, you can create a bid in the Project market that is 10% above the median price in the No Project market
+    - If your Balance of cash conditional on Project in your wallet is larger than the median price in the No Project market, you can increase the median price in the Project market by making a bid in the Project market with a price equal to max( Balance of cash conditional on Project; median price No Project market + 10%)
 
 Decreasing the median price in the No Project market can be done in two ways:
-    - if the best bid is lower than the median price in the No Project market, you can accept the best bid in this market by sending an ask with 'now' set to true.
-    - if the best bid is higher than the median price in the No Project market, you can create a ask in the No Project market that is 10% below the median price in the Project market
-
+    - If you have at least one Tax Shares conditional on No Project in your wallet, you can decrease the median price in the No Project market by creating an ask in the No Project market with a price that is 10% below the median price in the Project market.
 
 {% endif %}
 
@@ -78,8 +75,6 @@ Decreasing the median price in the No Project market can be done in two ways:
 Remember:
 - You can only trade one share at a time
 - If a median price does not exist yet, it is assumed to be 0
-- when deciding between several offers to accept, select the order with the smallest difference between your private signal and the median price
-- when deciding between several offers to make, select the order with the smallest difference between your private signal and the median price
 - when choosing what market to target, manipulating the losing market is cheaper. So manipulte the losing market unless the offer you intend to make resembles existing open offers in this market.
 - You have limited time to trade
 - Setting "now": true will execute at the best available price
