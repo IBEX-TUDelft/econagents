@@ -5,49 +5,57 @@ This is your information about the state of the game and instructions for this p
    - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
    - Name: {{ meta.player_name }}
    - Your Wallet:
-     - Tax Shares conditional on Project development: {{ private_information.wallet[0].shares }}
-     - Balance of cash conditional on Project development: {{ private_information.wallet[0].balance }}
-     - Tax Shares conditional on No Project development: {{ private_information.wallet[1].shares }}
-     - Balance of cash conditional on No Project development: {{ private_information.wallet[1].balance }}
+     - Tax Shares conditional on Project (Condition 1) development: {{ private_information.wallet[0].shares }}
+     - Balance of cash conditional on Project (Condition 1) development: {{ private_information.wallet[0].balance }}
+     - Tax Shares conditional on No Project (Condition 0) development: {{ private_information.wallet[1].shares }}
+     - Balance of cash conditional on No Project (Condition 0) development: {{ private_information.wallet[1].balance }}
 
 2. **Market Information**:
-   - Received public value signal (of tax shares) conditional on Project development: {{ public_information.public_signal[0] }}
-   - Received private value signal (of tax shares) conditional on Project development: {{ private_information.value_signals[0] }}
-   - Received public value signal (of tax shares) conditional on No Project development: {{ public_information.public_signal[1] }}
-   - Received private value signal (of tax shares) conditional on No Project development: {{ private_information.value_signals[1] }}
-   - Best ask price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_ask"] }}
+   - Received public value signal (of tax shares) conditional on Project (Condition 1) development: {{ public_information.public_signal[1] }}
+   - Received private value signal (of tax shares) conditional on Project (Condition 1) development: {{ private_information.value_signals[1] }}
+   - Received public value signal (of tax shares) conditional on No Project (Condition 0) development: {{ public_information.public_signal[0] }}
+   - Received private value signal (of tax shares) conditional on No Project (Condition 0) development: {{ private_information.value_signals[0] }}
    - Best ask price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_ask"] }}
-   - Best bid price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}
+   - Best ask price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_ask"] }}
    - Best bid price of No Project: {{ public_information.market_state.best_prices_from_orders[0]["best_bid"] }}
+   - Best bid price of Project: {{ public_information.market_state.best_prices_from_orders[1]["best_bid"] }}
    - Project Market median price: {{ public_information.market_state.median_prices[1] }}
    - No Project Market median price: {{ public_information.market_state.median_prices[0] }}
-
-   - Current market information and open Orders:
+   - Orders:
 
 {{ public_information.market_state.order_book }}
 
-3. **Trading decisions when there are trades available in the market**:
+3.1 **Trading decisions in the market**
 
-{% if not public_information.market_state.median_prices[0] and not public_information.market_state.median_prices[1] %}
+{% if public_information.market_state.order_book == "No active orders" %}
 
-- No trades have been made yet.
+- No orders have been made yet.
 
 {% else %}
 
-- When median price of Project < median price of No Project then do nothing
-- When median price of Project > median price of No Project then increase the median price of the No Project market or decrease the median price of the Project market
+- If price of the best ask in the no Project market < your private signal in the No Project condition, then buy a share in the No Project (Condition 0) market
+- If price of the best bid in the no Project market > your private signal in the No Project condition, then sell a share in the No Project (Condition 0) market
 
-Increasing the median price in the No Project market
-If your Balance of cash conditional on No Project in your wallet is larger than the median price in the Project market, you can increase the median price in the No Project market by making a bid in the No Project market with a price equal to max( Balance of cash conditional on No Project; median price Project market + 10%)
-
-Decrease the price in the Project market
-If you have at least one Tax Shares conditional on Project in your wallet, you can decrease the median price in the Project market by creating an ask in the Project market with a price that is 10% below the median price in the No Project market.
+- If price of ask in the Project market < your private signal in the Project condition, then buy a share in the Project (Condition 1) market
+- If price of bid in the Project market > your private signal in the Project condition, then sell a share in the Project (Condition 1) market
 
 {% endif %}
 
 
+3.2 **If there are no shares you want to buy or sell in either market**
+If there are no shares you want to buy or sell in either market, then post a bid or ask in the market with the largerst difference between your private signal and the best ask or bid price
+
+For posting a bid or ask in the No Project, you can use the following price:
+- For a bid, post a price that is equal to 95% of {{ private_information.value_signals[0] }}
+- For an ask, post a price that is equal to 105% of {{ private_information.value_signals[0] }}
+
+For posting a bid or ask in the Project, you can use the following price:
+- For a bid, post a price that is equal to 95% of  {{ private_information.value_signals[1] }}
+- Por an ask, post a price that is equal to 105% of {{ private_information.value_signals[1] }}
+
 4. **Your Decision Options**:
    Provide the output (one of these options) as a JSON object:
+   A. Post a new order:
    {
        "gameId": {{ meta.game_id }},
        "type": "post-order",
@@ -57,7 +65,7 @@ If you have at least one Tax Shares conditional on Project in your wallet, you c
            "type": <"ask" or "bid">,
            "now": <true or false>,
            "condition": <0 or 1>
-       },
+       }
    }
 
    B. Cancel an existing order:
@@ -67,19 +75,21 @@ If you have at least one Tax Shares conditional on Project in your wallet, you c
        "order": {
            "id": <order_id>,
            "condition": <0 or 1>
-       },
+       }
    }
 
    C. Do nothing:
    {}
 
 Remember:
-- You can only trade one share at a time
+- You can only trade one share at a time,
 - If a median price does not exist yet, it is assumed to be 0
-- when choosing what market to target, manipulating the losing market is cheaper. So manipulate the losing market unless the offer you intend to make resembles existing open offers in this market.
+- when deciding between several offers to accept, select the order with the largest difference between your private signal and the best ask or bid price
+- when deciding between several offers to make, select the order with the largest difference between your price and the median price in that market
 - You have limited time to trade
-- Setting "now": true will execute at the best available price
+- Setting "now": true will execute your bid or ask at the best available price
 - Orders can be canceled before they are fulfilled
-- setting the condition to 0 means that the order is for No Project development
-- setting the condition to 1 means that the order is for Project development
-- your goal is to make sure the median price of the No Project Market is above the median price of the Project Market
+- setting the condition to 0 means that the order is for No Project (Condition 0) development
+- setting the condition to 1 means that the order is for Project (Condition 1) development
+- you can never have more offers to sell shares (asks) in any market than the number of tax shares in your wallet for that market
+- The sum of the prices of the offers to buy shares (bids) in any market can never exceed the balance in your wallet for that market

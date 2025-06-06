@@ -42,14 +42,14 @@ This is your information about the state of the game and instructions for this p
 {% endif %}
 
 
-3.2 **If you there are no shares you want to buy or sell in either market**
+3.2 **If there are no shares you want to buy or sell in either market**
 If there are no shares you want to buy or sell in either market, then post a bid or ask in the market with the largerst difference between your private signal and the best ask or bid price
 
 For posting a bid or ask in the No Project, you can use the following price:
 - For a bid, post a price that is equal to 95% of {{ private_information.value_signals[0] }}
-- Por an ask, post a price that is equal to 105% of {{ private_information.value_signals[0] }}
+- For an ask, post a price that is equal to 105% of {{ private_information.value_signals[0] }}
 
-For posting a bid or ask in the No Project , you can use the following price:
+For posting a bid or ask in the Project, you can use the following price:
 - For a bid, post a price that is equal to 95% of  {{ private_information.value_signals[1] }}
 - Por an ask, post a price that is equal to 105% of {{ private_information.value_signals[1] }}
 
@@ -87,7 +87,9 @@ Remember:
 - when deciding between several offers to accept, select the order with the largest difference between your private signal and the best ask or bid price
 - when deciding between several offers to make, select the order with the largest difference between your price and the median price in that market
 - You have limited time to trade
-- Setting "now": true will execute at the best available price
+- Setting "now": true will execute your bid or ask at the best available price
 - Orders can be canceled before they are fulfilled
 - setting the condition to 0 means that the order is for No Project (Condition 0) development
 - setting the condition to 1 means that the order is for Project (Condition 1) development
+- you can never have more offers to sell shares (asks) in any market than the number of tax shares in your wallet for that market
+- The sum of the prices of the offers to buy shares (bids) in any market can never exceed the balance in your wallet for that market
