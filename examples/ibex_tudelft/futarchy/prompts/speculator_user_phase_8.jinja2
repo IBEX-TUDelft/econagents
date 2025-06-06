@@ -45,8 +45,18 @@ This is your information about the state of the game and instructions for this p
    - Decide which transactions to make based on the available information
    - You should provide the id of the player you want to trade with
    - Provide the output as a JSON object:
+
+   {% if public_information.winning_condition == 0 %}
     {
       "gameId": {{ meta.game_id }},
       "type": "done-speculating",
       "snipe":[ [<player_id>, <player_id>, <player_id>], []],
     }
+      {% else %}
+
+    {
+      "gameId": {{ meta.game_id }},
+      "type": "done-speculating",
+      "snipe":[[], [<player_id>, <player_id>, <player_id>]],
+    }
+  {% endif %}
