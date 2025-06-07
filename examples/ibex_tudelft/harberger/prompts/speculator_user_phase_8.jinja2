@@ -36,7 +36,7 @@ Instructions for this phase:
   3.1. **Gather the following data for each property** (Owner or Developer):
     - **Player ID**
     - **Declared Value for winning condition**
-    - **Declared Value Percentile** 
+    - **Declared Value Percentile**
     - **Known Ranges** of possible true values for winning condition per owner and developer
 
   3.2. **Threshold-Based Buying Rule**:
@@ -44,13 +44,21 @@ Instructions for this phase:
     - If declared value percentile is >50% percentile than **do not buy**.
 
 4. **Your Decision to Make**:
-   - You can purchase the properties of multiple players under the same condition or different conditions, choose not to buy a property, or purchase the same property under both conditions.
-   - You should make a list of the id of the players whose property you want to purchase under the condition noProject: [<player_id>,<player_id>].
-   - You should make a list of the id of the players whose property you want to purchase under the condition project: [<player_id>,<player_id>, <player_id>].
-   - You should combine these two lists in a list of lists: [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]] and place this list of lists in the snipe field.
+   - You can purchase the properties of multiple players, or choose not to buy a property.
+   - You should make a list of the id of the players whose property you want to purchase under the winning condition  {{ public_information.winning_condition_description }}.
    - Provide the output as a JSON object:
+
+    {% if public_information.winning_condition == 0 %}
     {
       "gameId": {{ meta.game_id }},
       "type": "done-speculating",
-      "snipe": [[<player_id>, <player_id>], [<player_id>, <player_id>, <player_id>]]
+      "snipe":[ [<player_id>, <player_id>, <player_id>], []]
     }
+      {% else %}
+
+    {
+      "gameId": {{ meta.game_id }},
+      "type": "done-speculating",
+      "snipe":[[], [<player_id>, <player_id>, <player_id>]]
+    }
+    {% endif %}

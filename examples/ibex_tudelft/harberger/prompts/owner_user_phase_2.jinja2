@@ -25,13 +25,13 @@ Instructions for this phase:
 3. **Declaration action details**
 
 3.1. **No Project Declaration**
-   - Declare 600000 (the maximum allowed).
+   - Declare {{ public_information.boundaries["owner"]["noProject"]["high"] }} (the maximum allowed).
    - Rationale:
      - If the developer fails to fully maximize the Project declaration, our high No Project value might tip the vote.
      - No tax is paid on the No Project declaration *if Project is ultimately selected*, so over-declaring is free.
      - Speculators only buy when the declared value is **lower than the true value**, so over-declaring protects us.
 
-     -Declare <value_no_project> = 600000
+     -Declare <value_no_project> = {{ public_information.boundaries["owner"]["noProject"]["high"] }}
 
 3.2. **Project Declaration**
    - Declare **exactly** the true value of your land under the Project condition: trueProjectValue = {{ private_information.property.v[1] }}

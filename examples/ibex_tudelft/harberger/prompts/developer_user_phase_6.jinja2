@@ -23,29 +23,21 @@ This is your information about the state of the game and instructions for this p
 
 {% if public_information.winning_condition == 0 %}
 
-- If price of ask ({{ public_information.market_state.median_prices[0] }}) < {{ private_information.value_signals[0] }} then buy a share in the No Project (Condition 0) market
-- If price of bid ({{ public_information.market_state.median_prices[0] }}) > {{ private_information.value_signals[0] }} then sell a share in the No Project (Condition 0) market
+- If price of the best ask in the no Project market < your private signal in the No Project condition, then buy a share in the No Project (Condition 0) market
+- If price of the best bid in the no Project market > your private signal in the No Project condition, then sell a share in the No Project (Condition 0) market
 
 {% else %}
 
-- If price of ask ({{ public_information.market_state.median_prices[1] }}) < {{ private_information.value_signals[1] }} then buy a share in the Project (Condition 1) market
-- If price of bid ({{ public_information.market_state.median_prices[1] }}) > {{ private_information.value_signals[1] }} then sell a share in the Project (Condition 1) market
+- If price of ask in the Project market < your private signal in the Project condition, then buy a share in the Project (Condition 1) market
+- If price of bid in the Project market > your private signal in the Project condition, then sell a share in the Project (Condition 1) market
 
 {% endif %}
 
 3.2 **If no bids or asks outstanding in the winning market**
 
-{% if public_information.winning_condition == 0 %}
+- Post a bid that is equal to 95% of {{ private_information.value_signals[public_information.winning_condition] }}
+- Post an ask that is equal to 105% of {{ private_information.value_signals[public_information.winning_condition] }}
 
-- Post a bid that is equal to 95% of {{ private_information.value_signals[0] }}
-- Post an ask that is equal to 105% of {{ private_information.value_signals[0] }}
-
-{% else %}
-
--Post a bid that is equal to 95% of {{ private_information.value_signals[1] }}
--Post an ask that is equal to 105% of {{ private_information.value_signals[1] }}
-
-{% endif %}
 
 4. **Your Decision output**:
    Provide the output (one of these options) as a JSON object:
@@ -81,3 +73,6 @@ Remember:
 - Setting "now": true will execute at the best available price
 - Orders can be canceled before they are fulfilled
 - trade using the private signal in the winning market since the public signal is likely distorted
+- you can never have more offers to sell shares (asks) than the number of tax shares in your wallet
+- The sum of the prices of your offers to buy shares (bids) can never exceed the balance in your wallet
+- If your outstanding asks or bids exceed the limits in your wallet, you should cancel the order that is furthest from the median price in the market
