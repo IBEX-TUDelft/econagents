@@ -31,9 +31,3 @@ class PDManager(TurnBasedPhaseManager):
             agent_role=Prisoner(),
         )
         self.game_id = game_id
-        self.register_event_handler("assign-name", self._handle_name_assignment)
-
-    async def _handle_name_assignment(self, message: Message) -> None:
-        """Handle the name assignment event."""
-        ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
-        await self.send_message(json.dumps(ready_msg))

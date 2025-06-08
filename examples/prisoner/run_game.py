@@ -29,7 +29,7 @@ async def main():
         game_id=game_specs["game_id"],
         logs_dir=Path(__file__).parent / "logs",
         prompts_dir=Path(__file__).parent / "prompts",
-        log_level=logging.DEBUG,
+        log_level=logging.INFO,
         # Server configuration
         hostname="localhost",
         port=8765,

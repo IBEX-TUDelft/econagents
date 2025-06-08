@@ -159,7 +159,6 @@ class PrisonersDilemmaServer:
                     logger.debug(f"Message: {data}")
                     msg_type = data.get("type", "")
 
-                    # Handle different message types
                     if msg_type == "join":
                         game_id = data.get("gameId")
                         recovery = data.get("recovery")
@@ -181,7 +180,6 @@ class PrisonersDilemmaServer:
                             await self.send_error(websocket, f"Invalid recovery code: {recovery}")
                             continue
 
-                        # check if already exists in games
                         if game_id in self.games:
                             game = self.games[game_id]
                         else:
@@ -198,16 +196,7 @@ class PrisonersDilemmaServer:
                         game.add_player(player_number, websocket, player_name)
                         await self.send_assign_name_message(websocket, player_name, player_number)
 
-                        # If game now has 2 players, start it
                         if game.is_ready():
-                            await self.start_game(game)
-
-                    elif msg_type == "player-is-ready":
-                        if not game or not player_number:
-                            await self.send_error(websocket, "Not in a game")
-                            continue
-
-                        if game.is_ready() and game.state == WAITING:
                             await self.start_game(game)
 
                     elif msg_type == "choice":
@@ -254,7 +243,6 @@ class PrisonersDilemmaServer:
         game.state = PLAYING
         game.current_round = 0
 
-        # Send game-started event to all players
         for player_number, websocket in game.players.items():
             if websocket:
                 await self.send_game_started(websocket, game, player_number)
