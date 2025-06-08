@@ -362,7 +362,6 @@ class GameRunner:
 
             agent_manager.logger.info(f"Connecting to WebSocket URL: {agent_manager.url}")
             await agent_manager.start()
-            agent_manager.logger.debug("manager.start() completed.")
         except asyncio.CancelledError:
             agent_manager.logger.info(f"Agent {agent_id} spawn_agent task was cancelled.")
             raise
@@ -456,7 +455,6 @@ class GameRunner:
             game_logger.exception(f"GameRunner.run_game failed: {e_run_game}")
             raise
         finally:
-            game_logger.debug(f"Game {self.config.game_id}: run_game finally block executing.")
             if timeout_monitor_task and not timeout_monitor_task.done():
                 game_logger.debug(
                     f"Game {self.config.game_id} finished or errored before timeout. Cancelling timeout watchdog."
