@@ -11,8 +11,8 @@ style = "semver"
 name = "econagents"
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/iwanalabs/econagents"
-repository = "https://github.com/iwanalabs/econagents"
+homepage = "https://github.com/IBEX-TUDelft/econagents"
+repository = "https://github.com/IBEX-TUDelft/econagents"
 dynamic = ["version"]
 
 [tool.poetry]

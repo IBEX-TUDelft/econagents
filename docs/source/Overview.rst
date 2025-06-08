@@ -118,7 +118,7 @@ For example, in a game where there is a market where tax shares are traded in th
     C. Do nothing:
     {}
 
-The prompts use [Jinja templates](https://jinja.palletsprojects.com/en/stable/). This allows you to use variables from the game state and other information to customize the prompts.
+The prompts use `Jinja templates <https://jinja.palletsprojects.com/en/stable/>`_. This allows you to use variables from the game state and other information to customize the prompts.
 
 You can learn more about this in the :doc:`Customizing Agent Roles <Customizing_Agent_Roles>` section.
 

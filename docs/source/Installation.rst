@@ -12,17 +12,17 @@ To install directly from GitHub, you can run:
 
 .. code-block:: bash
 
-   python -m pip install git+https://github.com/iwanalabs/econagents.git
+   python -m pip install git+https://github.com/IBEX-TUDelft/econagents.git
 
 For development, its recommended to use Poetry:
 
 .. code-block:: bash
 
-   git clone https://github.com/iwanalabs/econagents.git
+   git clone https://github.com/IBEX-TUDelft/econagents.git
    cd econagents
    poetry install
 
-Note that [Poetry](https://python-poetry.org/) is used to create and manage the virtual environment for the project development. If you are not planning to contribute to the project, you can install the dependencies using your preferred package manager.
+Note that `Poetry <https://python-poetry.org/>`_ is used to create and manage the virtual environment for the project development. If you are not planning to contribute to the project, you can install the dependencies using your preferred package manager.
 
 Optional Dependencies
 ---------------------

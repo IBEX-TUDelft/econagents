@@ -89,7 +89,7 @@ autodoc_default_options = {
 autoclass_content = "class"
 
 # LinkCode
-code_url = f"https://github.com/iwanalabs/econagents/blob/{git_commit}"
+code_url = f"https://github.com/IBEX-TUDelft/econagents/blob/{git_commit}"
 
 # Autodoc Pydantic
 autodoc_pydantic_model_show_json = False

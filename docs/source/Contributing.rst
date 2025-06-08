@@ -19,7 +19,7 @@ Setting Up the Development Environment
        cd econagents
 
 2.  **Install Poetry:**
-    This project uses [Poetry](https://python-poetry.org/) for dependency management and packaging. If you don't have Poetry installed, follow the official installation guide.
+    This project uses `Poetry <https://python-poetry.org/>`_ for dependency management and packaging. If you don't have Poetry installed, follow the official installation guide.
 
 3.  **Install Dependencies:**
     Once Poetry is installed, you can install the project dependencies, including development tools:
@@ -33,10 +33,16 @@ Setting Up the Development Environment
 4.  **Activate the Virtual Environment:**
     Activate the Poetry-managed virtual environment:
 
+    On Linux and MacOS:
+    .. code-block:: bash
+    
+      eval "$(poetry env activate)"
+
+    On Windows PowerShell:
     .. code-block:: bash
 
-       poetry env activate
-
+      Invoke-Expression (poetry env activate)
+         
     All subsequent commands should be run within this activated environment.
 
 Setting Up Pre-Commit Hooks
@@ -70,7 +76,7 @@ You can also run tests with coverage reporting:
 Code Style and Linting
 ----------------------
 
-We use [Ruff](https://github.com/astral-sh/ruff) for linting and formatting. The pre-commit hooks automatically handle formatting. You can also run Ruff manually:
+We use `Ruff <https://github.com/astral-sh/ruff>`_ for linting and formatting. The pre-commit hooks automatically handle formatting. You can also run Ruff manually:
 
 .. code-block:: bash
 
