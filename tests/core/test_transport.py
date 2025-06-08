@@ -471,6 +471,7 @@ class TestWebSocketTransport:
             await transport.stop()
 
             assert transport._running is False
+            assert transport.ws is None
 
         finally:
             if listen_task:

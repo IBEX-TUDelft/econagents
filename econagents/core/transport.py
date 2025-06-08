@@ -93,36 +93,54 @@ class WebSocketTransport(LoggerMixin):
     async def start_listening(self):
         """Begin receiving messages in a loop."""
         self.logger.info("WebSocketTransport: starting to listen.")
-        async for websocket in websockets.connect(self.url, ping_interval=30, ping_timeout=10):
-            try:
-                self._running = True
-                self.ws = websocket
+        self._running = True
 
-                if not self._authenticated:
-                    await self._authenticate()
+        try:
+            async for websocket in websockets.connect(self.url):
+                if not self._running:
+                    self.logger.info("WebSocketTransport: stopping as requested.")
+                    break
+
+                try:
+                    self.ws = websocket
+
                     if not self._authenticated:
-                        self.logger.error("Authentication failed. Stopping transport.")
+                        await self._authenticate()
+                        if not self._authenticated:
+                            self.logger.error("Authentication failed. Stopping transport.")
+                            break
+
+                    async for message in self.ws:
+                        if not self._running:
+                            break
+                        if self.on_message_callback:
+                            self.logger.info(f"<-- Transport received: {message}")
+                            await self.on_message_callback(message)
+
+                except ConnectionClosed as e:
+                    self.logger.info(f"WebSocketTransport: connection closed: ({e.code}) {e.reason}")
+                    if not self._running:
+                        self.logger.info("WebSocketTransport: connection closed by client. Stopping transport.")
                         break
-
-                async for message in self.ws:
-                    if "assign-name" in message:
-                        print(message)  # TODO: Remove this
-
-                    if self.on_message_callback:
-                        self.logger.info(f"<-- Transport received: {message}")
-                        await self.on_message_callback(message)
-            except websockets.exceptions.ConnectionClosed as e:
-                self.logger.info(f"WebSocketTransport: connection closed: ({e.code}) {e.reason}")
-                continue
-            except Exception as e:
-                self.logger.exception(f"Error in receive loop: {e}")
-                break
-            finally:
-                self._running = False
-                if self.ws:
-                    await self.ws.close()
-                    self.logger.info("WebSocketTransport: connection closed.")
-                    self.ws = None
+                    self.logger.info("WebSocketTransport: reconnecting...")
+                    continue
+                except Exception as e:
+                    self.logger.exception(f"Error in receive loop: {e}")
+                    break
+                finally:
+                    if self.ws:
+                        try:
+                            await self.ws.close()
+                            self.logger.info("WebSocketTransport: connection closed.")
+                        except Exception as e:
+                            self.logger.debug(f"Error closing websocket: {e}")
+                        finally:
+                            self.ws = None
+        except Exception as e:
+            self.logger.exception(f"Error in start_listening: {e}")
+        finally:
+            self._running = False
+            self.logger.info("WebSocketTransport: stopped listening.")
 
     async def send(self, message: str):
         """Send a raw string message to the WebSocket."""
@@ -135,14 +153,14 @@ class WebSocketTransport(LoggerMixin):
 
     async def stop(self):
         """Gracefully close the WebSocket connection."""
-        self._running = False  # Signal to stop listening loop immediately
+        self.logger.info("WebSocketTransport: stopping...")
+        self._running = False
         if self.ws:
             try:
                 await self.ws.close()
                 self.logger.info("WebSocketTransport: connection closed.")
             except Exception as e:
-                self.logger.error(f"WebSocketTransport: error closing connection: {e}")
+                self.logger.debug(f"Error during stop: {e}")
             finally:
-                self.ws = None  # Set ws to None after closing attempt
-        else:
-            self.logger.info("WebSocketTransport: no active connection to close.")
+                self.ws = None
+                self._authenticated = False
