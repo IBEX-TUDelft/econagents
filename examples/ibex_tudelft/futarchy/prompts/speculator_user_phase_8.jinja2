@@ -50,13 +50,13 @@ This is your information about the state of the game and instructions for this p
     {
       "gameId": {{ meta.game_id }},
       "type": "done-speculating",
-      "snipe":[ [<player_id>, <player_id>, <player_id>], []],
+      "snipe":[ [<player_id>, <player_id>, <player_id>], []]
     }
       {% else %}
 
     {
       "gameId": {{ meta.game_id }},
       "type": "done-speculating",
-      "snipe":[[], [<player_id>, <player_id>, <player_id>]],
+      "snipe":[[], [<player_id>, <player_id>, <player_id>]]
     }
   {% endif %}
