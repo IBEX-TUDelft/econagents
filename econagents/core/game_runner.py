@@ -460,16 +460,6 @@ class GameRunner:
                     f"Game {self.config.game_id} finished or errored before timeout. Cancelling timeout watchdog."
                 )
                 timeout_monitor_task.cancel()
-                try:
-                    await timeout_monitor_task
-                except asyncio.CancelledError:
-                    game_logger.debug(
-                        f"Timeout watchdog for game {self.config.game_id} successfully cancelled in finally block."
-                    )
-                except Exception as e_finally_watchdog:
-                    game_logger.error(
-                        f"Error awaiting cancelled timeout watchdog in finally for game {self.config.game_id}: {e_finally_watchdog}"
-                    )
 
             game_logger.info(f"Game {self.config.game_id}: Final cleanup - ensuring all agents are stopped.")
             final_stop_tasks = []

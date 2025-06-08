@@ -147,10 +147,6 @@ async def test_game_finishes_before_timeout(base_config, caplog):
         f"Game {base_config.game_id} finished or errored before timeout. Cancelling timeout watchdog." in record.message
         for record in caplog.records
     )
-    assert any(
-        f"Timeout watchdog for game {base_config.game_id} successfully cancelled in finally block." in record.message
-        for record in caplog.records
-    )
     assert not any(
         f"Game {base_config.game_id} reached maximum duration" in record.message for record in caplog.records
     )
