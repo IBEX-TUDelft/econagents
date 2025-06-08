@@ -34,14 +34,16 @@ Setting Up the Development Environment
     Activate the Poetry-managed virtual environment:
 
     On Linux and MacOS:
+
     .. code-block:: bash
-    
-      eval "$(poetry env activate)"
+
+       eval "$(poetry env activate)"
 
     On Windows PowerShell:
+
     .. code-block:: bash
 
-      Invoke-Expression (poetry env activate)
+       Invoke-Expression (poetry env activate)
          
     All subsequent commands should be run within this activated environment.
 
