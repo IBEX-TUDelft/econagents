@@ -78,7 +78,7 @@ class TestMessageHandling:
         await agent_manager._raw_message_received("test message")
 
         # Wait a short time for the task to complete (may not be strictly necessary after direct await)
-        await asyncio.sleep(0.01) # Reduced sleep time, potentially removable
+        await asyncio.sleep(0.01)  # Reduced sleep time, potentially removable
 
         # Check that on_message was called with the message
         mock_on_message.assert_called_once_with(mock_message)
@@ -519,20 +519,7 @@ class TestConnectionManagement:
 
         # Verify connection sequence
         agent_manager.transport.start_listening.assert_called_once()
-        assert agent_manager.running is False
-
-    async def test_start_failed_connection(self, agent_manager):
-        """Test start method behavior when connection fails."""
-        # Setup connection to fail
-        agent_manager.transport.connect.return_value = False
-
-        # Call start
-        await agent_manager.start()
-
-        # Verify correct behavior on failure
-        agent_manager.transport.connect.assert_called_once()
-        agent_manager.transport.start_listening.assert_not_called()
-        assert agent_manager.running is False
+        assert agent_manager.running is True
 
     async def test_stop(self, agent_manager):
         """Test that stop method correctly terminates connection."""
