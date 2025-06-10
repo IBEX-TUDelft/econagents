@@ -3,6 +3,8 @@ Tutorial
 
 This tutorial will guide you through setting up and running the Prisoner's Dilemma experiment included in the ``examples/prisoner`` directory.
 
+For more examples, see the `econagents cookbook <https://github.com/iwanalabs/econagents-cookbook/tree/main/>`_.
+
 Prerequisites
 -------------
 

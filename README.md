@@ -68,3 +68,5 @@ Note: you still have to set up the connection to the agents.
 ## Documentation
 
 For detailed guides and API reference, visit [the documentation](https://econagents.readthedocs.io/en/latest/).
+
+You should also check out the [econagents cookbook](https://github.com/iwanalabs/econagents-cookbook/tree/main/) for more examples.
