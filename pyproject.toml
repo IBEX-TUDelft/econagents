@@ -38,7 +38,7 @@ requests = "^2.32.3"
 websockets = "^15.0"
 openai = {version = "^1.82.1", optional = true}
 ollama = {version = "^0.5.1", optional = true}
-langsmith = {version = "^0.3.43", optional = true}
+langsmith = {version = "^0.3.45", optional = true}
 langfuse = {version = "^2.60.7", optional = true}
 
 
