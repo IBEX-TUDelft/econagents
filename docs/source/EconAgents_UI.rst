@@ -3,6 +3,8 @@ Using EconAgents UI for Configuration
 
 The `econagents` framework can be configured programmatically or through YAML configuration files. To simplify the creation and management of these configuration files, the **EconAgents UI** project was developed.
 
+You can access the EconAgents UI at https://econagents.iwanalabs.com/. The UI is hosted on a separate repository, https://github.com/iwanalabs/econagents-ui.
+
 .. contents:: Table of Contents
    :depth: 2
    :local:
@@ -14,13 +16,11 @@ EconAgents UI is a web-based graphical user interface designed to streamline the
 
 - Manage multiple experiment configurations (projects).
 - Define agent roles, including their names, IDs, LLM models, and task phases.
-- Structure the game state, detailing `MetaInformation`, `PrivateInformation`, and `PublicInformation` fields.
+- Structure the game state, detailing meta, private, and public information fields.
 - Create and manage system and user prompts using Jinja templating, with support for reusable partials.
 - Configure game runner settings, such as connection details and phase management.
 
 The primary output of the EconAgents UI is a YAML configuration file (e.g., `experiment_config.yaml`) that is fully compatible with the `econagents` library.
-
-You can access the EconAgents UI at `https://econagents.iwanalabs.com/`. The UI is hosted on a separate repository, `https://github.com/iwanalabs/econagents-ui`.
 
 Workflow: From UI Configuration to Experiment Execution
 -------------------------------------------------------
@@ -93,8 +93,9 @@ Here's a conceptual example of how you might run an experiment using a YAML file
         asyncio.run(main())
 
 You can find practical examples of scripts that run experiments from YAML files in the `examples` directory of the `econagents` library, such as:
-- `examples/prisoner/run_game_from_yaml.py`
-- `examples/ibex_tudelft/futarchy_yaml/run_game_from_yaml.py`
+
+* `examples/prisoner/run_game_from_yaml.py`
+* `examples/ibex_tudelft/futarchy_yaml/run_game_from_yaml.py`
 
 These examples demonstrate how to integrate game creation on a server with the `run_experiment_from_yaml` function.
 
