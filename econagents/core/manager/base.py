@@ -146,7 +146,7 @@ class AgentManager(LoggerMixin):
         """Process raw message from the transport layer"""
         msg = self._extract_message_data(raw_message)
         if msg:
-            await self.on_message(msg)
+            asyncio.create_task(self.on_message(msg))
         return None
 
     def _extract_message_data(self, raw_message: str) -> Optional[Message]:
