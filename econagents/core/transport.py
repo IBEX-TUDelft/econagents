@@ -69,14 +69,11 @@ class WebSocketTransport(LoggerMixin):
         self.on_message_callback = on_message_callback
         self.ws: Optional[ClientConnection] = None
         self._running = False
+        self._authenticated = False
 
-    async def connect(self) -> bool:
-        """Establish the WebSocket connection and authenticate."""
+    async def _authenticate(self) -> bool:
+        """Authenticate the connection."""
         try:
-            self.ws = await websockets.connect(self.url, ping_interval=30, ping_timeout=10)
-            self.logger.info("WebSocketTransport: connection opened.")
-
-            # Perform authentication using the callback
             if self.auth_mechanism:
                 if not self.auth_mechanism_kwargs:
                     self.auth_mechanism_kwargs = {}
@@ -84,9 +81,9 @@ class WebSocketTransport(LoggerMixin):
                 if not auth_success:
                     self.logger.error("Authentication failed")
                     await self.stop()
-                    self.ws = None  # Ensure ws is set to None after stopping
+                    self.ws = None
                     return False
-
+            self._authenticated = True
         except Exception as e:
             self.logger.exception(f"Transport connection error: {e}")
             return False
@@ -95,26 +92,55 @@ class WebSocketTransport(LoggerMixin):
 
     async def start_listening(self):
         """Begin receiving messages in a loop."""
+        self.logger.info("WebSocketTransport: starting to listen.")
         self._running = True
-        while self._running and self.ws:
-            try:
-                message_str = await self.ws.recv()
-                if self.on_message_callback:
-                    self.logger.debug(f"<-- Transport received: {message_str}")
-                    result = self.on_message_callback(message_str)
-                    if asyncio.iscoroutine(result):
-                        asyncio.create_task(result)
-            except asyncio.CancelledError:
-                self.logger.debug("WebSocket listening task cancelled.")
-                break
-            except ConnectionClosed:
-                self.logger.debug("WebSocket connection closed by remote.")
-                break
-            except Exception:
-                self.logger.exception("Error in receive loop.")
-                break
-        self._running = False
-        self.logger.debug("WebSocket start_listening loop finished.")
+
+        try:
+            async for websocket in websockets.connect(self.url):
+                if not self._running:
+                    self.logger.info("WebSocketTransport: stopping as requested.")
+                    break
+
+                try:
+                    self.ws = websocket
+
+                    if not self._authenticated:
+                        await self._authenticate()
+                        if not self._authenticated:
+                            self.logger.error("Authentication failed. Stopping transport.")
+                            break
+
+                    async for message in self.ws:
+                        if not self._running:
+                            break
+                        if self.on_message_callback:
+                            self.logger.info(f"<-- Transport received: {message}")
+                            await self.on_message_callback(message)
+
+                except ConnectionClosed as e:
+                    self.logger.info(f"WebSocketTransport: connection closed: ({e.code}) {e.reason}")
+                    if not self._running:
+                        self.logger.info("WebSocketTransport: connection closed by client. Stopping transport.")
+                        break
+                    self.logger.info("WebSocketTransport: reconnecting...")
+                    continue
+                except Exception as e:
+                    self.logger.exception(f"Error in receive loop: {e}")
+                    break
+                finally:
+                    if self.ws:
+                        try:
+                            await self.ws.close()
+                            self.logger.info("WebSocketTransport: connection closed.")
+                        except Exception as e:
+                            self.logger.debug(f"Error closing websocket: {e}")
+                        finally:
+                            self.ws = None
+        except Exception as e:
+            self.logger.exception(f"Error in start_listening: {e}")
+        finally:
+            self._running = False
+            self.logger.info("WebSocketTransport: stopped listening.")
 
     async def send(self, message: str):
         """Send a raw string message to the WebSocket."""
@@ -127,14 +153,14 @@ class WebSocketTransport(LoggerMixin):
 
     async def stop(self):
         """Gracefully close the WebSocket connection."""
-        self._running = False  # Signal to stop listening loop immediately
+        self.logger.info("WebSocketTransport: stopping...")
+        self._running = False
         if self.ws:
             try:
                 await self.ws.close()
                 self.logger.info("WebSocketTransport: connection closed.")
             except Exception as e:
-                self.logger.error(f"WebSocketTransport: error closing connection: {e}")
+                self.logger.debug(f"Error during stop: {e}")
             finally:
-                self.ws = None  # Set ws to None after closing attempt
-        else:
-            self.logger.info("WebSocketTransport: no active connection to close.")
+                self.ws = None
+                self._authenticated = False

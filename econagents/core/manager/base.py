@@ -142,7 +142,7 @@ class AgentManager(LoggerMixin):
             auth_mechanism_kwargs=self._auth_mechanism_kwargs,
         )
 
-    def _raw_message_received(self, raw_message: str):
+    async def _raw_message_received(self, raw_message: str):
         """Process raw message from the transport layer"""
         msg = self._extract_message_data(raw_message)
         if msg:
@@ -217,29 +217,9 @@ class AgentManager(LoggerMixin):
             else:
                 raise ValueError("URL must be set before starting the agent manager")
 
-        try:
-            self.running = True
-            connected = await self.transport.connect()
-            if connected:
-                self.logger.info("Connected to WebSocket. Listening...")
-                await self.transport.start_listening()
-                self.logger.debug("transport.start_listening() returned.")
-            else:
-                self.logger.error("Failed to connect.")
-                self.running = False
-        except asyncio.CancelledError:
-            self.logger.info("Start task was cancelled.")
-            await self.stop()
-            raise
-        except Exception as e:
-            self.logger.exception(f"Error during start: {e}")
-            await self.stop()
-            raise
-        finally:
-            if self.running:
-                self.logger.warning("Start method exited but manager still marked as running.")
-                self.running = False
-            self.logger.debug(f"Start method fully exited. Running: {self.running}")
+        self.running = True
+        self.logger.info("Starting agent manager. Receiving messages...")
+        await self.transport.start_listening()
 
     async def stop(self):
         """Stop the agent manager and close the connection."""
