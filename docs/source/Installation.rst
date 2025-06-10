@@ -95,3 +95,9 @@ The core package depends on the following packages:
 - ``pydantic``: For data validation and parsing
 - ``requests``: For HTTP requests
 - ``websockets``: For WebSocket connections
+
+Known Issues
+------------
+
+1. Organizational security policies may break the websocket connection. If you keep getting ``1006, ConnectionClosed`` errors try to install the package in another device. 
+2. Notebooks and `asyncio` may not play well together. When you cancel a game running in a notebook, the websocket connection may not be closed properly. Close the notebook kernel before running another game. 
