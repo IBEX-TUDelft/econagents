@@ -1,5 +1,5 @@
-Using EconAgents UI for Configuration
-=====================================
+EconAgents UI
+=============
 
 The `econagents` framework can be configured programmatically or through YAML configuration files. To simplify the creation and management of these configuration files, the **EconAgents UI** project was developed.
 
