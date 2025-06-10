@@ -2077,15 +2077,15 @@ pydantic = ">=2.9"
 
 [[package]]
 name = "openai"
-version = "1.82.1"
+version = "1.85.0"
 description = "The official Python library for the openai API"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
 markers = "extra == \"all\" or extra == \"openai\" or extra == \"standard\""
 files = [
-    {file = "openai-1.82.1-py3-none-any.whl", hash = "sha256:334eb5006edf59aa464c9e932b9d137468d810b2659e5daea9b3a8c39d052395"},
-    {file = "openai-1.82.1.tar.gz", hash = "sha256:ffc529680018e0417acac85f926f92aa0bbcbc26e82e2621087303c66bc7f95d"},
+    {file = "openai-1.85.0-py3-none-any.whl", hash = "sha256:7dc3e839cb8bb8747979a90c63ad4cb25a8e0cbec17b53eec009532c9965cecf"},
+    {file = "openai-1.85.0.tar.gz", hash = "sha256:6ba76e4ebc5725f71f2f6126c7cb5169ca8de60dd5aa61f350f9448ad162c913"},
 ]
 
 [package.dependencies]
@@ -4088,4 +4088,4 @@ standard = ["langsmith", "openai"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4"
-content-hash = "4d9ce36926a256dbf9cce13ffba199d9a99016d396eca724aa6926208349811d"
+content-hash = "cab3ff0ab32e6e566f339b5e3120a56e6f5cef9eca9827c7973e90f716725dcc"
