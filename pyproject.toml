@@ -44,10 +44,10 @@ python = ">=3.10,<4"
 pydantic = "^2.11.5"
 requests = "^2.32.4"
 websockets = "^15.0"
-openai = {version = "^1.89.0", optional = true}
-ollama = {version = "^0.5.1", optional = true}
-langsmith = {version = "^0.4.1", optional = true}
-langfuse = {version = "^3.0.3", optional = true}
+openai = {version = "^1.89.0", extras = ["standard", "all", "openai"]}
+ollama = {version = "^0.5.1", extras = ["standard", "all", "ollama"]}
+langsmith = {version = "^0.4.1", extras = ["standard", "all", "langsmith"]}
+langfuse = {version = "^3.0.3", extras = ["standard", "all", "langfuse"]}
 
 
 [tool.poetry.group.docs.dependencies]
@@ -170,11 +170,3 @@ ignore = [
 
 [tool.codespell]
 skip = 'poetry.lock,'
-
-[tool.poetry.extras]
-openai = ["openai"]
-ollama = ["ollama"]
-langsmith = ["langsmith"]
-langfuse = ["langfuse"]
-standard = ["openai", "langsmith"]
-all = ["openai", "ollama", "langsmith", "langfuse"]
