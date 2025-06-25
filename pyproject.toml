@@ -14,14 +14,16 @@ readme = "README.md"
 homepage = "https://github.com/IBEX-TUDelft/econagents"
 repository = "https://github.com/IBEX-TUDelft/econagents"
 dynamic = ["version"]
-
-[project.optional-dependencies]
-openai = ["openai"]
-ollama = ["ollama"]
-langsmith = ["langsmith"]
-langfuse = ["langfuse"]
-standard = ["openai", "langsmith"]
-all = ["openai", "ollama", "langsmith", "langfuse"]
+requires-python = ">=3.10,<4"
+dependencies = [
+    "pydantic>=2.11.5",
+    "requests>=2.32.4",
+    "websockets>=15.0",
+    "openai>=1.89.0",
+    "ollama>=0.5.1",
+    "langsmith>=0.4.1",
+    "langfuse>=3.0.3",
+]
 
 [tool.poetry]
 name = "econagents"
@@ -38,17 +40,13 @@ generate-setup-file = false
 [tool.poetry.scripts]
 econagents = "econagents.cli:run_cli"
 
-[tool.poetry.dependencies]
-# Be as loose as possible if writing a library.
-python = ">=3.10,<4"
-pydantic = "^2.11.5"
-requests = "^2.32.4"
-websockets = "^15.0"
-openai = {version = "^1.89.0", extras = ["standard", "all", "openai"]}
-ollama = {version = "^0.5.1", extras = ["standard", "all", "ollama"]}
-langsmith = {version = "^0.4.1", extras = ["standard", "all", "langsmith"]}
-langfuse = {version = "^3.0.3", extras = ["standard", "all", "langfuse"]}
-
+[project.optional-dependencies]
+openai = ["openai"]
+ollama = ["ollama"]
+langsmith = ["langsmith"]
+langfuse = ["langfuse"]
+standard = ["openai", "langsmith"]
+all = ["openai", "ollama", "langsmith", "langfuse"]
 
 [tool.poetry.group.docs.dependencies]
 myst-parser = {extras = ["linkify"], version = "^4.0.1"}
