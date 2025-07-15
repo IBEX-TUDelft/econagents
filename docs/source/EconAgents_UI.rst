@@ -3,7 +3,7 @@ EconAgents UI
 
 The `econagents` framework can be configured programmatically or through YAML configuration files. To simplify the creation and management of these configuration files, the **EconAgents UI** project was developed.
 
-You can access the EconAgents UI at https://econagents.iwanalabs.com/. The UI is hosted on a separate repository, https://github.com/iwanalabs/econagents-ui.
+You can access the EconAgents UI at https://ibex-tudelft.github.io/econagents-ui/. The UI is hosted on a separate repository, https://github.com/IBEX-TUDelft/econagents-ui.
 
 .. contents:: Table of Contents
    :depth: 2
