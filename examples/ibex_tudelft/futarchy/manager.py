@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from econagents.core.events import Message
 from econagents.core.manager.phase import HybridPhaseManager
+from econagents.llm.observability import LangSmithObservability
 from examples.ibex_tudelft.futarchy.roles import Developer, Owner, Speculator
 from examples.ibex_tudelft.futarchy.state import FGameState
 
@@ -39,12 +40,15 @@ class FAgentManager(HybridPhaseManager):
         if role == 1:
             self.agent_role = Speculator()
             self.agent_role.logger = self.logger
+            self.agent_role.llm.observability = LangSmithObservability()
         elif role == 2:
             self.agent_role = Developer()
             self.agent_role.logger = self.logger
+            self.agent_role.llm.observability = LangSmithObservability()
         elif role == 3:
             self.agent_role = Owner()
             self.agent_role.logger = self.logger
+            self.agent_role.llm.observability = LangSmithObservability()
         else:
             self.logger.error("Invalid role assigned; cannot initialize agent.")
             raise ValueError("Invalid role for agent initialization.")
