@@ -8,8 +8,9 @@ from econagents.core.events import Message
 from econagents.core.manager.phase import PhaseManager
 from econagents.core.state.game import GameState
 from econagents.core.game_runner import GameRunner
-from econagents.config_parser.base import BaseConfigParser
+from econagents.config_parser.base import BaseConfigParser, TYPE_MAPPING
 from econagents.llm.observability import get_observability_provider
+from econagents_ibex_tudelft.core.state.market import MarketState
 
 
 def handle_market_event_impl(self: GameState, event_type: str, data: dict[str, Any]) -> None:
@@ -47,8 +48,8 @@ def get_custom_handlers_impl(self: GameState) -> Dict[str, Callable[[Message], N
 
 class IbexTudelftConfigParser(BaseConfigParser):
     """
-    IBEX-TUDelft configuration parser that extends the BasicConfigParser
-    and adds role assignment functionality.
+    IBEX-TUDelft configuration parser that extends the BaseConfigParser
+    and adds role assignment functionality and MarketState support.
     """
 
     def __init__(self, config_path: Path):
@@ -60,6 +61,8 @@ class IbexTudelftConfigParser(BaseConfigParser):
         """
         super().__init__(config_path)
         self._role_classes: Dict[int, Type[AgentRole]] = {}
+        # Extend type mapping with MarketState
+        self.type_mapping = {**TYPE_MAPPING, "MarketState": MarketState}
 
     def register_role_class(self, role_id: int, role_class: Type[AgentRole]) -> None:
         """
@@ -163,23 +166,128 @@ class IbexTudelftConfigParser(BaseConfigParser):
         ):
             raise ValueError("Winning condition or wallet is not present in the config")
 
+    def create_state_class(self) -> Type[GameState]:
+        """
+        Create a GameState class with MarketState support.
+        This method creates a custom state class that can handle MarketState fields.
+        """
+        from typing import Any, Optional
+        from pydantic import Field as PydanticField
+        from econagents.core.state.fields import EventField
+        
+        # Helper function to resolve field types including MarketState
+        def resolve_field_type(field_type_str: str) -> Any:
+            """Resolve type string to Python type, including custom types."""
+            # First check our extended type mapping
+            if field_type_str in self.type_mapping:
+                return self.type_mapping[field_type_str]
+            # Then check the base TYPE_MAPPING
+            elif field_type_str in TYPE_MAPPING:
+                return TYPE_MAPPING[field_type_str]
+            else:
+                try:
+                    # Try to evaluate complex types
+                    resolved_type = eval(
+                        field_type_str, {"list": list, "dict": dict, "Any": Any}
+                    )
+                    return resolved_type
+                except (NameError, SyntaxError):
+                    raise ValueError(f"Unsupported field type: {field_type_str}")
+        
+        def get_default_factory(factory_name: str) -> Any:
+            """Get default factory function."""
+            if factory_name == "list":
+                return list
+            elif factory_name == "dict":
+                return dict
+            elif factory_name == "MarketState":
+                return MarketState
+            else:
+                raise ValueError(f"Unsupported default_factory: {factory_name}")
+        
+        def create_fields_dict(field_configs: List) -> Dict[str, Any]:
+            """Create a dictionary of field definitions for create_model."""
+            fields = {}
+            for field in field_configs:
+                base_type = resolve_field_type(field.type)
+                field_type = Optional[base_type] if field.optional else base_type
+                
+                event_field_args = {
+                    "event_key": field.event_key,
+                    "exclude_from_mapping": field.exclude_from_mapping,
+                    "events": field.events,
+                    "exclude_events": field.exclude_events,
+                }
+                # Handle default vs default_factory
+                if field.default_factory:
+                    event_field_args["default_factory"] = get_default_factory(
+                        field.default_factory
+                    )
+                else:
+                    event_field_args["default"] = field.default
+                
+                # EventField needs to be the default value passed to create_model
+                field_definition = EventField(**event_field_args)  # type: ignore
+                fields[field.name] = (field_type, field_definition)
+            return fields
+        
+        # Import necessary classes
+        from econagents.core.state.game import MetaInformation, PrivateInformation, PublicInformation
+        
+        # Create dynamic classes using create_model
+        meta_fields = create_fields_dict(self.config.state.meta_information)
+        DynamicMeta = create_model(
+            "DynamicMeta",
+            __base__=MetaInformation,
+            **meta_fields,
+        )
+        
+        private_fields = create_fields_dict(self.config.state.private_information)
+        DynamicPrivate = create_model(
+            "DynamicPrivate",
+            __base__=PrivateInformation,
+            **private_fields,
+        )
+        
+        public_fields = create_fields_dict(self.config.state.public_information)
+        DynamicPublic = create_model(
+            "DynamicPublic",
+            __base__=PublicInformation,
+            **public_fields,
+        )
+        
+        # Create the final GameState subclass
+        base_state_class = create_model(
+            "DynamicGameState",
+            __base__=GameState,
+            meta=(DynamicMeta, PydanticField(default_factory=DynamicMeta)),
+            private_information=(
+                DynamicPrivate,
+                PydanticField(default_factory=DynamicPrivate),
+            ),
+            public_information=(
+                DynamicPublic,
+                PydanticField(default_factory=DynamicPublic),
+            ),
+        )
+        
+        # Check if MarketState is used and enhance if needed
+        has_market_state, market_state_details = self._detect_market_state_in_config()
+        if has_market_state and market_state_details:
+            self._check_additional_required_fields(base_state_class)
+            return self._create_enhanced_state_class(cast(Type[GameState], base_state_class))
+        return cast(Type[GameState], base_state_class)
+
     async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
         """
         Run the experiment from this configuration, potentially enhancing the GameState
         class with market event handlers if MarketState is specified in the config.
         """
-        # Step 1: Get the base state class from the original StateConfig
-        base_dynamic_state_class = self.config.state.create_state_class()
+        # Step 1: Get the state class with MarketState support
+        final_state_class = self.create_state_class()
 
-        # Step 2: Detect if MarketState is used and get details
+        # Step 2: Detect if MarketState is used for metadata
         has_market_state_field, market_state_details = self._detect_market_state_in_config()
-
-        # Step 3: If MarketState is present, create an enhanced state class
-        if has_market_state_field and market_state_details:
-            self._check_additional_required_fields(base_dynamic_state_class)
-            final_state_class = self._create_enhanced_state_class(base_dynamic_state_class)
-        else:
-            final_state_class = base_dynamic_state_class
 
         if not self.config.agent_roles:
             raise ValueError("Configuration has no 'agent_roles'.")

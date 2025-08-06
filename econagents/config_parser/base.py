@@ -8,11 +8,24 @@ from datetime import datetime, date, time
 import yaml
 from pydantic import BaseModel, Field, create_model
 
-from econagents.core.game_runner import GameRunner, GameRunnerConfig, HybridGameRunnerConfig, TurnBasedGameRunnerConfig
-from econagents.core.manager.phase import PhaseManager, TurnBasedPhaseManager, HybridPhaseManager
+from econagents.core.game_runner import (
+    GameRunner,
+    GameRunnerConfig,
+    HybridGameRunnerConfig,
+    TurnBasedGameRunnerConfig,
+)
+from econagents.core.manager.phase import (
+    PhaseManager,
+    TurnBasedPhaseManager,
+    HybridPhaseManager,
+)
 from econagents.core.state.fields import EventField
-from econagents.core.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
-from econagents.core.state.market import MarketState
+from econagents.core.state.game import (
+    GameState,
+    MetaInformation,
+    PrivateInformation,
+    PublicInformation,
+)
 from econagents.core.agent_role import AgentRole
 
 TYPE_MAPPING = {
@@ -26,7 +39,6 @@ TYPE_MAPPING = {
     "date": date,
     "time": time,
     "any": Any,
-    "MarketState": MarketState,
 }
 
 
@@ -96,7 +108,9 @@ class AgentConfig(BaseModel):
 
         # Create a dynamic AgentRole subclass
         agent_role = type(
-            f"Dynamic{self.name}Role", (AgentRole,), {"role": self.role_id, "name": self.name, "llm": llm_instance}
+            f"Dynamic{self.name}Role",
+            (AgentRole,),
+            {"role": self.role_id, "name": self.name, "llm": llm_instance},
         )
 
         return agent_role()
@@ -133,7 +147,7 @@ class StateConfig(BaseModel):
             else:
                 try:
                     resolved_type = eval(
-                        field_type_str, {"list": list, "dict": dict, "Any": Any, "MarketState": MarketState}
+                        field_type_str, {"list": list, "dict": dict, "Any": Any}
                     )
                     return resolved_type
                 except (NameError, SyntaxError):
@@ -146,10 +160,7 @@ class StateConfig(BaseModel):
             elif factory_name == "dict":
                 return dict
             else:
-                try:
-                    return eval(factory_name, {"MarketState": MarketState})
-                except (NameError, SyntaxError):
-                    raise ValueError(f"Unsupported default_factory: {factory_name}")
+                raise ValueError(f"Unsupported default_factory: {factory_name}")
 
         def create_fields_dict(field_configs: List[StateFieldConfig]) -> Dict[str, Any]:
             """Create a dictionary of field definitions for create_model."""
@@ -166,7 +177,9 @@ class StateConfig(BaseModel):
                 }
                 # Handle default vs default_factory
                 if field.default_factory:
-                    event_field_args["default_factory"] = get_default_factory(field.default_factory)
+                    event_field_args["default_factory"] = get_default_factory(
+                        field.default_factory
+                    )
                 else:
                     # Pydantic handles Optional defaults correctly (None if optional and no default)
                     event_field_args["default"] = field.default
@@ -218,7 +231,11 @@ class ManagerConfig(BaseModel):
     event_handlers: List[EventHandler] = Field(default_factory=list)
 
     def create_manager(
-        self, game_id: int, state: GameState, agent_role: Optional[AgentRole], auth_kwargs: Dict[str, Any]
+        self,
+        game_id: int,
+        state: GameState,
+        agent_role: Optional[AgentRole],
+        auth_kwargs: Dict[str, Any],
     ) -> PhaseManager:
         """Create a PhaseManager instance from this configuration."""
 
@@ -385,7 +402,9 @@ class ExperimentConfig(BaseModel):
 
                     # Create the prompt file name
                     if phase:
-                        file_name = f"{role.name.lower()}_{base_type}_phase_{phase}.jinja2"
+                        file_name = (
+                            f"{role.name.lower()}_{base_type}_phase_{phase}.jinja2"
+                        )
                     else:
                         file_name = f"{role.name.lower()}_{base_type}.jinja2"
 
@@ -395,18 +414,24 @@ class ExperimentConfig(BaseModel):
 
         return temp_dir
 
-    async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
+    async def run_experiment(
+        self, login_payloads: List[Dict[str, Any]], game_id: int
+    ) -> None:
         """Run the experiment from this configuration."""
         # Create state class
         state_class = self.state.create_state_class()
-        role_configs = {role_config.role_id: role_config for role_config in self.agent_roles}
+        role_configs = {
+            role_config.role_id: role_config for role_config in self.agent_roles
+        }
 
         if not self.agent_roles and self.agents:
             raise ValueError(
                 "Configuration has 'agents' but no 'agent_roles'. Cannot determine agent role configurations."
             )
 
-        agent_to_role_map = {agent_map.id: agent_map.role_id for agent_map in self.agents}
+        agent_to_role_map = {
+            agent_map.id: agent_map.role_id for agent_map in self.agents
+        }
 
         # Create managers for each agent
         agents = []
@@ -420,7 +445,9 @@ class ExperimentConfig(BaseModel):
                 raise ValueError(f"No role_id mapping found for agent {agent_id}")
 
             if role_id not in role_configs:
-                raise ValueError(f"No agent role configuration found for role_id {role_id}")
+                raise ValueError(
+                    f"No agent role configuration found for role_id {role_id}"
+                )
 
             agent_role_instance = role_configs[role_id].create_agent_role()
 
@@ -483,7 +510,11 @@ class BaseConfigParser:
         return ExperimentConfig(**config_data)
 
     def create_manager(
-        self, game_id: int, state: GameState, agent_role: Optional[AgentRole], auth_kwargs: Dict[str, Any]
+        self,
+        game_id: int,
+        state: GameState,
+        agent_role: Optional[AgentRole],
+        auth_kwargs: Dict[str, Any],
     ) -> PhaseManager:
         """
         Create a manager instance based on the configuration.
@@ -502,7 +533,9 @@ class BaseConfigParser:
             game_id=game_id, state=state, agent_role=agent_role, auth_kwargs=auth_kwargs
         )
 
-    async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
+    async def run_experiment(
+        self, login_payloads: List[Dict[str, Any]], game_id: int
+    ) -> None:
         """
         Run the experiment from this configuration.
 
@@ -512,7 +545,9 @@ class BaseConfigParser:
         await self.config.run_experiment(login_payloads, game_id)
 
 
-async def run_experiment_from_yaml(yaml_path: Path, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
+async def run_experiment_from_yaml(
+    yaml_path: Path, login_payloads: List[Dict[str, Any]], game_id: int
+) -> None:
     """Run an experiment from a YAML configuration file."""
     parser = BaseConfigParser(yaml_path)
     await parser.run_experiment(login_payloads, game_id)
