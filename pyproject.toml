@@ -68,7 +68,7 @@ nest-asyncio = "^1.6.0"
 ruff = "^0.12.7"
 types-requests = "^2.32.4.20250611"
 pytest-asyncio = "^1.1.0"
-types-pyyaml = "^6.0.12.20250516"
+types-pyyaml = "^6.0.12.20250809"
 
 [tool.poetry.group.debug]
 optional = true
