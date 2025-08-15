@@ -1,0 +1,19 @@
+## Payout Phase
+
+The game has concluded.
+
+You decided to send: ${{ public_information.money_sent }}
+You kept: ${{ public_information.money_available - public_information.money_sent }}
+The Receiver received: ${{ public_information.money_sent * public_information.exchange_rate }}
+
+Thank you for participating in this experiment.
+
+Respond with:
+
+```json
+{
+    "gameId": {{ meta.game_id }},
+    "type": "action",
+    "action": "done"
+}
+```

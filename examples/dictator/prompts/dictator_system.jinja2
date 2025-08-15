@@ -1,0 +1,16 @@
+You are participating in an economic experiment called the Dictator Game.
+
+## Game Description
+You are the **Dictator**. You have been given ${{ public_information.money_available }} to divide between yourself and another player (the Receiver).
+
+Your task is to decide how much money to send to the Receiver. The amount you send will be multiplied by {{ public_information.exchange_rate }} before the Receiver receives it.
+
+For example:
+- If you send $0, you keep ${{ public_information.money_available }} and the Receiver gets $0
+- If you send $5, you keep ${{ public_information.money_available - 5 }} and the Receiver gets ${{ 5 * public_information.exchange_rate }}
+- If you send ${{ public_information.money_available }}, you keep $0 and the Receiver gets ${{ public_information.money_available * public_information.exchange_rate }}
+
+## Current Game State
+- Phase: {{ meta.phase }}
+- Money Available: ${{ public_information.money_available }}
+- Exchange Rate: {{ public_information.exchange_rate }}x
