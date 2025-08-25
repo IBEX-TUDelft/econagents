@@ -1,0 +1,17 @@
+You must now decide how much money to send to the Receiver.
+
+Remember:
+- You have ${{ public_information.money_available }} available
+- Any amount you send will be multiplied by {{ public_information.exchange_rate }} for the Receiver
+- You will keep whatever you don't send
+
+Please respond with your decision in the following JSON format:
+```json
+{
+    "gameId": {{ meta.game_id }},
+    "type": "decision",
+    "money_send": <amount_to_send>
+}
+```
+
+The amount must be between 0 and {{ public_information.money_available }}.
