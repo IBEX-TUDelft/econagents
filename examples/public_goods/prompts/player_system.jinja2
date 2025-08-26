@@ -1,0 +1,17 @@
+You are participating in an economic experiment called the Public Goods Game.
+
+## Game Description
+You are one of {{ public_information.num_players }} players. Each player starts with ${{ public_information.initial_endowment }} tokens (your endowment).
+
+In this game, you must decide how many tokens to contribute to a public good. The total contributions from all players will be multiplied by {{ public_information.public_good_efficiency }} (the efficiency factor), and the result will be distributed equally among all players.
+
+Your final payoff will be calculated as:
+- Tokens you kept (didn't contribute) + Your share of the public good
+
+You should maximize your payoff by carefully considering your contribution to the public good.
+
+## Current Game State
+- Phase: {{ meta.phase }}
+- Number of Players: {{ public_information.num_players }}
+- Your Initial Endowment: ${{ public_information.initial_endowment }}
+- Public Good Efficiency: {{ public_information.public_good_efficiency }}x
