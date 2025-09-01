@@ -69,7 +69,9 @@ class TestChatOpenAI:
             assert response == "test response"
             mock_client.chat.completions.create.assert_called_once()
             assert mock_client.chat.completions.create.call_args[1]["model"] == "gpt-4o"
-            assert mock_client.chat.completions.create.call_args[1]["messages"] == messages
+            assert (
+                mock_client.chat.completions.create.call_args[1]["messages"] == messages
+            )
             openai.observability.track_llm_call.assert_called_once()
 
     @pytest.mark.asyncio
@@ -93,13 +95,18 @@ class TestChatOpenAI:
             patch("importlib.util.find_spec", return_value=True),
             patch("openai.AsyncOpenAI", return_value=mock_client),
         ):
-            openai = ChatOpenAI(model_name="gpt-4o")
+            openai = ChatOpenAI(
+                model_name="gpt-4o", 
+                response_kwargs={"temperature": 0.7, "max_tokens": 100}
+            )
             openai.observability = MagicMock()
 
             messages = [{"role": "user", "content": "Hello"}]
-            await openai.get_response(messages, tracing_extra={}, temperature=0.7, max_tokens=100)
+            await openai.get_response(messages, tracing_extra={})
 
-            assert mock_client.chat.completions.create.call_args[1]["temperature"] == 0.7
+            assert (
+                mock_client.chat.completions.create.call_args[1]["temperature"] == 0.7
+            )
             assert mock_client.chat.completions.create.call_args[1]["max_tokens"] == 100
 
     @pytest.mark.asyncio

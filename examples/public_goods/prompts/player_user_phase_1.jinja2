@@ -1,0 +1,17 @@
+You must now decide how many tokens to contribute to the public good.
+
+Remember:
+- You have ${{ public_information.initial_endowment }} tokens available
+- All contributions will be multiplied by {{ public_information.public_good_efficiency }} and distributed equally among all {{ public_information.num_players }} players
+- You will keep whatever tokens you don't contribute
+
+Please respond with your contribution decision in the following JSON format:
+```json
+{
+    "gameId": {{ meta.game_id }},
+    "type": "contribution",
+    "contribution": <amount_to_contribute>
+}
+```
+
+The amount must be between 0 and {{ public_information.initial_endowment }}.

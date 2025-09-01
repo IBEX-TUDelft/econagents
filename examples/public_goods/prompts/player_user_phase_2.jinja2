@@ -1,0 +1,34 @@
+## Payout Phase
+
+The contribution phase has ended. Here are the results:
+
+### Contributions by all players:
+{% for player_id, contribution in public_information.contributions.items() %}
+- {{ player_id }}: ${{ contribution }}
+{% endfor %}
+
+### Total Contribution to Public Good: ${{ public_information.total_contribution }}
+
+### Calculation:
+- Total in public good: ${{ public_information.total_contribution }} × {{ public_information.public_good_efficiency }} = ${{ public_information.total_contribution * public_information.public_good_efficiency }}
+- Each player's share: ${{ public_information.total_contribution * public_information.public_good_efficiency / public_information.num_players }}
+
+### Final Payoffs:
+{% for player_id, payoff in public_information.payoffs.items() %}
+- {{ player_id }}: ${{ payoff }}
+{% endfor %}
+
+Your contribution: ${{ public_information.contributions[private_information.player_id] if private_information.player_id in public_information.contributions else 0 }}
+Your final payoff: ${{ private_information.your_payoff }}
+
+Thank you for participating in this experiment.
+
+Respond with:
+
+```json
+{
+    "gameId": {{ meta.game_id }},
+    "type": "action",
+    "action": "done"
+}
+```

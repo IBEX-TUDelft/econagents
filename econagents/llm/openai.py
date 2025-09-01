@@ -14,6 +14,7 @@ class ChatOpenAI(BaseLLM):
         self,
         model_name: str = "gpt-4o",
         api_key: Optional[str] = None,
+        response_kwargs: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize the OpenAI LLM interface.
 
@@ -24,17 +25,19 @@ class ChatOpenAI(BaseLLM):
         self.model_name = model_name
         self.api_key = api_key
         self._check_openai_available()
+        self._response_kwargs = response_kwargs or {}
 
     def _check_openai_available(self) -> None:
         """Check if OpenAI is available."""
         if not importlib.util.find_spec("openai"):
-            raise ImportError("OpenAI is not installed. Install it with: pip install econagents[openai]")
+            raise ImportError(
+                "OpenAI is not installed. Install it with: pip install econagents[openai]"
+            )
 
     async def get_response(
         self,
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
-        **kwargs: Any,
     ) -> str:
         """Get a response from the LLM.
 
@@ -59,7 +62,7 @@ class ChatOpenAI(BaseLLM):
                 model=self.model_name,
                 messages=messages,  # type: ignore
                 response_format={"type": "json_object"},
-                **kwargs,
+                **(self._response_kwargs),
             )
 
             # Track the LLM call using the observability provider
@@ -74,4 +77,6 @@ class ChatOpenAI(BaseLLM):
             return response.choices[0].message.content
         except ImportError as e:
             logger.error(f"Failed to import OpenAI: {e}")
-            raise ImportError("OpenAI is not installed. Install it with: pip install econagents[openai]") from e
+            raise ImportError(
+                "OpenAI is not installed. Install it with: pip install econagents[openai]"
+            ) from e

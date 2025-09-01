@@ -15,6 +15,7 @@ class ChatOllama(BaseLLM):
         self,
         model_name: str,
         host: Optional[str] = None,
+        response_kwargs: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize the Ollama LLM interface.
 
@@ -25,17 +26,19 @@ class ChatOllama(BaseLLM):
         self._check_ollama_available()
         self.model_name = model_name
         self.host = host
+        self._response_kwargs = response_kwargs or {}
 
     def _check_ollama_available(self) -> None:
         """Check if Ollama is available."""
         if not importlib.util.find_spec("ollama"):
-            raise ImportError("Ollama is not installed. Install it with: pip install econagents[ollama]")
+            raise ImportError(
+                "Ollama is not installed. Install it with: pip install econagents[ollama]"
+            )
 
     async def get_response(
         self,
         messages: List[Dict[str, Any]],
         tracing_extra: Dict[str, Any],
-        **kwargs: Any,
     ) -> str:
         """Get a response from the LLM.
 
@@ -58,7 +61,7 @@ class ChatOllama(BaseLLM):
             response = await client.chat(
                 model=self.model_name,
                 messages=messages,
-                **kwargs,
+                **(self._response_kwargs),
             )
 
             # End the LLM run
@@ -74,4 +77,6 @@ class ChatOllama(BaseLLM):
 
         except ImportError as e:
             logger.error(f"Failed to import Ollama: {e}")
-            raise ImportError("Ollama is not installed. Install it with: pip install econagents[ollama]") from e
+            raise ImportError(
+                "Ollama is not installed. Install it with: pip install econagents[ollama]"
+            ) from e

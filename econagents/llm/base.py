@@ -47,7 +47,6 @@ class BaseLLM(ABC):
         self,
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
-        **kwargs: Any,
     ) -> str:
         """Get a response from the LLM.
 
