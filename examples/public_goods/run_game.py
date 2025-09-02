@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
+from typing_extensions import Literal
 
 from econagents.core.game_runner import GameRunner, TurnBasedGameRunnerConfig
 from examples.public_goods.manager import PublicGoodsManager
@@ -10,6 +11,11 @@ from examples.public_goods.server.create_game import create_game_from_specs
 from examples.public_goods.state import PGGameState
 
 logger = logging.getLogger("public_goods_game")
+
+
+def get_personality(player_number: int) -> Literal["cooperative", "selfish"]:
+    """Get the personality type for a player."""
+    return "cooperative" if player_number % 2 == 0 else "selfish"
 
 
 async def main():
@@ -26,9 +32,9 @@ async def main():
     game_specs = create_game_from_specs(
         num_players=num_players,
         initial_endowment=initial_endowment,
-        public_good_efficiency=public_good_efficiency
+        public_good_efficiency=public_good_efficiency,
     )
-    
+
     login_payloads = [
         {"type": "join", "gameId": game_specs["game_id"], "recovery": code}
         for code in game_specs["recovery_codes"]
@@ -53,7 +59,8 @@ async def main():
         PublicGoodsManager(
             game_id=game_specs["game_id"],
             auth_mechanism_kwargs=login_payloads[i],
-            player_number=i+1
+            player_number=i + 1,
+            personality=get_personality(i + 1),
         )
         for i in range(num_players)
     ]
