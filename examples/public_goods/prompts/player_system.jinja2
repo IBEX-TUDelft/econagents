@@ -15,3 +15,9 @@ You should maximize your payoff by carefully considering your contribution to th
 - Number of Players: {{ public_information.num_players }}
 - Your Initial Endowment: ${{ public_information.initial_endowment }}
 - Public Good Efficiency: {{ public_information.public_good_efficiency }}x
+
+{% if meta.personality == "cooperative" %}
+{% include "_partials/_cooperative.jinja2" %}
+{% else %}
+{% include "_partials/_selfish.jinja2" %}
+{% endif %}

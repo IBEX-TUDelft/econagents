@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from econagents import AgentRole
 from econagents.core.manager.phase import TurnBasedPhaseManager
 from econagents.llm import ChatOpenAI
+from examples.public_goods.state import PGGameState
 
 load_dotenv()
 
@@ -25,11 +26,16 @@ class PublicGoodsManager(TurnBasedPhaseManager):
     """
 
     def __init__(
-        self, game_id: int, auth_mechanism_kwargs: dict[str, Any], player_number: int
+        self,
+        game_id: int,
+        auth_mechanism_kwargs: dict[str, Any],
+        player_number: int,
+        personality: str,
     ):
         super().__init__(
             auth_mechanism_kwargs=auth_mechanism_kwargs,
             agent_role=Player(),
+            state=PGGameState(personality=personality),
         )
         self.game_id = game_id
         self.player_number = player_number
