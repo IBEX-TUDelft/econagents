@@ -286,7 +286,7 @@ Modifying Game Rules
 For more advanced usage, you can:
 
 1. Create your own game server for different economic experiments
-2. Customize agent roles with different personalities or strategies
+2. Customize agent roles with different personalities or strategies. For example, check out the `public goods game example <https://github.com/IBEX-TUDelft/econagents/tree/main/examples/public_goods>` for an scenario where each agent has a different personality and strategy.
 3. Implement more complex game rules and state management
 4. Explore multi-agent scenarios with more than two players
 
