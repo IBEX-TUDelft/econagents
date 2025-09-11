@@ -11,10 +11,13 @@ This is an implementation of the Public Goods game, a classic economic experimen
 Each player starts with an endowment of M tokens and must decide how much to contribute (gi) to a public good. The total contributions are multiplied by the efficiency factor (a) and distributed equally among all players.
 
 **Payoff formula for player i:**
+
 ```
 Payoff_i = M - gi + a * Σ(g)
 ```
+
 Where:
+
 - M = initial endowment
 - gi = player i's contribution
 - a = public good efficiency factor
@@ -43,12 +46,22 @@ python run_game.py
 ```
 
 This will:
+
 1. Create a new game with specified parameters
 2. Launch AI agents that connect to the server
 3. Execute the two phases:
    - Phase 1: Contribution decision
    - Phase 2: Payout calculation and display
 4. Log all interactions in the `logs/` directory
+
+## Agent Personalities
+
+The implementation showcases how to create agents with different personalities. It includes two types of personalities:
+
+- **Cooperative**: These agents prioritize collective well-being and maximizing the overall group payoff. They tend to contribute more to the public good.
+- **Selfish**: These agents focus solely on maximizing their own individual payoff and may contribute less to the public good.
+
+In `run_game.py`, you can see how the agents are assigned personalities in an alternating pattern. However, you can use any logic you prefer, such as a random assignment based on a probability distribution.
 
 ## Configuration
 
@@ -57,6 +70,8 @@ You can modify game parameters in `run_game.py`:
 - `num_players`: Number of players (default: 4)
 - `initial_endowment`: Starting tokens per player (default: 20.0)
 - `public_good_efficiency`: Multiplier for public good (default: 0.5)
+
+The personality assignment logic can be modified in the `get_personality()` function. Currently, even-numbered players receive the "cooperative" personality while odd-numbered players receive the "selfish" personality.
 
 ## File Structure
 
@@ -72,7 +87,10 @@ public_goods/
 ├── prompts/              # Jinja2 templates for agent prompts
 │   ├── player_system.jinja2        # System prompt for all players
 │   ├── player_user_phase_1.jinja2  # Phase 1 contribution prompt
-│   └── player_user_phase_2.jinja2  # Phase 2 payout display prompt
+│   ├── player_user_phase_2.jinja2  # Phase 2 payout display prompt
+│   └── _partials/                  # Personality-specific prompt partials
+│       ├── _cooperative.jinja2     # Cooperative personality traits
+│       └── _selfish.jinja2         # Selfish personality traits
 └── logs/                 # Game logs directory
 ```
 
