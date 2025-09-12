@@ -17,7 +17,6 @@
 
 econagents is a Python library that lets you use LLM agents in economic experiments. The framework connects LLM agents to game servers through WebSockets and provides a flexible architecture for designing, customizing, and running economic simulations.
 
-
 ## Key Features
 
 - **Flexible Agent Customization**: Customize agent behavior with Jinja templates or custom Python methods
@@ -51,9 +50,7 @@ The repository includes three example games:
 
 1. **`prisoner`**: An iterated Prisoner's Dilemma game with 5 rounds and 2 LLM agents, runs on a local python server (included).
 2. **`dictator`**: A modified Dictator game with 2 LLM agents that runs on a local python server (included).
-3. **`public_goods`**: A public goods game with 4 players that runs on a local python server (included). 
-4. **`ibex_tudelft/harberger`**: A Harberger Tax simulation with LLM agents.
-5. **`ibex_tudelft/futarchy`**: A Futarchy simulation with LLM agents.
+3. **`public_goods`**: A public goods game with 4 players that runs on a local python server (included).
 
 ### Running the Prisoner's Dilemma game
 
