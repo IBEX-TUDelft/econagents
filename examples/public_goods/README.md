@@ -62,7 +62,11 @@ The implementation showcases how to create agents with different personalities. 
 - **Selfish**: These agents focus solely on maximizing their own individual payoff and may contribute less to the public good.
 
 In `run_game.py`, you can see how the agents are assigned personalities in an alternating pattern. However, you can use any logic you prefer, such as a random assignment based on a probability distribution.
-The personalities can be altered by using the variables assigned in `run_game.py` in the assignment to alter the prompts. In this example two personality types are assigned by setting a variable in the agent class as  "Cooperative" or "Selfish". In the player system prompt ("prompts/player_system.jinja2") an if condition imports the relvant partial from the partials folder as follows:
+The personalities can be altered by using the variables assigned in `run_game.py` in the assignment to alter the prompts. In this example two personality types are assigned using the following pattern:
+1) by setting a variable "personality" in the agent class as "Cooperative" or "Selfish" in  `run_game.py`.
+2) personality is innitiated in the "PublicGoodsManager" class in the "__init__" constructor to ensure persistance over the experiment
+3) this is variable is read in the meta information of the player in `state.py` to ensure availability for the jinja-file that delivers the prompts
+4) In the player system prompt ("prompts/player_system.jinja2") an if condition imports the relvant partial from the partials folder as follows:
 
 ```jinja
 {% if meta.personality == "cooperative" %}
@@ -71,8 +75,7 @@ The personalities can be altered by using the variables assigned in `run_game.py
 {% include "_partials/_selfish.jinja2" %}
 {% endif %}
 ```
-
-
+By changing the logic in `run_game.py` and adjusting the prompts and partials personalities can be created and assigned as needed. 
 
 ## Configuration
 
