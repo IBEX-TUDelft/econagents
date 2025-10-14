@@ -23,7 +23,6 @@ econagents is a Python library that lets you use LLM agents in economic experime
 - **Persistent personality can be set**: Built-in support to assign personalities to LLM players, example shown in Public goods game
 - **Event-Driven State Management**: Automatically update game state based on server events
 - **Turn-Based and Continuous Action Support**: Handle both turn-based games and continuous action phases
-- **LangChain Integration**: Built-in support for LangChain's agent capabilities
 
 ## Installation
 
