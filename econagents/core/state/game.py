@@ -58,7 +58,7 @@ class MetaInformation(BaseModel):
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=False)
 
-    game_id: int = EventField(default=0)
+    game_id: str = EventField(default="")
     """ID of the game"""
     player_name: Optional[str] = EventField(default=None)
     """Name of the player"""

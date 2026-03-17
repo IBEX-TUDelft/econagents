@@ -25,7 +25,7 @@ class PDManager(TurnBasedPhaseManager):
     Manages interactions between the server and agents.
     """
 
-    def __init__(self, game_id: int, auth_mechanism_kwargs: dict[str, Any]):
+    def __init__(self, game_id: str, auth_mechanism_kwargs: dict[str, Any]):
         super().__init__(
             auth_mechanism_kwargs=auth_mechanism_kwargs,
             agent_role=Prisoner(),

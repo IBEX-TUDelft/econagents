@@ -37,7 +37,7 @@ class GameRunnerConfig(BaseModel):
     port: int
 
     # Game configuration
-    game_id: int
+    game_id: str
     """ID of the game"""
     logs_dir: Path = Path.cwd() / "logs"
     """Directory to store logs"""

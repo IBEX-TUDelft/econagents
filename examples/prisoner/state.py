@@ -9,7 +9,7 @@ from econagents.core.state.game import GameState, MetaInformation, PrivateInform
 class PDMeta(MetaInformation):
     """Meta information for the Prisoner's Dilemma game."""
 
-    game_id: int = EventField(default=0, exclude_from_mapping=True)
+    game_id: str = EventField(default="", exclude_from_mapping=True)
     phase: int = EventField(default=0, event_key="round")
     total_rounds: int = EventField(default=5)
 
