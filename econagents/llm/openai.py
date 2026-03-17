@@ -61,8 +61,7 @@ class ChatOpenAI(BaseLLM):
             response = await client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,  # type: ignore
-                response_format={"type": "json_object"},
-                **(self._response_kwargs),
+                **{"response_format": {"type": "json_object"}, **self._response_kwargs},
             )
 
             # Track the LLM call using the observability provider
