@@ -35,6 +35,7 @@ async def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--game-id", required=True)
+    parser.add_argument("--personality", default=None)
     args, _ = parser.parse_known_args()
 
     hostname = os.getenv("HOSTNAME", "localhost")
@@ -70,6 +71,7 @@ async def main():
         game_id=args.game_id,
         auth_mechanism_kwargs=auth_payload,
         initial_phase=initial_phase,
+        personality=args.personality,
     )
     runner = GameRunner(config=config, agents=[agent])
     await runner.run_game()

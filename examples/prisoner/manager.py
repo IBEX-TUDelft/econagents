@@ -26,6 +26,9 @@ class Prisoner(AgentRole):
     llm = ChatOpenAI(model_name="gpt-4o", response_kwargs={"response_format": {"type": "text"}})
     task_phases = [PHASE_DECISION]
 
+    def __init__(self, personality: Optional[str] = None):
+        super().__init__(personality=personality)
+
     def parse_phase_1_llm_response(self, response: str, _state: Any) -> dict:
         choice = response.strip().lower()
         if choice not in VALID_CHOICES:
@@ -40,10 +43,10 @@ class PDManager(TurnBasedPhaseManager):
     Manages interactions between the server and agents.
     """
 
-    def __init__(self, game_id: str, auth_mechanism_kwargs: dict[str, Any], initial_phase: int = 0):
+    def __init__(self, game_id: str, auth_mechanism_kwargs: dict[str, Any], initial_phase: int = 0, personality: Optional[str] = None):
         super().__init__(
             auth_mechanism_kwargs=auth_mechanism_kwargs,
-            agent_role=Prisoner(),
+            agent_role=Prisoner(personality=personality),
         )
         self.game_id = game_id
         self._initial_phase = initial_phase

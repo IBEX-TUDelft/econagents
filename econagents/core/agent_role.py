@@ -54,9 +54,10 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
     _RESPONSE_PARSER_PATTERN: ClassVar[Pattern] = re.compile(r"parse_phase_(\d+)_llm_response")
     _PHASE_HANDLER_PATTERN: ClassVar[Pattern] = re.compile(r"handle_phase_(\d+)$")
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, logger: Optional[logging.Logger] = None, personality: Optional[str] = None):
         if logger:
             self.logger = logger
+        self.personality = personality
 
         # Validate that only one of task_phases or task_phases_excluded is specified
         if self.task_phases and self.task_phases_excluded:
@@ -108,7 +109,7 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
     ) -> str:
         """Render a prompt template with the given context.
 
-        Template resolution order:
+        Template resolution order (personality dir is searched first if set, then base dir):
 
         1. Role-specific phase prompt (e.g., "role_name_system_phase_1.jinja2")
 
@@ -130,24 +131,29 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
         Raises:
             FileNotFoundError: If no matching prompt template is found
         """
-        # Initialize Jinja environment with a file system loader
-        env = SandboxedEnvironment(loader=FileSystemLoader(prompts_path))
+        search_paths = []
+        if self.personality:
+            search_paths.append(prompts_path / self.personality)
+        search_paths.append(prompts_path)
 
-        # Try role-specific prompt first, then fall back to 'all'
-        for role in [self.name, "all"]:
-            if prompt_file_path := self._resolve_prompt_file(prompt_type, phase, role, prompts_path):
-                # Get filename relative to the prompts_path for the loader
-                template_filename = str(prompt_file_path.relative_to(prompts_path))
-                try:
-                    template = env.get_template(template_filename)
-                    return template.render(**context)
-                except Exception as e:  # Catch potential Jinja errors during loading/rendering
-                    self.logger.error(f"Error loading/rendering template {template_filename}: {e}")
-                    raise  # Re-raise after logging
+        for search_path in search_paths:
+            if not search_path.exists():
+                continue
+            for role in [self.name, "all"]:
+                if prompt_file_path := self._resolve_prompt_file(prompt_type, phase, role, search_path):
+                    env = SandboxedEnvironment(loader=FileSystemLoader(search_path))
+                    template_filename = str(prompt_file_path.relative_to(search_path))
+                    try:
+                        template = env.get_template(template_filename)
+                        return template.render(**context)
+                    except Exception as e:
+                        self.logger.error(f"Error loading/rendering template {template_filename}: {e}")
+                        raise
 
         raise FileNotFoundError(
             f"No prompt template found for type={prompt_type}, phase={phase}, "
             f"roles=[{self.name}, all] in {prompts_path}"
+            + (f" (personality: {self.personality})" if self.personality else "")
         )
 
     def _extract_phase_from_pattern(self, attr_name: str, pattern: Pattern) -> Optional[int]:

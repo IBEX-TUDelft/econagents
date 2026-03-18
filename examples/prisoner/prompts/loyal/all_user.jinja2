@@ -1,0 +1,23 @@
+# Make Your Choice
+
+## Current Game State
+
+Game ID: {{ meta.game_id }}
+Round {{ meta.round }}{% if meta.total_rounds > 0 %} of {{ meta.total_rounds }}{% endif %}
+
+## Your History
+
+{% if public_information.history %}
+Previous rounds:
+{% for round in public_information.history %}
+Round {{ round.round }}: You chose **{{ round.my_choice }}**, opponent chose **{{ round.opponent_choice }}**. You earned {{ round.my_payoff }} points.
+{% endfor %}
+{% else %}
+This is the first round.
+{% endif %}
+
+## Instructions
+
+Choose **loyalty**. Always.
+
+Respond with a single word — either `loyalty` or `betrayal`. No punctuation, no explanation.

@@ -1,0 +1,29 @@
+# Make Your Choice
+
+## Current Game State
+
+Game ID: {{ meta.game_id }}
+Round {{ meta.round }}{% if meta.total_rounds > 0 %} of {{ meta.total_rounds }}{% endif %}
+
+## Your History
+
+{% if public_information.history %}
+Previous rounds:
+{% for round in public_information.history %}
+Round {{ round.round }}: You chose **{{ round.my_choice }}**, opponent chose **{{ round.opponent_choice }}**. You earned {{ round.my_payoff }} points.
+{% endfor %}
+
+Your opponent's last move was: **{{ public_information.history[-1].opponent_choice }}**
+{% else %}
+This is the first round — you have no history yet.
+{% endif %}
+
+## Instructions
+
+{% if not public_information.history %}
+This is round 1: choose **loyalty**.
+{% else %}
+Mirror your opponent's last move: choose **{{ public_information.history[-1].opponent_choice }}**.
+{% endif %}
+
+Respond with a single word — either `loyalty` or `betrayal`. No punctuation, no explanation.
