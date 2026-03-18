@@ -16,6 +16,8 @@ class PDMeta(MetaInformation):
 class PDPrivate(PrivateInformation):
     """Private information for the Prisoner's Dilemma game."""
 
+    total_score: int = EventField(default=0)
+
 
 class PDPublic(PublicInformation):
     """Public information for the Prisoner's Dilemma game."""
