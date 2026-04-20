@@ -22,7 +22,7 @@ dependencies = [
     "openai>=1.89.0",
     "ollama>=0.5.1",
     "langsmith>=0.4.1",
-    "langfuse>=3.0.3",
+    "langfuse>=4.3.1",
 ]
 
 [tool.poetry]
