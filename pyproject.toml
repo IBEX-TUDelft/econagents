@@ -58,7 +58,7 @@ autodoc-pydantic = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = {extras = ["toml"], version = ">=5.1"}
-pre_commit = ">=2.16.0"
+pre_commit = ">=4.5.1"
 pytest = ">=7.1.2"
 pytest-cov = ">=3.0.0"
 pytest-mock = ">=3.7.0"
