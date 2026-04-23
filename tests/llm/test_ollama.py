@@ -70,10 +70,7 @@ class TestChatOllama:
             patch("importlib.util.find_spec", return_value=True),
             patch("ollama.AsyncClient", return_value=mock_client),
         ):
-            ollama = ChatOllama(
-                model_name="llama2",
-                response_kwargs={"temperature": 0.7, "num_predict": 100}
-            )
+            ollama = ChatOllama(model_name="llama2", response_kwargs={"temperature": 0.7, "num_predict": 100})
             ollama.observability = MagicMock()
 
             messages = [{"role": "user", "content": "Hello"}]
@@ -81,10 +78,7 @@ class TestChatOllama:
 
             assert response == "test response"
             mock_client.chat.assert_called_once_with(
-                model="llama2", 
-                messages=messages, 
-                temperature=0.7, 
-                num_predict=100
+                model="llama2", messages=messages, temperature=0.7, num_predict=100
             )
             ollama.observability.track_llm_call.assert_called_once()
 

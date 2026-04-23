@@ -30,9 +30,7 @@ class ChatOpenAI(BaseLLM):
     def _check_openai_available(self) -> None:
         """Check if OpenAI is available."""
         if not importlib.util.find_spec("openai"):
-            raise ImportError(
-                "OpenAI is not installed. Install it with: pip install econagents[openai]"
-            )
+            raise ImportError("OpenAI is not installed. Install it with: pip install econagents[openai]")
 
     async def get_response(
         self,
@@ -77,6 +75,4 @@ class ChatOpenAI(BaseLLM):
             return response.choices[0].message.content
         except ImportError as e:
             logger.error(f"Failed to import OpenAI: {e}")
-            raise ImportError(
-                "OpenAI is not installed. Install it with: pip install econagents[openai]"
-            ) from e
+            raise ImportError("OpenAI is not installed. Install it with: pip install econagents[openai]") from e

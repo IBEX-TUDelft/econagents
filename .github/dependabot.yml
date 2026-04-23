@@ -5,7 +5,12 @@
 
 version: 2
 updates:
-  - package-ecosystem: "pip" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "uv"
+    directory: "/"
     schedule:
       interval: "weekly"
+    # Mirrors tool.uv.exclude-newer = "1 week" in pyproject.toml.
+    # Ensures dependabot only proposes bumps to versions that have already
+    # cleared uv's 1-week supply-chain delay, avoiding PRs that fail to lock.
+    cooldown:
+      default-days: 7

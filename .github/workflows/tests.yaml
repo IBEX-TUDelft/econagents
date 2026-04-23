@@ -30,58 +30,24 @@ jobs:
     env:
       OS: ${{ matrix.os }}
       PYTHON: ${{ matrix.python-version }}
-      POETRY_HOME: "~/poetry"
 
     steps:
-      - name: Set OS Environment Variables (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          echo 'ACTIVATE_PYTHON_VENV=.venv/scripts/activate' >> $GITHUB_ENV
-
-      - name: Set OS Environment Variables (not Windows)
-        if: runner.os != 'Windows'
-        run: |
-          echo 'ACTIVATE_PYTHON_VENV=.venv/bin/activate' >> $GITHUB_ENV
-
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed so hatch-vcs can read git tags.
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up python ${{ matrix.python-version }}
-        id: setup-python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Cache Poetry Install
-        uses: actions/cache@v4
-        id: cached-poetry
-        with:
-          path: ${{ env.POETRY_HOME }}
-          key: poetry-cache-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.github/workflows/tests.yaml') }}-${{ hashFiles('pyproject.toml') }}
-
-      - name: Install poetry
-        uses: snok/install-poetry@v1
-        if: steps.cached-poetry.outputs.cache-hit != 'true'
-
-      - name: Add Poetry to PATH # Needs to be separate from install-poetry because cache.
-        run: |
-          echo "$POETRY_HOME/bin" >> $GITHUB_PATH
-
-      - name: Configure Poetry # Needs to be separate from install-poetry because cache.
-        run: |
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
-          poetry config installer.parallel ${{ runner.os != 'Windows' }} # Currently there seems to be some race-condition in windows
-
-      - name: Cache venv
-        uses: actions/cache@v4
-        id: cached-venv
-        with:
-          path: .venv/
-          key: venv-cache-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.github/workflows/tests.yaml') }}-${{ hashFiles('pyproject.toml') }}
+        run: uv python install ${{ matrix.python-version }}
 
       - name: Install library
-        run: poetry install --no-interaction --extras all
+        run: uv sync --all-extras --all-groups --python ${{ matrix.python-version }}
 
       - name: Check tests folder existence
         id: check_test_files
@@ -92,14 +58,11 @@ jobs:
       - name: Run tests
         if: steps.check_test_files.outputs.files_exists == 'true'
         run: |
-          source ${{ env.ACTIVATE_PYTHON_VENV }}
-          python -m pytest --cov=econagents --cov-report term --cov-report xml --junitxml=testresults.xml
-          coverage report
+          uv run --python ${{ matrix.python-version }} python -m pytest --cov=econagents --cov-report term --cov-report xml --junitxml=testresults.xml
+          uv run --python ${{ matrix.python-version }} coverage report
 
       #----------------------------------------------
       #            make sure docs build
       #----------------------------------------------
       - name: Build HTML docs
-        run: |
-          source ${{ env.ACTIVATE_PYTHON_VENV }}
-          sphinx-build -b html -W docs/source/ docs/build/html
+        run: uv run --python ${{ matrix.python-version }} sphinx-build -b html -W docs/source/ docs/build/html

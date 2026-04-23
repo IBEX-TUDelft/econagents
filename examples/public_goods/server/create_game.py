@@ -19,13 +19,13 @@ def generate_recovery_codes(num_players: int = 4) -> list[str]:
 
 
 def save_game_data(
-    specs_path: Path, 
-    game_id: int, 
-    game_name: str, 
-    num_players: int, 
+    specs_path: Path,
+    game_id: int,
+    game_name: str,
+    num_players: int,
     recovery_codes: list[str],
     initial_endowment: float = 20.0,
-    public_good_efficiency: float = 0.5
+    public_good_efficiency: float = 0.5,
 ) -> Path:
     """Save game data to a JSON file in the specs/games directory."""
     specs_dir = specs_path.parent / "games"
@@ -54,9 +54,7 @@ def save_game_data(
 
 
 def create_game_from_specs(
-    num_players: int = 4,
-    initial_endowment: float = 20.0, 
-    public_good_efficiency: float = 0.5
+    num_players: int = 4, initial_endowment: float = 20.0, public_good_efficiency: float = 0.5
 ) -> dict:
     """Create a new Public Goods game from specs."""
     try:

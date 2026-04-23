@@ -13,18 +13,18 @@
 
 ## Build, Test, and Development Commands
 
-- Prereqs: Python 3.10+, Poetry. Install all extras and dev tooling:
-  - `poetry install --all-extras`
+- Prereqs: Python 3.10+, [uv](https://docs.astral.sh/uv/). Install all extras and dev tooling:
+  - `uv sync --all-extras --all-groups`
 - Run tests:
-  - `poetry run pytest -q`
-  - Coverage: `poetry run pytest --cov=econagents --cov-report=term-missing`
+  - `uv run pytest -q`
+  - Coverage: `uv run pytest --cov=econagents --cov-report=term-missing`
 - Lint and format (Ruff):
-  - `poetry run ruff check .`
-  - `poetry run ruff format .`
-- Build docs: `poetry run make -C docs html`
+  - `uv run ruff check .`
+  - `uv run ruff format .`
+- Build docs: `uv run make -C docs html`
 - Run an example locally:
-  - Server: `poetry run python examples/prisoner/server/server.py`
-  - Client: `poetry run python examples/prisoner/run_game.py`
+  - Server: `uv run python examples/prisoner/server/server.py`
+  - Client: `uv run python examples/prisoner/run_game.py`
 
 ## Coding Style & Naming Conventions
 

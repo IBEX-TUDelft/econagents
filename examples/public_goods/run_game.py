@@ -36,8 +36,7 @@ async def main():
     )
 
     login_payloads = [
-        {"type": "join", "gameId": game_specs["game_id"], "recovery": code}
-        for code in game_specs["recovery_codes"]
+        {"type": "join", "gameId": game_specs["game_id"], "recovery": code} for code in game_specs["recovery_codes"]
     ]
 
     config = TurnBasedGameRunnerConfig(

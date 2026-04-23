@@ -30,9 +30,7 @@ SPECS_PATH = Path(__file__).parent / "games"
 class DictatorGame:
     """Represents a single Dictator game."""
 
-    def __init__(
-        self, game_id: int, money_available: float = 10.0, exchange_rate: float = 3.0
-    ):
+    def __init__(self, game_id: int, money_available: float = 10.0, exchange_rate: float = 3.0):
         self.game_id = game_id
         self.players: dict[str, Optional[ServerConnection]] = {}
         self.player_names: dict[str, str] = {}
@@ -61,9 +59,7 @@ class DictatorGame:
         if money_send < 0:
             raise ValueError(f"Cannot send negative amount: {money_send}")
         if money_send > self.money_available:
-            raise ValueError(
-                f"Cannot send more than available: {money_send} > {self.money_available}"
-            )
+            raise ValueError(f"Cannot send more than available: {money_send} > {self.money_available}")
 
         self.money_sent = money_send
         self.dictator_decision_made = True
@@ -116,26 +112,20 @@ class DictatorServer:
                         recovery = data.get("recovery")
 
                         if not game_id and not recovery:
-                            await self.send_error(
-                                websocket, "Game ID and recovery code are required"
-                            )
+                            await self.send_error(websocket, "Game ID and recovery code are required")
                             continue
 
                         game_specs_path = SPECS_PATH / f"game_{game_id}.json"
 
                         if not game_specs_path.exists():
-                            await self.send_error(
-                                websocket, f"Game {game_id} does not exist"
-                            )
+                            await self.send_error(websocket, f"Game {game_id} does not exist")
                             continue
 
                         with game_specs_path.open("r") as f:
                             game_specs = json.load(f)
 
                         if recovery not in game_specs["recovery_codes"]:
-                            await self.send_error(
-                                websocket, f"Invalid recovery code: {recovery}"
-                            )
+                            await self.send_error(websocket, f"Invalid recovery code: {recovery}")
                             continue
 
                         if game_id in self.games:
@@ -156,16 +146,12 @@ class DictatorServer:
                         player_role = "dictator" if recovery_index == 0 else "receiver"
 
                         if player_role in game.players:
-                            await self.send_error(
-                                websocket, f"Role {player_role} already taken"
-                            )
+                            await self.send_error(websocket, f"Role {player_role} already taken")
                             continue
 
                         player_name = player_role.capitalize()
                         game.add_player(player_role, websocket, player_name)
-                        await self.send_assign_role_message(
-                            websocket, player_name, player_role
-                        )
+                        await self.send_assign_role_message(websocket, player_name, player_role)
 
                         if game.is_ready():
                             await self.start_game(game)
@@ -176,23 +162,17 @@ class DictatorServer:
                             continue
 
                         if game.state != DECISION_PHASE:
-                            await self.send_error(
-                                websocket, "Game not in decision phase"
-                            )
+                            await self.send_error(websocket, "Game not in decision phase")
                             continue
 
                         if player_role != "dictator":
-                            await self.send_error(
-                                websocket, "Only dictator can make decisions"
-                            )
+                            await self.send_error(websocket, "Only dictator can make decisions")
                             continue
 
                         try:
                             money_send = data.get("money_send")
                             if money_send is None:
-                                await self.send_error(
-                                    websocket, "money_send is required"
-                                )
+                                await self.send_error(websocket, "money_send is required")
                                 continue
 
                             game.record_decision(float(money_send))
@@ -214,14 +194,10 @@ class DictatorServer:
                             if game.state == PAYOUT_PHASE and game.all_players_done():
                                 await self.end_game(game)
                         else:
-                            await self.send_error(
-                                websocket, f"Unknown action: {action}"
-                            )
+                            await self.send_error(websocket, f"Unknown action: {action}")
 
                     else:
-                        await self.send_error(
-                            websocket, f"Unknown message type: {msg_type}"
-                        )
+                        await self.send_error(websocket, f"Unknown message type: {msg_type}")
 
                 except json.JSONDecodeError:
                     await self.send_error(websocket, "Invalid JSON message")
@@ -246,9 +222,7 @@ class DictatorServer:
             if websocket:
                 await self.send_game_started(websocket, game, role)
 
-        logger.info(
-            f"Game {game.game_id} started with players {list(game.players.keys())}"
-        )
+        logger.info(f"Game {game.game_id} started with players {list(game.players.keys())}")
 
     async def process_decision_completion(self, game: DictatorGame) -> None:
         """Process the completion of the dictator's decision."""
@@ -271,9 +245,7 @@ class DictatorServer:
             if websocket:
                 await self.send_decision_result(websocket, game, role, payouts)
 
-    async def send_message(
-        self, websocket: ServerConnection, message: Dict[str, Any]
-    ) -> None:
+    async def send_message(self, websocket: ServerConnection, message: Dict[str, Any]) -> None:
         """Send a message to a client."""
         await websocket.send(json.dumps(message))
 
@@ -287,9 +259,7 @@ class DictatorServer:
             },
         )
 
-    async def send_assign_role_message(
-        self, websocket: ServerConnection, player_name: str, role: str
-    ) -> None:
+    async def send_assign_role_message(self, websocket: ServerConnection, player_name: str, role: str) -> None:
         """Send an assign-role message to a player when they first connect."""
         await self.send_message(
             websocket,
@@ -303,9 +273,7 @@ class DictatorServer:
             },
         )
 
-    async def send_game_started(
-        self, websocket: ServerConnection, game: DictatorGame, role: str
-    ) -> None:
+    async def send_game_started(self, websocket: ServerConnection, game: DictatorGame, role: str) -> None:
         """Send a game-started message to a player."""
         await self.send_message(
             websocket,
@@ -323,9 +291,7 @@ class DictatorServer:
 
         await self.send_phase_started(websocket, game, role)
 
-    async def send_phase_started(
-        self, websocket: ServerConnection, game: DictatorGame, role: str
-    ) -> None:
+    async def send_phase_started(self, websocket: ServerConnection, game: DictatorGame, role: str) -> None:
         """Send a phase-started message to a player."""
         await self.send_message(
             websocket,
@@ -404,9 +370,7 @@ class DictatorServer:
     async def start_server(self) -> None:
         """Start the WebSocket server."""
         async with serve(self.handle_websocket, self.host, self.port):
-            logger.info(
-                f"Dictator game WebSocket server started on {self.host}:{self.port}"
-            )
+            logger.info(f"Dictator game WebSocket server started on {self.host}:{self.port}")
             await asyncio.Future()
 
     @classmethod

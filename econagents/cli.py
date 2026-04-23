@@ -95,31 +95,31 @@ def run_cli():
             "The config file should be a YAML file defining the experiment setup.\n"
             "The login payloads file should be a JSONL file with login credentials for each agent."
         ),
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
 
     # --- Run Command ---
     run_parser = subparsers.add_parser(
-        "run", 
+        "run",
         help="Run an experiment defined by a YAML configuration file.",
         description=(
             "Run an economic agent experiment using the specified configuration.\n\n"
             "Example:\n"
             "  econagents run experiments/market_sim.yaml --login-payloads-file credentials.jsonl"
         ),
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     run_parser.add_argument(
-        "config_path", 
-        type=str, 
-        help="Path to the experiment configuration YAML file that defines the agent behaviors and experiment parameters."
+        "config_path",
+        type=str,
+        help="Path to the experiment configuration YAML file that defines the agent behaviors and experiment parameters.",
     )
     run_parser.add_argument(
         "--login-payloads-file",
         required=True,
         type=str,
-        help="Path to a JSON Lines (.jsonl) file containing login credentials for each agent, one per line."
+        help="Path to a JSON Lines (.jsonl) file containing login credentials for each agent, one per line.",
     )
 
     args = parser.parse_args()
