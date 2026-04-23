@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-16T18:13:15.298125Z"
+exclude-newer = "2026-04-16T18:23:29.428907576Z"
 exclude-newer-span = "P1W"
 
 [[package]]
@@ -718,7 +718,7 @@ debug = [
     { name = "line-profiler", specifier = ">=3.5.1" },
 ]
 dev = [
-    { name = "coverage", extras = ["toml"], specifier = ">=5.1" },
+    { name = "coverage", extras = ["toml"], specifier = ">=7.13.5" },
     { name = "jupyter", specifier = ">=1.1.1,<2" },
     { name = "nest-asyncio", specifier = ">=1.6.0,<2" },
     { name = "pre-commit", specifier = ">=2.16.0" },
