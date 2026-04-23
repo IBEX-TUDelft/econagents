@@ -18,34 +18,38 @@ Setting Up the Development Environment
        git clone https://github.com/IBEX-TUDelft/econagents
        cd econagents
 
-2.  **Install Poetry:**
-    This project uses `Poetry <https://python-poetry.org/>`_ for dependency management and packaging. If you don't have Poetry installed, follow the official installation guide.
+2.  **Install uv:**
+    This project uses `uv <https://docs.astral.sh/uv/>`_ for dependency management and packaging. If you don't have uv installed, follow the official installation guide.
 
 3.  **Install Dependencies:**
-    Once Poetry is installed, you can install the project dependencies, including development tools:
+    Once uv is installed, you can install the project dependencies, including development tools:
 
     .. code-block:: bash
 
-       poetry install --all-extras
+       uv sync --all-extras --all-groups
 
     This command creates a virtual environment (if one doesn't exist) and installs all required packages defined in ``pyproject.toml``, including optional groups like ``dev``, LLM provider, and observability provider dependencies.
 
-4.  **Activate the Virtual Environment:**
-    Activate the Poetry-managed virtual environment:
+4.  **Run commands inside the environment:**
+    Prefix commands with ``uv run`` so they execute in the project-managed virtual environment, e.g.:
+
+    .. code-block:: bash
+
+       uv run pytest
+
+    Alternatively, activate the venv directly:
 
     On Linux and MacOS:
 
     .. code-block:: bash
 
-       eval "$(poetry env activate)"
+       source .venv/bin/activate
 
     On Windows PowerShell:
 
     .. code-block:: bash
 
-       Invoke-Expression (poetry env activate)
-         
-    All subsequent commands should be run within this activated environment.
+       .venv\Scripts\activate
 
 Setting Up Pre-Commit Hooks
 ---------------------------
@@ -119,4 +123,4 @@ General Contribution Guidelines
 -   **Keep it Simple:** Adhere to the project's principles of modular design and simplicity.
 -   **Documentation:** Update or add documentation (including docstrings) for any new features or changes in behavior.
 
-Thank you for contributing to econagents! 
+Thank you for contributing to econagents!

@@ -14,15 +14,15 @@ To install directly from GitHub, you can run:
 
    python -m pip install git+https://github.com/IBEX-TUDelft/econagents.git
 
-For development, its recommended to use Poetry:
+For development, it's recommended to use uv:
 
 .. code-block:: bash
 
    git clone https://github.com/IBEX-TUDelft/econagents.git
    cd econagents
-   poetry install
+   uv sync --all-extras --all-groups
 
-Note that `Poetry <https://python-poetry.org/>`_ is used to create and manage the virtual environment for the project development. If you are not planning to contribute to the project, you can install the dependencies using your preferred package manager.
+Note that `uv <https://docs.astral.sh/uv/>`_ is used to create and manage the virtual environment for the project development. If you are not planning to contribute to the project, you can install the dependencies using your preferred package manager.
 
 Optional Dependencies
 ---------------------
@@ -69,11 +69,11 @@ Convenience Installations
 
 You can combine multiple optional dependencies:
 
-- Default installation (includes OpenAI and LangSmith):
+- Standard installation (includes OpenAI and LangSmith):
 
    .. code-block:: bash
 
-      pip install econagents[default]
+      pip install econagents[standard]
 
 - All optional dependencies:
 
@@ -95,9 +95,11 @@ The core package depends on the following packages:
 - ``pydantic``: For data validation and parsing
 - ``requests``: For HTTP requests
 - ``websockets``: For WebSocket connections
+- ``jinja2``: For rendering prompt templates
+- ``pyyaml``: For parsing experiment config files
 
 Known Issues
 ------------
 
-1. Organizational security policies may break the websocket connection. If you keep getting ``1006, ConnectionClosed`` errors try to install the package in another device. 
-2. Notebooks and `asyncio` may not play well together. When you cancel a game running in a notebook, the websocket connection may not be closed properly. Close the notebook kernel before running another game. 
+1. Organizational security policies may break the websocket connection. If you keep getting ``1006, ConnectionClosed`` errors try to install the package in another device.
+2. Notebooks and `asyncio` may not play well together. When you cancel a game running in a notebook, the websocket connection may not be closed properly. Close the notebook kernel before running another game.

@@ -19,13 +19,13 @@ def generate_recovery_codes(num_players: int = 2) -> list[str]:
 
 
 def save_game_data(
-    specs_path: Path, 
-    game_id: int, 
-    game_name: str, 
-    num_players: int, 
+    specs_path: Path,
+    game_id: int,
+    game_name: str,
+    num_players: int,
     recovery_codes: list[str],
     money_available: float = 10.0,
-    exchange_rate: float = 3.0
+    exchange_rate: float = 3.0,
 ) -> Path:
     """Save game data to a JSON file in the specs/games directory."""
     specs_dir = specs_path.parent / "games"

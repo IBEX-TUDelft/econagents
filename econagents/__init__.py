@@ -1,5 +1,5 @@
 """
-econagents: A Python library that lets you use LLM agents in economic experiments. 
+econagents: A Python library that lets you use LLM agents in economic experiments.
 """
 
 from econagents.core.agent_role import AgentRole
@@ -11,8 +11,10 @@ from econagents.core.state.fields import EventField
 from econagents.core.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
 from econagents.llm.openai import ChatOpenAI
 
-# Don't manually change, let poetry-dynamic-versioning handle it.
-__version__ = "0.1.0"
+try:
+    from econagents._version import __version__
+except ImportError:
+    __version__ = "0.0.0+unknown"
 
 __all__: list[str] = [
     "AgentRole",

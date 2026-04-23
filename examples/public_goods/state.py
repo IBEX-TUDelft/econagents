@@ -33,13 +33,9 @@ class PGPublic(PublicInformation):
     """Public information for the Public Goods game."""
 
     initial_endowment: float = EventField(default=20.0, event_key="initial_endowment")
-    public_good_efficiency: float = EventField(
-        default=0.5, event_key="public_good_efficiency"
-    )
+    public_good_efficiency: float = EventField(default=0.5, event_key="public_good_efficiency")
     total_contribution: float = EventField(default=0.0, event_key="total_contribution")
-    contributions: dict[str, float] = EventField(
-        default_factory=dict, event_key="contributions"
-    )
+    contributions: dict[str, float] = EventField(default_factory=dict, event_key="contributions")
     payoffs: dict[str, float] = EventField(default_factory=dict, event_key="payoffs")
     num_players: int = EventField(default=4, event_key="num_players")
 

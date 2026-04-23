@@ -31,9 +31,7 @@ class ChatOllama(BaseLLM):
     def _check_ollama_available(self) -> None:
         """Check if Ollama is available."""
         if not importlib.util.find_spec("ollama"):
-            raise ImportError(
-                "Ollama is not installed. Install it with: pip install econagents[ollama]"
-            )
+            raise ImportError("Ollama is not installed. Install it with: pip install econagents[ollama]")
 
     async def get_response(
         self,
@@ -77,6 +75,4 @@ class ChatOllama(BaseLLM):
 
         except ImportError as e:
             logger.error(f"Failed to import Ollama: {e}")
-            raise ImportError(
-                "Ollama is not installed. Install it with: pip install econagents[ollama]"
-            ) from e
+            raise ImportError("Ollama is not installed. Install it with: pip install econagents[ollama]") from e

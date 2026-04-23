@@ -181,26 +181,18 @@ class TestBaseConfigParser:
 
         # Valid instantiation
         DynamicGameState(private_information={"score": 50})  # score is int, ok
-        DynamicGameState(
-            private_information={"secret_code": "abc"}
-        )  # secret_code is Optional[str], ok
-        DynamicGameState(
-            private_information={"secret_code": None}
-        )  # secret_code is Optional[str], None ok
+        DynamicGameState(private_information={"secret_code": "abc"})  # secret_code is Optional[str], ok
+        DynamicGameState(private_information={"secret_code": None})  # secret_code is Optional[str], None ok
 
         # Invalid instantiation (wrong type)
         with pytest.raises(ValidationError):
             DynamicGameState(private_information={"score": "not_an_int"})
 
         with pytest.raises(ValidationError):
-            DynamicGameState(
-                private_information={"secret_code": 123}
-            )  # Expected Optional[str]
+            DynamicGameState(private_information={"secret_code": 123})  # Expected Optional[str]
 
         with pytest.raises(ValidationError):
-            DynamicGameState(
-                public_information={"complex_optional": "not_a_list"}
-            )  # Expected Optional[list[str]]
+            DynamicGameState(public_information={"complex_optional": "not_a_list"})  # Expected Optional[list[str]]
 
     def test_dynamic_state_update_optional_fields(self, config_file: Path):
         """Test updating optional fields in the dynamic GameState."""
@@ -221,9 +213,7 @@ class TestBaseConfigParser:
             "optional_public": 1.23,
             "complex_optional": ["x", "y", "z"],
         }
-        event = Message(
-            message_type="event", event_type="update_optionals", data=event_data
-        )
+        event = Message(message_type="event", event_type="update_optionals", data=event_data)
         state_instance.update(event)
 
         # Check updated values
@@ -239,9 +229,7 @@ class TestBaseConfigParser:
             "optional_public": None,
             "complex_optional": None,  # Assuming None is acceptable for Optional[list[str]]
         }
-        event_reset = Message(
-            message_type="event", event_type="reset_optionals", data=event_data_reset
-        )
+        event_reset = Message(message_type="event", event_type="reset_optionals", data=event_data_reset)
         state_instance.update(event_reset)
 
         assert state_instance.meta.optional_meta is None  # type: ignore
@@ -335,11 +323,7 @@ class TestBaseConfigParser:
         assert state_instance.public_information.optional_int_list == [1, 2, 3]  # type: ignore
 
         with pytest.raises(ValidationError):
-            DynamicGameState(
-                public_information={"string_list": [1, 2]}
-            )  # list[int] instead of list[str]
+            DynamicGameState(public_information={"string_list": [1, 2]})  # list[int] instead of list[str]
 
         with pytest.raises(ValidationError):
-            DynamicGameState(
-                public_information={"optional_int_list": ["a", "b"]}
-            )  # list[str] instead of list[int]
+            DynamicGameState(public_information={"optional_int_list": ["a", "b"]})  # list[str] instead of list[int]

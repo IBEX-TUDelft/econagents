@@ -31,11 +31,7 @@ class PublicGoodsGame:
     """Represents a single Public Goods game."""
 
     def __init__(
-        self, 
-        game_id: int, 
-        num_players: int = 4,
-        initial_endowment: float = 20.0, 
-        public_good_efficiency: float = 0.5
+        self, game_id: int, num_players: int = 4, initial_endowment: float = 20.0, public_good_efficiency: float = 0.5
     ):
         self.game_id = game_id
         self.num_players = num_players
@@ -67,9 +63,7 @@ class PublicGoodsGame:
         if contribution < 0:
             raise ValueError(f"Cannot contribute negative amount: {contribution}")
         if contribution > self.initial_endowment:
-            raise ValueError(
-                f"Cannot contribute more than endowment: {contribution} > {self.initial_endowment}"
-            )
+            raise ValueError(f"Cannot contribute more than endowment: {contribution} > {self.initial_endowment}")
 
         self.contributions[player_id] = contribution
         self.contributions_made[player_id] = True
@@ -79,13 +73,13 @@ class PublicGoodsGame:
         """Calculate the payoffs for all players."""
         total_contribution = sum(self.contributions.values())
         payoffs = {}
-        
+
         for player_id in self.players:
             player_contribution = self.contributions.get(player_id, 0.0)
             kept = self.initial_endowment - player_contribution
             share_of_public_good = self.public_good_efficiency * total_contribution
             payoffs[player_id] = kept + share_of_public_good
-        
+
         return payoffs
 
     def mark_player_done(self, player_id: str) -> None:
@@ -96,7 +90,7 @@ class PublicGoodsGame:
     def all_players_done(self) -> bool:
         """Check if all players are done with the current phase."""
         return all(self.players_done.values())
-    
+
     def all_contributions_made(self) -> bool:
         """Check if all players have made their contributions."""
         return all(self.contributions_made.values())
@@ -127,26 +121,20 @@ class PublicGoodsServer:
                         recovery = data.get("recovery")
 
                         if not game_id and not recovery:
-                            await self.send_error(
-                                websocket, "Game ID and recovery code are required"
-                            )
+                            await self.send_error(websocket, "Game ID and recovery code are required")
                             continue
 
                         game_specs_path = SPECS_PATH / f"game_{game_id}.json"
 
                         if not game_specs_path.exists():
-                            await self.send_error(
-                                websocket, f"Game {game_id} does not exist"
-                            )
+                            await self.send_error(websocket, f"Game {game_id} does not exist")
                             continue
 
                         with game_specs_path.open("r") as f:
                             game_specs = json.load(f)
 
                         if recovery not in game_specs["recovery_codes"]:
-                            await self.send_error(
-                                websocket, f"Invalid recovery code: {recovery}"
-                            )
+                            await self.send_error(websocket, f"Invalid recovery code: {recovery}")
                             continue
 
                         if game_id in self.games:
@@ -168,16 +156,12 @@ class PublicGoodsServer:
                         player_id = f"player_{recovery_index + 1}"
 
                         if player_id in game.players:
-                            await self.send_error(
-                                websocket, f"Player {player_id} already joined"
-                            )
+                            await self.send_error(websocket, f"Player {player_id} already joined")
                             continue
 
                         player_name = f"Player {recovery_index + 1}"
                         game.add_player(player_id, websocket, player_name)
-                        await self.send_assign_role_message(
-                            websocket, player_name, player_id
-                        )
+                        await self.send_assign_role_message(websocket, player_name, player_id)
 
                         if game.is_ready():
                             await self.start_game(game)
@@ -188,21 +172,17 @@ class PublicGoodsServer:
                             continue
 
                         if game.state != CONTRIBUTION_PHASE:
-                            await self.send_error(
-                                websocket, "Game not in contribution phase"
-                            )
+                            await self.send_error(websocket, "Game not in contribution phase")
                             continue
 
                         try:
                             contribution = data.get("contribution")
                             if contribution is None:
-                                await self.send_error(
-                                    websocket, "contribution is required"
-                                )
+                                await self.send_error(websocket, "contribution is required")
                                 continue
 
                             game.record_contribution(player_id, float(contribution))
-                            
+
                             if game.all_contributions_made():
                                 await self.process_contribution_completion(game)
                         except ValueError as e:
@@ -221,14 +201,10 @@ class PublicGoodsServer:
                             if game.state == PAYOUT_PHASE and game.all_players_done():
                                 await self.end_game(game)
                         else:
-                            await self.send_error(
-                                websocket, f"Unknown action: {action}"
-                            )
+                            await self.send_error(websocket, f"Unknown action: {action}")
 
                     else:
-                        await self.send_error(
-                            websocket, f"Unknown message type: {msg_type}"
-                        )
+                        await self.send_error(websocket, f"Unknown message type: {msg_type}")
 
                 except json.JSONDecodeError:
                     await self.send_error(websocket, "Invalid JSON message")
@@ -253,9 +229,7 @@ class PublicGoodsServer:
             if websocket:
                 await self.send_game_started(websocket, game, player_id)
 
-        logger.info(
-            f"Game {game.game_id} started with players {list(game.players.keys())}"
-        )
+        logger.info(f"Game {game.game_id} started with players {list(game.players.keys())}")
 
     async def process_contribution_completion(self, game: PublicGoodsGame) -> None:
         """Process the completion of all contributions."""
@@ -272,18 +246,14 @@ class PublicGoodsServer:
         # Send contribution results first to update state
         for player_id, websocket in game.players.items():
             if websocket:
-                await self.send_contribution_result(
-                    websocket, game, player_id, payoffs, total_contribution
-                )
+                await self.send_contribution_result(websocket, game, player_id, payoffs, total_contribution)
 
         # Then send phase-started event for phase 2
         for player_id, websocket in game.players.items():
             if websocket:
                 await self.send_phase_started(websocket, game, player_id)
 
-    async def send_message(
-        self, websocket: ServerConnection, message: Dict[str, Any]
-    ) -> None:
+    async def send_message(self, websocket: ServerConnection, message: Dict[str, Any]) -> None:
         """Send a message to a client."""
         await websocket.send(json.dumps(message))
 
@@ -297,9 +267,7 @@ class PublicGoodsServer:
             },
         )
 
-    async def send_assign_role_message(
-        self, websocket: ServerConnection, player_name: str, player_id: str
-    ) -> None:
+    async def send_assign_role_message(self, websocket: ServerConnection, player_name: str, player_id: str) -> None:
         """Send an assign-role message to a player when they first connect."""
         await self.send_message(
             websocket,
@@ -313,9 +281,7 @@ class PublicGoodsServer:
             },
         )
 
-    async def send_game_started(
-        self, websocket: ServerConnection, game: PublicGoodsGame, player_id: str
-    ) -> None:
+    async def send_game_started(self, websocket: ServerConnection, game: PublicGoodsGame, player_id: str) -> None:
         """Send a game-started message to a player."""
         await self.send_message(
             websocket,
@@ -334,9 +300,7 @@ class PublicGoodsServer:
 
         await self.send_phase_started(websocket, game, player_id)
 
-    async def send_phase_started(
-        self, websocket: ServerConnection, game: PublicGoodsGame, player_id: str
-    ) -> None:
+    async def send_phase_started(self, websocket: ServerConnection, game: PublicGoodsGame, player_id: str) -> None:
         """Send a phase-started message to a player."""
         await self.send_message(
             websocket,
@@ -366,7 +330,7 @@ class PublicGoodsServer:
         """Send a contribution-result message to a player."""
         # Ensure all players are in contributions dict (with 0 for those who didn't contribute)
         all_contributions = {pid: game.contributions.get(pid, 0.0) for pid in game.players}
-        
+
         await self.send_message(
             websocket,
             {
@@ -395,7 +359,7 @@ class PublicGoodsServer:
         """Send a game-ended message to a player."""
         # Ensure all players are in contributions dict (with 0 for those who didn't contribute)
         all_contributions = {pid: game.contributions.get(pid, 0.0) for pid in game.players}
-        
+
         await self.send_message(
             websocket,
             {
@@ -427,9 +391,7 @@ class PublicGoodsServer:
     async def start_server(self) -> None:
         """Start the WebSocket server."""
         async with serve(self.handle_websocket, self.host, self.port):
-            logger.info(
-                f"Public Goods game WebSocket server started on {self.host}:{self.port}"
-            )
+            logger.info(f"Public Goods game WebSocket server started on {self.host}:{self.port}")
             await asyncio.Future()
 
     @classmethod

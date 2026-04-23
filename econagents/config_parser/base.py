@@ -146,9 +146,7 @@ class StateConfig(BaseModel):
                 return TYPE_MAPPING[field_type_str]
             else:
                 try:
-                    resolved_type = eval(
-                        field_type_str, {"list": list, "dict": dict, "Any": Any}
-                    )
+                    resolved_type = eval(field_type_str, {"list": list, "dict": dict, "Any": Any})
                     return resolved_type
                 except (NameError, SyntaxError):
                     raise ValueError(f"Unsupported field type: {field_type_str}")
@@ -177,9 +175,7 @@ class StateConfig(BaseModel):
                 }
                 # Handle default vs default_factory
                 if field.default_factory:
-                    event_field_args["default_factory"] = get_default_factory(
-                        field.default_factory
-                    )
+                    event_field_args["default_factory"] = get_default_factory(field.default_factory)
                 else:
                     # Pydantic handles Optional defaults correctly (None if optional and no default)
                     event_field_args["default"] = field.default
@@ -402,9 +398,7 @@ class ExperimentConfig(BaseModel):
 
                     # Create the prompt file name
                     if phase:
-                        file_name = (
-                            f"{role.name.lower()}_{base_type}_phase_{phase}.jinja2"
-                        )
+                        file_name = f"{role.name.lower()}_{base_type}_phase_{phase}.jinja2"
                     else:
                         file_name = f"{role.name.lower()}_{base_type}.jinja2"
 
@@ -414,24 +408,18 @@ class ExperimentConfig(BaseModel):
 
         return temp_dir
 
-    async def run_experiment(
-        self, login_payloads: List[Dict[str, Any]], game_id: int
-    ) -> None:
+    async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
         """Run the experiment from this configuration."""
         # Create state class
         state_class = self.state.create_state_class()
-        role_configs = {
-            role_config.role_id: role_config for role_config in self.agent_roles
-        }
+        role_configs = {role_config.role_id: role_config for role_config in self.agent_roles}
 
         if not self.agent_roles and self.agents:
             raise ValueError(
                 "Configuration has 'agents' but no 'agent_roles'. Cannot determine agent role configurations."
             )
 
-        agent_to_role_map = {
-            agent_map.id: agent_map.role_id for agent_map in self.agents
-        }
+        agent_to_role_map = {agent_map.id: agent_map.role_id for agent_map in self.agents}
 
         # Create managers for each agent
         agents = []
@@ -445,9 +433,7 @@ class ExperimentConfig(BaseModel):
                 raise ValueError(f"No role_id mapping found for agent {agent_id}")
 
             if role_id not in role_configs:
-                raise ValueError(
-                    f"No agent role configuration found for role_id {role_id}"
-                )
+                raise ValueError(f"No agent role configuration found for role_id {role_id}")
 
             agent_role_instance = role_configs[role_id].create_agent_role()
 
@@ -533,9 +519,7 @@ class BaseConfigParser:
             game_id=game_id, state=state, agent_role=agent_role, auth_kwargs=auth_kwargs
         )
 
-    async def run_experiment(
-        self, login_payloads: List[Dict[str, Any]], game_id: int
-    ) -> None:
+    async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
         """
         Run the experiment from this configuration.
 
@@ -545,9 +529,7 @@ class BaseConfigParser:
         await self.config.run_experiment(login_payloads, game_id)
 
 
-async def run_experiment_from_yaml(
-    yaml_path: Path, login_payloads: List[Dict[str, Any]], game_id: int
-) -> None:
+async def run_experiment_from_yaml(yaml_path: Path, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
     """Run an experiment from a YAML configuration file."""
     parser = BaseConfigParser(yaml_path)
     await parser.run_experiment(login_payloads, game_id)

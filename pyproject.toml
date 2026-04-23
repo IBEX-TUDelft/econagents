@@ -1,81 +1,81 @@
 [build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
-build-backend = "poetry_dynamic_versioning.backend"
-
-[tool.poetry-dynamic-versioning]
-enable = true
-vcs = "git"
-style = "semver"
+requires = ["hatchling>=1.25", "hatch-vcs>=0.4"]
+build-backend = "hatchling.build"
 
 [project]
 name = "econagents"
+description = "A Python library that lets you use LLM agents in economic experiments."
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/IBEX-TUDelft/econagents"
-repository = "https://github.com/IBEX-TUDelft/econagents"
+authors = [{ name = "Dylan Castillo", email = "dylan@iwanalabs.com" }]
 dynamic = ["version"]
 requires-python = ">=3.10,<4"
 dependencies = [
     "pydantic>=2.11.5",
     "requests>=2.32.4",
     "websockets>=15.0",
-    "openai>=1.89.0",
-    "ollama>=0.5.1",
-    "langsmith>=0.4.1",
-    "langfuse>=3.0.3",
+    "jinja2>=3.1",
+    "pyyaml>=6.0",
 ]
 
-[tool.poetry]
-name = "econagents"
-version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
-packages = [{include = "econagents"}]
-include = ["econagents/*.so", "econagents/*.pyd"]  # Compiled extensions
-license = "MIT"
-description = ""
-authors = ["Dylan Castillo <dylan@iwanalabs.com>"]
+[project.urls]
+Homepage = "https://github.com/IBEX-TUDelft/econagents"
+Repository = "https://github.com/IBEX-TUDelft/econagents"
 
-[tool.poetry.build]
-generate-setup-file = false
-
-[tool.poetry.scripts]
+[project.scripts]
 econagents = "econagents.cli:run_cli"
 
 [project.optional-dependencies]
-openai = ["openai"]
-ollama = ["ollama"]
-langsmith = ["langsmith"]
-langfuse = ["langfuse"]
-standard = ["openai", "langsmith"]
-all = ["openai", "ollama", "langsmith", "langfuse"]
+openai = ["openai>=1.89.0"]
+ollama = ["ollama>=0.5.1"]
+langsmith = ["langsmith>=0.4.1"]
+langfuse = ["langfuse>=3.0.3"]
+standard = ["openai>=1.89.0", "langsmith>=0.4.1"]
+all = ["openai>=1.89.0", "ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3"]
 
-[tool.poetry.group.docs.dependencies]
-myst-parser = {extras = ["linkify"], version = "^4.0.1"}
-sphinx = "~8.1.3"
-sphinx_rtd_theme = "~3.0.2"
-gitpython = ">=3.1.31"
-sphinx-copybutton = "^0.5.2"
-autodoc-pydantic = "^2.2.0"
+[dependency-groups]
+docs = [
+    "myst-parser[linkify]>=4.0.1,<5",
+    "sphinx>=8.1.3,<8.2",
+    "sphinx-rtd-theme>=3.0.2,<3.1",
+    "gitpython>=3.1.31",
+    "sphinx-copybutton>=0.5.2,<0.6",
+    "autodoc-pydantic>=2.2.0,<3",
+]
+dev = [
+    "coverage[toml]>=5.1",
+    "pre-commit>=2.16.0",
+    "pytest>=7.1.2",
+    "pytest-cov>=3.0.0",
+    "pytest-mock>=3.7.0",
+    "python-dotenv>=1.2.1,<2",
+    "jupyter>=1.1.1,<2",
+    "nest-asyncio>=1.6.0,<2",
+    "ruff>=0.14.3,<0.15",
+    "types-requests>=2.32.4.20250913,<3",
+    "pytest-asyncio>=1.2.0,<2",
+    "types-pyyaml>=6.0.12.20250915,<7",
+]
+debug = [
+    "ipdb>=0.13.9",
+    "line-profiler>=3.5.1",
+]
 
-[tool.poetry.group.dev.dependencies]
-coverage = {extras = ["toml"], version = ">=5.1"}
-pre_commit = ">=2.16.0"
-pytest = ">=7.1.2"
-pytest-cov = ">=3.0.0"
-pytest-mock = ">=3.7.0"
-python-dotenv = "^1.2.1"
-jupyter = "^1.1.1"
-nest-asyncio = "^1.6.0"
-ruff = "^0.14.3"
-types-requests = "^2.32.4.20250913"
-pytest-asyncio = "^1.2.0"
-types-pyyaml = "^6.0.12.20250915"
+[tool.hatch.version]
+source = "vcs"
 
-[tool.poetry.group.debug]
-optional = true
+[tool.hatch.build.hooks.vcs]
+version-file = "econagents/_version.py"
 
-[tool.poetry.group.debug.dependencies]
-ipdb = ">=0.13.9"
-line_profiler = ">=3.5.1"
+[tool.hatch.build.targets.wheel]
+packages = ["econagents"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/econagents",
+    "/README.md",
+    "/LICENSE",
+]
 
 [tool.coverage.run]
 branch = true
@@ -167,4 +167,4 @@ ignore = [
 ]
 
 [tool.codespell]
-skip = 'poetry.lock,'
+skip = 'uv.lock,'
