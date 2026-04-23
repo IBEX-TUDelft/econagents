@@ -61,6 +61,11 @@ debug = [
     "line-profiler>=3.5.1",
 ]
 
+[tool.uv]
+# Only consider package versions that have been on PyPI for at least a week.
+# Guards against compromised or broken zero-day releases.
+exclude-newer = "1 week"
+
 [tool.hatch.version]
 source = "vcs"
 
