@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, Type, Union, runtime_checkable
+
+from pydantic import BaseModel
 
 from econagents.llm.observability import ObservabilityProvider, get_observability_provider
 
@@ -12,9 +14,14 @@ class LLMProvider(Protocol):
         self,
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
-        **kwargs: Any,
-    ) -> str:
-        """Get a response from the LLM."""
+        response_schema: Optional[Type[BaseModel]] = None,
+    ) -> Union[str, BaseModel]:
+        """Get a response from the LLM.
+
+        When ``response_schema`` is provided and the provider supports it, the
+        return value is a validated instance of that model. Otherwise a raw
+        string is returned.
+        """
         ...
 
     def build_messages(self, system_prompt: str, user_prompt: str) -> list[dict[str, Any]]:
@@ -47,15 +54,19 @@ class BaseLLM(ABC):
         self,
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
-    ) -> str:
+        response_schema: Optional[Type[BaseModel]] = None,
+    ) -> Union[str, BaseModel]:
         """Get a response from the LLM.
 
         Args:
             messages: The messages for the LLM.
-            tracing_extra: The extra tracing information.
-            **kwargs: Additional arguments to pass to the LLM.
+            tracing_extra: Extra tracing information passed to observability.
+            response_schema: Optional Pydantic model to use as the structured
+                output schema. Providers that support structured outputs should
+                return a validated instance of this model.
 
         Returns:
-            The response from the LLM.
+            Either a validated ``response_schema`` instance or a raw string,
+            depending on provider capabilities and whether a schema was given.
         """
         ...

@@ -19,24 +19,8 @@ This is the first round.
 
 ## Instructions
 
-Based on the current game state and your strategy, please choose whether to **cooperate** or **defect** in this round.
+Based on the current game state and your strategy, choose whether to **cooperate** or **defect** in this round.
 
-Respond with only one of the following:
-1. "COOPERATE" - if you choose to remain silent (cooperate)
-2. "DEFECT" - if you choose to testify against the other player (defect)
-
-Provide your choice as a JSON object with the following fields:
-- `gameId`: The ID of the game
-- `type`: The type of message, which should be "choice"
-- `choice`: The choice you made
-
-Example:
-```
-{
-    "gameId": <game_id>,
-    "type": "choice",
-    "choice": "COOPERATE"
-}
-```
-
-Don't include any other text in your response. Start with `{` and end with `}`.
+- `gameId` must be {{ meta.game_id }}.
+- `type` must be `choice`.
+- `choice` must be either `COOPERATE` (remain silent) or `DEFECT` (testify).

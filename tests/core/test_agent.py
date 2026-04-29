@@ -1,11 +1,17 @@
 import json
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import pytest
+from pydantic import BaseModel
 
 from econagents.core.agent_role import AgentRole
 from econagents.core.state.game import GameStateProtocol
 from tests.conftest import MockLLM
+
+
+class _SampleSchema(BaseModel):
+    gameId: int
+    action: Literal["go", "stop"]
 
 
 class TestAgentInitialization:
@@ -231,6 +237,25 @@ class TestResponseParsing:
 
         assert result == {"custom": True, "phase": 0}
 
+    def test_parse_pydantic_response(self, mock_agent_role, game_state):
+        """A validated Pydantic instance from the provider is passed through."""
+        response = _SampleSchema(gameId=game_state.meta.game_id, action="go")
+        result = mock_agent_role.parse_phase_llm_response(response, game_state)
+        assert result == {"gameId": game_state.meta.game_id, "action": "go"}
+
+    def test_parse_with_registered_schema(self, mock_agent_role, game_state):
+        """Raw JSON is validated when a schema is registered for the phase."""
+        mock_agent_role.register_response_schema(game_state.meta.phase, _SampleSchema)
+        result = mock_agent_role.parse_phase_llm_response('{"gameId": 7, "action": "stop"}', game_state)
+        assert result == {"gameId": 7, "action": "stop"}
+
+    def test_parse_with_registered_schema_invalid(self, mock_agent_role, game_state):
+        """Invalid JSON surfaces a validation error payload when a schema is registered."""
+        mock_agent_role.register_response_schema(game_state.meta.phase, _SampleSchema)
+        result = mock_agent_role.parse_phase_llm_response('{"gameId": 7, "action": "sideways"}', game_state)
+        assert result["error"] == "Failed to validate response"
+        assert result["raw_response"] == '{"gameId": 7, "action": "sideways"}'
+
 
 class TestPhaseSpecificMethods:
     """Tests for phase-specific methods."""
@@ -260,6 +285,23 @@ class TestPhaseSpecificMethods:
         assert 1 in agent._user_prompt_handlers
         assert 1 in agent._response_parsers
         assert 1 in agent._phase_handlers
+
+    def test_class_level_response_schemas(self, logger):
+        """Class-level ``response_schemas`` / ``default_response_schema`` are exposed via the registry."""
+
+        class OtherSchema(BaseModel):
+            reply: str
+
+        class WithSchema(AgentRole[GameStateProtocol]):
+            role: ClassVar[int] = 1
+            name: ClassVar[str] = "schema_agent"
+            llm = MockLLM()
+            response_schemas = {2: _SampleSchema}
+            default_response_schema = OtherSchema
+
+        agent = WithSchema(logger=logger)
+        assert agent.get_response_schema(2) is _SampleSchema
+        assert agent.get_response_schema(99) is OtherSchema
 
     @pytest.mark.asyncio
     async def test_llm_error_handling(self, mock_agent_role, game_state, mocker, prompts_path):

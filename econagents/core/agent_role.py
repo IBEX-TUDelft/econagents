@@ -4,9 +4,10 @@ import re
 from abc import ABC
 from pathlib import Path
 from jinja2 import FileSystemLoader
-from typing import Any, Callable, ClassVar, Dict, Generic, Literal, Optional, Pattern, Protocol, TypeVar
+from typing import Any, Callable, ClassVar, Dict, Generic, Literal, Optional, Pattern, Protocol, Type, TypeVar, Union
 
 from jinja2.sandbox import SandboxedEnvironment
+from pydantic import BaseModel, ValidationError
 
 from econagents.core.logging_mixin import LoggerMixin
 from econagents.core.state.game import GameStateProtocol
@@ -24,7 +25,7 @@ class AgentProtocol(Protocol):
 
 SystemPromptHandler = Callable[[StateT_contra], str]
 UserPromptHandler = Callable[[StateT_contra], str]
-ResponseParser = Callable[[str, StateT_contra], dict]
+ResponseParser = Callable[[Union[str, BaseModel], StateT_contra], dict]
 PhaseHandler = Callable[[int, StateT_contra], Any]
 
 
@@ -48,6 +49,10 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
     """List of phases this agent should participate in (empty means all phases)"""
     task_phases_excluded: ClassVar[list[int]] = []  # Empty list means no phases are excluded
     """ Alternative way to specify phases this agent should participate in, listed phases are excluded (empty means nothing excluded)"""
+    response_schemas: ClassVar[Dict[int, Type[BaseModel]]] = {}
+    """Phase-specific Pydantic schemas used as structured output formats."""
+    default_response_schema: ClassVar[Optional[Type[BaseModel]]] = None
+    """Fallback schema used for phases not listed in ``response_schemas``."""
     # Regex patterns for method name extraction
     _SYSTEM_PROMPT_PATTERN: ClassVar[Pattern] = re.compile(r"get_phase_(\d+)_system_prompt")
     _USER_PROMPT_PATTERN: ClassVar[Pattern] = re.compile(r"get_phase_(\d+)_user_prompt")
@@ -69,6 +74,7 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
         self._system_prompt_handlers: Dict[int, SystemPromptHandler] = {}
         self._user_prompt_handlers: Dict[int, UserPromptHandler] = {}
         self._response_parsers: Dict[int, ResponseParser] = {}
+        self._response_schemas: Dict[int, Type[BaseModel]] = dict(self.response_schemas)
         self._phase_handlers: Dict[int, PhaseHandler] = {}
 
         # Auto-register phase-specific methods if they exist
@@ -224,6 +230,26 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
         self._response_parsers[phase] = parser
         self.logger.debug(f"Registered response parser for phase {phase}")
 
+    def register_response_schema(self, phase: int, schema: Type[BaseModel]) -> None:
+        """Register a Pydantic response schema for a specific phase.
+
+        When a schema is registered, the LLM is asked to emit structured
+        output matching it, and the parsed instance is used as the phase
+        result.
+
+        Args:
+            phase (int): Game phase number
+            schema (Type[BaseModel]): Pydantic model describing the output
+        """
+        self._response_schemas[phase] = schema
+        self.logger.debug(f"Registered response schema for phase {phase}")
+
+    def get_response_schema(self, phase: int) -> Optional[Type[BaseModel]]:
+        """Return the schema to use for a given phase, if any."""
+        if phase in self._response_schemas:
+            return self._response_schemas[phase]
+        return self.default_response_schema
+
     def register_phase_handler(self, phase: int, handler: PhaseHandler) -> None:
         """Register a custom phase handler for a specific phase.
 
@@ -274,23 +300,41 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
             context=state.model_dump(), prompt_type="user", phase=phase, prompts_path=prompts_path
         )
 
-    def parse_phase_llm_response(self, response: str, state: StateT_contra) -> dict:
+    def parse_phase_llm_response(self, response: Union[str, BaseModel], state: StateT_contra) -> dict:
         """Parse the LLM response for the current phase.
 
-        This method will use a phase-specific parser if registered,
-        otherwise it falls back to the default implementation which attempts
-        to parse the response as JSON.
+        Resolution order:
+
+        1. A phase-specific parser registered via ``register_response_parser``.
+        2. If the provider returned a validated Pydantic instance, its
+           ``model_dump()``.
+        3. If a response schema is registered for this phase (or a default
+           schema is set), validate the raw string against it.
+        4. Fall back to ``json.loads`` on the raw string.
 
         Args:
-            response (str): Raw LLM response string
-            state (StateT_contra): Current game state
+            response: Either a raw LLM response string or a Pydantic instance
+                produced by a structured-output-capable provider.
+            state: Current game state.
 
         Returns:
-            dict: Parsed response as a dictionary
+            dict: Parsed response as a dictionary.
         """
         phase = state.meta.phase
         if phase in self._response_parsers:
             return self._response_parsers[phase](response, state)
+
+        if isinstance(response, BaseModel):
+            return response.model_dump()
+
+        schema = self.get_response_schema(phase)
+        if schema is not None:
+            try:
+                return schema.model_validate_json(response).model_dump()
+            except ValidationError as e:
+                self.logger.error(f"Failed to validate LLM response against schema {schema.__name__}: {e}")
+                self.logger.debug(f"Raw response: {response}")
+                return {"error": "Failed to validate response", "raw_response": response}
 
         try:
             return json.loads(response)
@@ -362,6 +406,7 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
                 tracing_extra={
                     "state": state.model_dump(),
                 },
+                response_schema=self.get_response_schema(phase),
             )
             return self.parse_phase_llm_response(response, state)
         except Exception as e:

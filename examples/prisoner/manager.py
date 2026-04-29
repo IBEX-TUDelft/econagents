@@ -1,14 +1,21 @@
-import json
-from typing import Any
+from typing import Any, Literal
 
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 from econagents import AgentRole
-from econagents.core.events import Message
 from econagents.core.manager.phase import TurnBasedPhaseManager
 from econagents.llm import ChatOpenAI
 
 load_dotenv()
+
+
+class PrisonerChoice(BaseModel):
+    """Structured output the prisoner emits every round."""
+
+    gameId: int
+    type: Literal["choice"]
+    choice: Literal["COOPERATE", "DEFECT"]
 
 
 class Prisoner(AgentRole):
@@ -16,7 +23,8 @@ class Prisoner(AgentRole):
 
     role = 1
     name = "Prisoner"
-    llm = ChatOpenAI(model_name="gpt-4o")
+    llm = ChatOpenAI(model_name="gpt-5.4-mini")
+    default_response_schema = PrisonerChoice
 
 
 class PDManager(TurnBasedPhaseManager):

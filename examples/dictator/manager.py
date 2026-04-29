@@ -1,14 +1,29 @@
-import json
-from typing import Any
+from typing import Any, Literal
 
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
 from econagents import AgentRole
-from econagents.core.events import Message
 from econagents.core.manager.phase import TurnBasedPhaseManager
 from econagents.llm import ChatOpenAI
 
 load_dotenv()
+
+
+class DictatorDecision(BaseModel):
+    """Phase 1 output for the Dictator."""
+
+    gameId: int
+    type: Literal["decision"]
+    money_send: float = Field(description="Amount of money sent to the Receiver, must be >= 0.")
+
+
+class DoneAction(BaseModel):
+    """Terminal acknowledgment sent at the end of the game."""
+
+    gameId: int
+    type: Literal["action"]
+    action: Literal["done"]
 
 
 class Dictator(AgentRole):
@@ -16,7 +31,8 @@ class Dictator(AgentRole):
 
     role = 1
     name = "dictator"
-    llm = ChatOpenAI(model_name="gpt-4.1-mini")
+    llm = ChatOpenAI(model_name="gpt-5.4-mini")
+    response_schemas = {1: DictatorDecision, 2: DoneAction}
 
 
 class Receiver(AgentRole):
@@ -24,7 +40,8 @@ class Receiver(AgentRole):
 
     role = 2
     name = "receiver"
-    llm = ChatOpenAI(model_name="gpt-4.1-mini")
+    llm = ChatOpenAI(model_name="gpt-5.4-mini")
+    response_schemas = {2: DoneAction}
 
     task_phases = [2]
 

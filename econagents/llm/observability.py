@@ -20,13 +20,13 @@ class ObservabilityProvider(ABC):
         response: Any,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Track an LLM call directly without creating a run tree.
+        """Track an LLM call.
 
         Args:
             name: Name of the operation.
             model: Model used for the call.
             messages: Messages sent to the model.
-            response: Response from the model.
+            response: Raw response object from the provider SDK.
             metadata: Additional metadata for the call.
         """
         ...
@@ -43,94 +43,83 @@ class NoOpObservability(ObservabilityProvider):
         response: Any,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """No-op implementation of track_llm_call."""
         pass
+
+
+def _extract_output(response: Any) -> Any:
+    """Best-effort extraction of the user-facing output from a provider response.
+
+    Supports the OpenAI Responses API (``output_parsed``/``output_text``), the
+    legacy Chat Completions API (``choices[0].message.content``), and Ollama's
+    ``{"message": {"content": ...}}`` dict shape. Falls back to returning the
+    raw object.
+    """
+    parsed = getattr(response, "output_parsed", None)
+    if parsed is not None:
+        try:
+            return parsed.model_dump()
+        except AttributeError:
+            return parsed
+
+    text = getattr(response, "output_text", None)
+    if text:
+        return text
+
+    choices = getattr(response, "choices", None)
+    if choices:
+        first = choices[0]
+        message = getattr(first, "message", None)
+        content = getattr(message, "content", None) if message is not None else None
+        if content is not None:
+            return content
+
+    if isinstance(response, dict):
+        message = response.get("message")
+        if isinstance(message, dict) and "content" in message:
+            return message["content"]
+
+    return response
+
+
+def _extract_usage(response: Any) -> Optional[Dict[str, int]]:
+    """Best-effort usage extraction (token counts) from a provider response."""
+    usage = getattr(response, "usage", None)
+    if usage is None and isinstance(response, dict):
+        usage = response.get("usage")
+    if usage is None:
+        return None
+
+    def _get(name: str) -> Optional[int]:
+        val = getattr(usage, name, None)
+        if val is None and isinstance(usage, dict):
+            val = usage.get(name)
+        return val
+
+    input_tokens = _get("input_tokens") or _get("prompt_tokens") or _get("prompt_eval_count")
+    output_tokens = _get("output_tokens") or _get("completion_tokens") or _get("eval_count")
+    total_tokens = _get("total_tokens")
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+
+    details: Dict[str, int] = {}
+    if input_tokens is not None:
+        details["input"] = int(input_tokens)
+    if output_tokens is not None:
+        details["output"] = int(output_tokens)
+    if total_tokens is not None:
+        details["total"] = int(total_tokens)
+    return details or None
 
 
 class LangSmithObservability(ObservabilityProvider):
     """LangSmith observability provider."""
 
     def __init__(self) -> None:
-        """Initialize the LangSmith observability provider."""
         self._check_langsmith_available()
 
     def _check_langsmith_available(self) -> None:
-        """Check if LangSmith is available."""
         if not importlib.util.find_spec("langsmith"):
             raise ImportError("LangSmith is not installed. Install it with: pip install econagents[langsmith]")
-
-    def _create_run_tree(
-        self,
-        name: str,
-        run_type: str,
-        inputs: Dict[str, Any],
-    ) -> Any:
-        """Create a LangSmith run tree.
-
-        Args:
-            name: Name of the run.
-            run_type: Type of the run (e.g., "chain", "llm").
-            inputs: Inputs for the run.
-
-        Returns:
-            A LangSmith RunTree object.
-        """
-        try:
-            from langsmith.run_trees import RunTree
-
-            run_tree = RunTree(name=name, run_type=run_type, inputs=inputs)
-            run_tree.post()
-            return run_tree
-        except ImportError:
-            logger.warning("LangSmith is not available. Using no-op run tree.")
-            return {"name": name, "run_type": run_type, "inputs": inputs}
-
-    def _create_child_run(
-        self,
-        parent_run: Any,
-        name: str,
-        run_type: str,
-        inputs: Dict[str, Any],
-    ) -> Any:
-        """Create a child run in LangSmith.
-
-        Args:
-            parent_run: Parent RunTree object.
-            name: Name of the child run.
-            run_type: Type of the child run.
-            inputs: Inputs for the child run.
-
-        Returns:
-            A child RunTree object.
-        """
-        try:
-            child_run = parent_run.create_child(
-                name=name,
-                run_type=run_type,
-                inputs=inputs,
-            )
-            child_run.post()
-            return child_run
-        except (ImportError, AttributeError):
-            logger.warning("LangSmith create_child failed. Using no-op child run.")
-            return {"name": name, "run_type": run_type, "inputs": inputs, "parent": parent_run}
-
-    def _end_run(
-        self,
-        run: Any,
-        outputs: Dict[str, Any],
-    ) -> None:
-        """End a LangSmith run with outputs.
-
-        Args:
-            run: RunTree object to end.
-            outputs: Outputs of the run.
-        """
-        try:
-            run.end(outputs=outputs)
-            run.patch()
-        except (ImportError, AttributeError) as e:
-            logger.warning(f"LangSmith end_run failed: {e}")
 
     def track_llm_call(
         self,
@@ -140,55 +129,53 @@ class LangSmithObservability(ObservabilityProvider):
         response: Any,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Track an LLM call using LangSmith RunTree.
-
-        Args:
-            name: Name of the operation.
-            model: Model used for the call.
-            messages: Messages sent to the model.
-            response: Response from the model.
-            metadata: Additional metadata for the call.
-        """
         try:
-            # Create a top-level run
-            run_tree = self._create_run_tree(
-                name=name, run_type="chain", inputs={"messages": messages, "metadata": metadata or {}}
+            from langsmith.run_trees import RunTree
+
+            meta = dict(metadata or {})
+            run_tree = RunTree(
+                name=name,
+                run_type="chain",
+                inputs={"messages": messages},
+                extra={"metadata": meta, "invocation_params": {"model": model}},
             )
+            run_tree.post()
 
-            # Create LLM child run
-            child_run = self._create_child_run(
-                parent_run=run_tree, name=f"{model} Call", run_type="llm", inputs={"messages": messages}
+            child_run = run_tree.create_child(
+                name=f"{model}",
+                run_type="llm",
+                inputs={"messages": messages},
+                extra={"metadata": meta, "invocation_params": {"model": model}},
             )
+            child_run.post()
 
-            # End the runs
-            self._end_run(child_run, outputs=response)
+            output = _extract_output(response)
+            usage = _extract_usage(response)
+            child_outputs: Dict[str, Any] = {"output": output}
+            if usage:
+                child_outputs["usage"] = usage
 
-            # Get the content from the response if it's in the expected format
-            output_content = None
-            if hasattr(response, "choices") and response.choices:
-                if hasattr(response.choices[0], "message") and hasattr(response.choices[0].message, "content"):
-                    output_content = response.choices[0].message.content
+            child_run.end(outputs=child_outputs)
+            child_run.patch()
 
-            self._end_run(run_tree, outputs={"response": output_content or response})
+            run_tree.end(outputs={"output": output})
+            run_tree.patch()
         except Exception as e:
             logger.warning(f"Failed to track LLM call with LangSmith: {e}")
 
 
 class LangFuseObservability(ObservabilityProvider):
-    """LangFuse observability provider."""
+    """LangFuse observability provider (SDK v4)."""
 
     def __init__(self) -> None:
-        """Initialize the LangFuse observability provider."""
         self._check_langfuse_available()
-        self._langfuse_client = None
+        self._langfuse_client: Optional[Any] = None
 
     def _check_langfuse_available(self) -> None:
-        """Check if LangFuse is available."""
         if not importlib.util.find_spec("langfuse"):
             raise ImportError("LangFuse is not installed. Install it with: pip install econagents[langfuse]")
 
     def _get_langfuse_client(self) -> Any:
-        """Get or create a LangFuse client."""
         if self._langfuse_client is None:
             try:
                 from langfuse import Langfuse
@@ -207,43 +194,32 @@ class LangFuseObservability(ObservabilityProvider):
         response: Any,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Track an LLM call using LangFuse generation.
-
-        Args:
-            name: Name of the operation.
-            model: Model used for the call.
-            messages: Messages sent to the model.
-            response: Response from the model.
-            metadata: Additional metadata for the call.
-        """
         client = self._get_langfuse_client()
         if client is None:
             return
 
         try:
-            # Create a generation in Langfuse
-            trace = client.trace(name=name, metadata={"model": model, **metadata} if metadata else {}, input=messages)
-            generation = trace.generation(
-                name=name + "_generation",
+            meta = dict(metadata or {})
+            model_parameters = meta.pop("model_parameters", None)
+
+            generation = client.start_observation(
+                name=name,
+                as_type="generation",
                 model=model,
-                model_parameters=metadata.get("model_parameters", {}) if metadata else {},
                 input=messages,
-                metadata=metadata or {},
+                metadata=meta or None,
+                model_parameters=model_parameters,
             )
 
-            # Get response content in appropriate format
-            output_content = response
-            if hasattr(response, "choices") and response.choices:
-                if hasattr(response.choices[0], "message") and hasattr(response.choices[0].message, "content"):
-                    output_content = response.choices[0].message.content
-            elif isinstance(response, dict) and "message" in response and "content" in response["message"]:
-                output_content = response["message"]["content"]
+            output = _extract_output(response)
+            usage_details = _extract_usage(response)
 
-            # Update generation and set end time
-            generation.end(output=output_content)
-            trace.update(output=output_content)
+            generation.update(
+                output=output,
+                usage_details=usage_details,
+            )
+            generation.end()
 
-            # Flush to ensure all requests are sent
             client.flush()
         except Exception as e:
             logger.warning(f"Failed to track LLM call with LangFuse: {e}")
@@ -264,19 +240,18 @@ def get_observability_provider(provider_name: str = "noop") -> ObservabilityProv
     """
     if provider_name == "noop":
         return NoOpObservability()
-    elif provider_name == "langsmith":
+    if provider_name == "langsmith":
         try:
             return LangSmithObservability()
         except ImportError as e:
             logger.warning(f"Failed to initialize LangSmith: {e}")
             logger.warning("Falling back to NoOpObservability")
             return NoOpObservability()
-    elif provider_name == "langfuse":
+    if provider_name == "langfuse":
         try:
             return LangFuseObservability()
         except ImportError as e:
             logger.warning(f"Failed to initialize LangFuse: {e}")
             logger.warning("Falling back to NoOpObservability")
             return NoOpObservability()
-    else:
-        raise ValueError(f"Invalid observability provider: {provider_name}")
+    raise ValueError(f"Invalid observability provider: {provider_name}")

@@ -4,14 +4,7 @@ The game has concluded.
 
 You received: ${{ private_information.payout }}
 
-Thank you for participating in this experiment.
-
-Respond with:
-
-```json
-{
-  "gameId": {{ meta.game_id }},
-  "type": "action",
-  "action": "done"
-}
-```
+Acknowledge completion with:
+- `gameId` = {{ meta.game_id }}
+- `type` = `action`
+- `action` = `done`

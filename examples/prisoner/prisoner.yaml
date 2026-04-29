@@ -60,7 +60,7 @@ agent_roles:
     name: "cooperator"
     llm_type: "ChatOpenAI"
     llm_params:
-      model_name: "gpt-4o"
+      model_name: "gpt-5.4-mini"
     prompts:
       - system: |
           {% include "_partials/game_description.jinja2" %}
@@ -82,7 +82,7 @@ agent_roles:
     name: "defector"
     llm_type: "ChatOpenAI"
     llm_params:
-      model_name: "gpt-4o"
+      model_name: "gpt-5.4-mini"
     prompts:
       - system: |
           {% include "_partials/game_instructions.jinja2" %}

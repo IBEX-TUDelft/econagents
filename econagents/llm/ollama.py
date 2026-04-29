@@ -1,7 +1,8 @@
 import importlib.util
-import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
+
+from pydantic import BaseModel
 
 from econagents.llm.base import BaseLLM
 
@@ -22,6 +23,7 @@ class ChatOllama(BaseLLM):
         Args:
             model_name: The model name to use.
             host: The host for the Ollama API (e.g., "http://localhost:11434").
+            response_kwargs: Extra keyword arguments forwarded to ``chat``.
         """
         self._check_ollama_available()
         self.model_name = model_name
@@ -37,16 +39,20 @@ class ChatOllama(BaseLLM):
         self,
         messages: List[Dict[str, Any]],
         tracing_extra: Dict[str, Any],
+        response_schema: Optional[Type[BaseModel]] = None,
     ) -> str:
-        """Get a response from the LLM.
+        """Get a response from Ollama.
 
         Args:
             messages: The messages for the LLM.
             tracing_extra: The extra tracing information.
-            **kwargs: Additional arguments to pass to the LLM.
+            response_schema: Optional Pydantic model. When provided, its JSON
+                schema is passed to Ollama via ``format`` so the local model
+                is guided to emit matching JSON. The raw string is still
+                returned; the agent layer handles validation.
 
         Returns:
-            The response from the LLM.
+            The response text from Ollama.
 
         Raises:
             ImportError: If Ollama is not installed.
@@ -56,13 +62,16 @@ class ChatOllama(BaseLLM):
 
             client = AsyncClient(host=self.host)
 
+            kwargs: Dict[str, Any] = dict(self._response_kwargs)
+            if response_schema is not None:
+                kwargs["format"] = response_schema.model_json_schema()
+
             response = await client.chat(
                 model=self.model_name,
                 messages=messages,
-                **(self._response_kwargs),
+                **kwargs,
             )
 
-            # End the LLM run
             self.observability.track_llm_call(
                 name="ollama_chat_completion",
                 model=self.model_name,

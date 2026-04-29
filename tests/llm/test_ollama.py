@@ -1,9 +1,15 @@
-import importlib.util
-import json
-import pytest
+from typing import Literal
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from pydantic import BaseModel
+
 from econagents.llm.ollama import ChatOllama
+
+
+class _SampleSchema(BaseModel):
+    gameId: int
+    action: Literal["go", "stop"]
 
 
 class TestChatOllama:
@@ -81,6 +87,26 @@ class TestChatOllama:
                 model="llama2", messages=messages, temperature=0.7, num_predict=100
             )
             ollama.observability.track_llm_call.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_response_with_schema_forwards_format(self):
+        """When a schema is given, its JSON schema is forwarded via ``format``."""
+        mock_client = AsyncMock()
+        mock_client.chat.return_value = {"message": {"content": '{"gameId": 1, "action": "go"}'}}
+
+        with (
+            patch("importlib.util.find_spec", return_value=True),
+            patch("ollama.AsyncClient", return_value=mock_client),
+        ):
+            ollama = ChatOllama(model_name="llama2")
+            ollama.observability = MagicMock()
+
+            messages = [{"role": "user", "content": "Hello"}]
+            response = await ollama.get_response(messages, tracing_extra={}, response_schema=_SampleSchema)
+
+            assert response == '{"gameId": 1, "action": "go"}'
+            call_kwargs = mock_client.chat.call_args.kwargs
+            assert call_kwargs["format"] == _SampleSchema.model_json_schema()
 
     @pytest.mark.asyncio
     async def test_get_response_import_error(self):

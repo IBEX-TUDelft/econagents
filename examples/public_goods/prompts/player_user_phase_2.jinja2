@@ -21,14 +21,7 @@ The contribution phase has ended. Here are the results:
 Your contribution: ${{ public_information.contributions[private_information.player_id] if private_information.player_id in public_information.contributions else 0 }}
 Your final payoff: ${{ private_information.your_payoff }}
 
-Thank you for participating in this experiment.
-
-Respond with:
-
-```json
-{
-    "gameId": {{ meta.game_id }},
-    "type": "action",
-    "action": "done"
-}
-```
+Acknowledge completion with:
+- `gameId` = {{ meta.game_id }}
+- `type` = `action`
+- `action` = `done`
