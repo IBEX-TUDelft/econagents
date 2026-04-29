@@ -1,11 +1,6 @@
 from econagents.llm.base import BaseLLM, LLMProvider
 from econagents.llm.observability import ObservabilityProvider, get_observability_provider
-
-# Import specific implementations if available
-try:
-    from econagents.llm.openai import ChatOpenAI
-except ImportError:
-    pass
+from econagents.llm.openai import ChatOpenAI
 
 try:
     from econagents.llm.ollama import ChatOllama
@@ -14,6 +9,7 @@ except ImportError:
 
 __all__: list[str] = [
     "BaseLLM",
+    "ChatOpenAI",
     "LLMProvider",
     "ObservabilityProvider",
     "get_observability_provider",

@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-16T18:13:15.298125Z"
+exclude-newer = "2026-04-22T19:29:55.308734Z"
 exclude-newer-span = "P1W"
 
 [[package]]
@@ -634,6 +634,7 @@ name = "econagents"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
+    { name = "openai" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -645,7 +646,6 @@ all = [
     { name = "langfuse" },
     { name = "langsmith" },
     { name = "ollama" },
-    { name = "openai" },
 ]
 langfuse = [
     { name = "langfuse" },
@@ -656,12 +656,8 @@ langsmith = [
 ollama = [
     { name = "ollama" },
 ]
-openai = [
-    { name = "openai" },
-]
 standard = [
     { name = "langsmith" },
-    { name = "openai" },
 ]
 
 [package.dev-dependencies]
@@ -702,15 +698,13 @@ requires-dist = [
     { name = "langsmith", marker = "extra == 'standard'", specifier = ">=0.4.1" },
     { name = "ollama", marker = "extra == 'all'", specifier = ">=0.5.1" },
     { name = "ollama", marker = "extra == 'ollama'", specifier = ">=0.5.1" },
-    { name = "openai", marker = "extra == 'all'", specifier = ">=1.89.0" },
-    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.89.0" },
-    { name = "openai", marker = "extra == 'standard'", specifier = ">=1.89.0" },
+    { name = "openai", specifier = ">=1.89.0" },
     { name = "pydantic", specifier = ">=2.11.5" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", specifier = ">=2.32.4" },
     { name = "websockets", specifier = ">=15.0" },
 ]
-provides-extras = ["all", "langfuse", "langsmith", "ollama", "openai", "standard"]
+provides-extras = ["all", "langfuse", "langsmith", "ollama", "standard"]
 
 [package.metadata.requires-dev]
 debug = [

@@ -27,19 +27,11 @@ Note that `uv <https://docs.astral.sh/uv/>`_ is used to create and manage the vi
 Optional Dependencies
 ---------------------
 
-econagents is designed to be modular, allowing you to install only the dependencies you need.
-The core package is lightweight, and you can add optional dependencies based on your use case.
+The base install ships with the OpenAI client, which is the default provider. Other providers
+and observability backends are available as extras so you can pick what you need.
 
 LLM Providers
 ~~~~~~~~~~~~~
-
-econagents supports multiple LLM providers through optional dependencies:
-
-- ``openai``: For using OpenAI models like GPT-4
-
-   .. code-block:: bash
-
-      pip install econagents[openai]
 
 - ``ollama``: For using locally-hosted Ollama models
 
@@ -69,7 +61,7 @@ Convenience Installations
 
 You can combine multiple optional dependencies:
 
-- Standard installation (includes OpenAI and LangSmith):
+- Standard installation (adds LangSmith on top of the default OpenAI client):
 
    .. code-block:: bash
 
@@ -85,7 +77,7 @@ You can combine multiple optional dependencies:
 
    .. code-block:: bash
 
-      pip install econagents[openai,langfuse]
+      pip install econagents[ollama,langfuse]
 
 Core Dependencies
 -----------------
@@ -97,6 +89,7 @@ The core package depends on the following packages:
 - ``websockets``: For WebSocket connections
 - ``jinja2``: For rendering prompt templates
 - ``pyyaml``: For parsing experiment config files
+- ``openai``: Default LLM provider client
 
 Known Issues
 ------------

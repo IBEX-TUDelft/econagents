@@ -16,6 +16,7 @@ dependencies = [
     "websockets>=15.0",
     "jinja2>=3.1",
     "pyyaml>=6.0",
+    "openai>=1.89.0",
 ]
 
 [project.urls]
@@ -26,12 +27,11 @@ Repository = "https://github.com/IBEX-TUDelft/econagents"
 econagents = "econagents.cli:run_cli"
 
 [project.optional-dependencies]
-openai = ["openai>=1.89.0"]
 ollama = ["ollama>=0.5.1"]
 langsmith = ["langsmith>=0.4.1"]
 langfuse = ["langfuse>=3.0.3"]
-standard = ["openai>=1.89.0", "langsmith>=0.4.1"]
-all = ["openai>=1.89.0", "ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3"]
+standard = ["langsmith>=0.4.1"]
+all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3"]
 
 [dependency-groups]
 docs = [

@@ -1,11 +1,11 @@
 import json
 from typing import Any, Dict, Optional
 
-from econagents import AgentRole
+from econagents.config_parser.base import BaseConfigParser
+from econagents.core.agent_role import AgentRole
 from econagents.core.events import Message
 from econagents.core.manager.phase import PhaseManager
 from econagents.core.state.game import GameState
-from econagents.config_parser.base import BaseConfigParser
 
 
 class BasicConfigParser(BaseConfigParser):
