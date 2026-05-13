@@ -32,6 +32,8 @@ The library has four key components:
 3. Game State
 4. Game Runner
 
+A fifth, optional component — **Personas** — gives each agent a portable identity (demographics, traits, optional bio) that gets injected into prompts. Useful for controlled experiments where a single neutral role drives different behavior depending on which persona is attached. See the :doc:`Personas <Personas>` section.
+
 Agent Roles
 ~~~~~~~~~~~
 

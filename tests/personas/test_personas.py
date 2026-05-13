@@ -60,7 +60,9 @@ class TestLoadPersona:
         assert p.id == "free-rider"
         assert p.traits["cooperativeness"] == "low"
 
-    def test_falls_back_with_no_user_dir(self):
+    def test_falls_back_with_no_user_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        # Chdir to a tmp dir so the cwd default has nothing to find — must fall back to bundled.
+        monkeypatch.chdir(tmp_path)
         p = load_persona("conditional-cooperator")
         assert p.id == "conditional-cooperator"
 
@@ -76,9 +78,33 @@ class TestLoadPersona:
             load_persona("does-not-exist", user_dir=tmp_path)
         assert exc.value.persona_id == "does-not-exist"
 
-    def test_missing_with_no_user_dir_raises(self):
+    def test_missing_with_no_user_dir_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.chdir(tmp_path)
         with pytest.raises(PersonaNotFoundError):
             load_persona("does-not-exist")
+
+    def test_defaults_to_cwd_personas_when_user_dir_unset(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Without user_dir, the loader checks <cwd>/personas as a sensible default."""
+        cwd_personas = tmp_path / "personas"
+        cwd_personas.mkdir()
+        (cwd_personas / "neighborhood-pal.yaml").write_text(
+            "id: neighborhood-pal\ntraits: {cooperativeness: high}\n"
+        )
+        monkeypatch.chdir(tmp_path)
+        p = load_persona("neighborhood-pal")
+        assert p.id == "neighborhood-pal"
+        assert p.traits == {"cooperativeness": "high"}
+
+    def test_cwd_default_does_not_apply_when_no_personas_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """If <cwd>/personas doesn't exist, the default silently falls through to bundled."""
+        monkeypatch.chdir(tmp_path)
+        # 'free-rider' is bundled; tmp_path has no personas/ dir, so bundled is the only source.
+        p = load_persona("free-rider")
+        assert p.id == "free-rider"
 
     def test_typo_in_yaml_raises(self, tmp_path: Path):
         path = tmp_path / "alice.yaml"

@@ -40,6 +40,11 @@ class Persona(BaseModel):
 def load_persona(persona_id: str, user_dir: Optional[Path] = None) -> Persona:
     """Resolve ``persona_id`` by checking ``user_dir`` first, then the bundled library.
 
+    If ``user_dir`` is not provided, the loader falls back to ``<cwd>/personas``
+    when that directory exists. Pass ``user_dir`` explicitly to point at a
+    different location, or just rely on the default when running from a
+    directory that has a ``personas/`` sibling.
+
     Each root is searched recursively for ``<persona_id>.yaml``, so subdirectories
     (e.g. ``library/archetypes/``) work without the caller knowing about them.
     Ids must be unique within a tree; if two files share a stem, lookup is
@@ -47,6 +52,11 @@ def load_persona(persona_id: str, user_dir: Optional[Path] = None) -> Persona:
 
     Raises ``PersonaNotFoundError`` if not found in either location.
     """
+    if user_dir is None:
+        candidate = Path.cwd() / "personas"
+        if candidate.is_dir():
+            user_dir = candidate
+
     searched: list[Path] = []
     for root in (user_dir, BUILTIN_LIBRARY):
         if root is None or not root.is_dir():

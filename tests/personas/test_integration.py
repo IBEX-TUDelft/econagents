@@ -13,12 +13,11 @@ from econagents.config_parser.base import (
     AgentMappingConfig,
     AgentRoleConfig,
     BaseConfigParser,
-    ExperimentConfig,
 )
 from econagents.core.agent_role import AgentRole
 from econagents.core.state.game import GameState
 from econagents.llm.openai import ChatOpenAI
-from econagents.personas import Persona, load_persona, save_persona
+from econagents.personas import Persona
 
 
 class _MockLLM(ChatOpenAI):
@@ -158,88 +157,18 @@ def test_create_agent_role_attaches_persona():
     assert role.persona == persona
 
 
-def test_persona_id_field_on_agent_mapping():
-    m = AgentMappingConfig(id=1, role_id=1, persona_id="conditional-cooperator")
-    assert m.persona_id == "conditional-cooperator"
+def test_persona_id_on_agent_mapping_is_a_string_ref():
+    """persona_id is set as a string; resolution happens at ExperimentConfig level."""
+    m = AgentMappingConfig(id=1, role_id=1, persona_id="alice")
+    assert m.persona_id == "alice"
 
 
-def test_inline_persona_on_agent_mapping():
-    m = AgentMappingConfig(
-        id=1,
-        role_id=1,
-        persona={"id": "alice-inline", "traits": {"cooperativeness": "high"}},
-    )
-    assert m.persona is not None
-    assert m.persona.id == "alice-inline"
-    assert m.persona.traits == {"cooperativeness": "high"}
-
-
-def test_inline_and_referenced_persona_are_mutually_exclusive():
-    with pytest.raises(ValueError, match="not both"):
-        AgentMappingConfig(
-            id=1,
-            role_id=1,
-            persona_id="conditional-cooperator",
-            persona={"id": "alice-inline"},
-        )
-
-
-def test_inline_persona_resolves_via_run_experiment_path(tmp_path: Path):
-    """run_experiment should attach an inline persona without consulting personas_dir."""
-    yaml_dir = tmp_path / "experiment"
-    yaml_dir.mkdir()
-    config_dict = {
-        "name": "inline-persona-test",
-        "agent_roles": [{"role_id": 1, "name": "player", "llm_params": {"model_name": "gpt-test"}}],
-        "agents": [
-            {
-                "id": 1,
-                "role_id": 1,
-                "persona": {
-                    "id": "alice-inline",
-                    "demographics": {"age": 30},
-                    "traits": {"cooperativeness": "high"},
-                },
-            }
-        ],
-        "state": {
-            "meta_information": [{"name": "phase", "type": "int", "default": 0}],
-            "private_information": [],
-            "public_information": [],
-        },
-        "manager": {"type": "TurnBasedPhaseManager"},
-        "runner": {
-            "type": "TurnBasedGameRunner",
-            "hostname": "localhost",
-            "port": 1,
-            "path": "ws",
-            "game_id": 1,
-        },
-    }
-    yaml_path = yaml_dir / "config.yaml"
-    yaml_path.write_text(yaml.safe_dump(config_dict))
-
-    parser = BaseConfigParser(config_path=yaml_path)
-    mapping = parser.config.agents[0]
-    assert mapping.persona is not None
-    assert mapping.persona.id == "alice-inline"
-    assert mapping.persona.traits["cooperativeness"] == "high"
-    # personas_dir was never set; inline personas don't need one.
-    assert parser.config.personas_dir is None
-
-
-def test_personas_dir_resolved_relative_to_yaml(tmp_path: Path):
-    """personas_dir written relative in YAML must resolve relative to the YAML file."""
-    yaml_dir = tmp_path / "experiment"
-    yaml_dir.mkdir()
-    personas_dir = yaml_dir / "personas"
-    save_persona(Persona(id="custom-pal", traits={"cooperativeness": "high"}), personas_dir / "custom-pal.yaml")
-
-    config_dict = {
+def _make_experiment_dict(personas, agents):
+    return {
         "name": "test",
-        "personas_dir": "./personas",
         "agent_roles": [{"role_id": 1, "name": "player", "llm_params": {"model_name": "gpt-test"}}],
-        "agents": [{"id": 1, "role_id": 1, "persona_id": "custom-pal"}],
+        "personas": personas,
+        "agents": agents,
         "state": {
             "meta_information": [{"name": "phase", "type": "int", "default": 0}],
             "private_information": [],
@@ -248,46 +177,58 @@ def test_personas_dir_resolved_relative_to_yaml(tmp_path: Path):
         "manager": {"type": "TurnBasedPhaseManager"},
         "runner": {
             "type": "TurnBasedGameRunner",
-            "hostname": "localhost",
+            "hostname": "h",
             "port": 1,
             "path": "ws",
             "game_id": 1,
         },
     }
-    yaml_path = yaml_dir / "config.yaml"
+
+
+def test_top_level_personas_resolve_by_id(tmp_path: Path):
+    """A persona declared once at the top level can be referenced by multiple agents."""
+    config_dict = _make_experiment_dict(
+        personas=[
+            {"id": "shared", "traits": {"cooperativeness": "high"}},
+        ],
+        agents=[
+            {"id": 1, "role_id": 1, "persona_id": "shared"},
+            {"id": 2, "role_id": 1, "persona_id": "shared"},
+        ],
+    )
+    yaml_path = tmp_path / "config.yaml"
     yaml_path.write_text(yaml.safe_dump(config_dict))
 
     parser = BaseConfigParser(config_path=yaml_path)
-    assert parser.config.personas_dir == personas_dir.resolve()
-
-    # Loading via the resolved path should work from any cwd.
-    p = load_persona("custom-pal", user_dir=parser.config.personas_dir)
-    assert p.traits["cooperativeness"] == "high"
+    assert len(parser.config.personas) == 1
+    assert parser.config.personas[0].id == "shared"
+    assert all(a.persona_id == "shared" for a in parser.config.agents)
 
 
-def test_personas_dir_absolute_left_alone(tmp_path: Path):
-    abs_dir = tmp_path / "absolute"
-    abs_dir.mkdir()
-    config = ExperimentConfig.model_validate(
-        {
-            "name": "test",
-            "personas_dir": str(abs_dir),
-            "agent_roles": [],
-            "agents": [],
-            "state": {
-                "meta_information": [],
-                "private_information": [],
-                "public_information": [],
-            },
-            "manager": {"type": "TurnBasedPhaseManager"},
-            "runner": {
-                "type": "TurnBasedGameRunner",
-                "hostname": "h",
-                "port": 1,
-                "path": "ws",
-                "game_id": 1,
-            },
-        }
+def test_unknown_persona_id_is_rejected(tmp_path: Path):
+    config_dict = _make_experiment_dict(
+        personas=[{"id": "known", "traits": {"cooperativeness": "high"}}],
+        agents=[{"id": 1, "role_id": 1, "persona_id": "unknown"}],
     )
-    # Without going through BaseConfigParser, absolute paths are simply preserved.
-    assert config.personas_dir == abs_dir
+    yaml_path = tmp_path / "config.yaml"
+    yaml_path.write_text(yaml.safe_dump(config_dict))
+
+    with pytest.raises(ValueError, match="not declared in the top-level"):
+        BaseConfigParser(config_path=yaml_path)
+
+
+def test_duplicate_persona_id_is_rejected(tmp_path: Path):
+    config_dict = _make_experiment_dict(
+        personas=[
+            {"id": "dup", "traits": {"cooperativeness": "high"}},
+            {"id": "dup", "traits": {"cooperativeness": "low"}},
+        ],
+        agents=[],
+    )
+    yaml_path = tmp_path / "config.yaml"
+    yaml_path.write_text(yaml.safe_dump(config_dict))
+
+    with pytest.raises(ValueError, match="Duplicate persona id"):
+        BaseConfigParser(config_path=yaml_path)
+
+

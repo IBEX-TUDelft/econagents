@@ -2,7 +2,8 @@ name: "Prisoner's Dilemma (persona-driven)"
 description: |
   Persona-driven variant of the prisoner's dilemma. A single neutral "player"
   role is shared by all agents; behavioral and demographic variation comes
-  from inline persona payloads declared per-agent below.
+  from personas declared in the top-level ``personas`` list and referenced
+  by id from the ``agents`` mappings.
 
 prompt_partials:
   - name: "game_description"
@@ -69,31 +70,35 @@ agent_roles:
           {% include "_partials/game_instructions.jinja2" %}
 
 
+personas:
+  - id: "maria-cooperative"
+    demographics:
+      age: 37
+      country: ES
+      occupation: social-worker
+    traits:
+      cooperativeness: high
+      reciprocity: high
+    bio: You believe most people are trying their best, and you give them a fair chance.
+
+  - id: "marcus-strategic"
+    demographics:
+      age: 44
+      country: US
+      occupation: hedge-fund-analyst
+    traits:
+      cooperativeness: low
+    bio: You evaluate every situation by expected value. Sentimentality is expensive.
+
+
 agents:
   - id: 1
     role_id: 1
-    persona:
-      id: "maria-cooperative"
-      demographics:
-        age: 37
-        country: ES
-        occupation: social-worker
-      traits:
-        cooperativeness: high
-        reciprocity: high
-      bio: You believe most people are trying their best, and you give them a fair chance.
+    persona_id: "maria-cooperative"
 
   - id: 2
     role_id: 1
-    persona:
-      id: "marcus-strategic"
-      demographics:
-        age: 44
-        country: US
-        occupation: hedge-fund-analyst
-      traits:
-        cooperativeness: low
-      bio: You evaluate every situation by expected value. Sentimentality is expensive.
+    persona_id: "marcus-strategic"
 
 
 state:

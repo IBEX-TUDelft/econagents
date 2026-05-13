@@ -68,7 +68,7 @@ async def main() -> None:
         PDManager(
             game_id=game_specs["game_id"],
             auth_mechanism_kwargs=payload,
-            persona=load_persona(persona_id, user_dir=PERSONAS_DIR),
+            persona=load_persona(persona_id),
         )
         for payload, persona_id in zip(login_payloads, PERSONA_IDS)
     ]

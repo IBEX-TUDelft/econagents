@@ -16,6 +16,7 @@ Welcome to econagents's documentation!
    Tutorial
    EconAgents_UI
    Customizing_Agent_Roles
+   Personas
    Managing_State
    Managing_Agents
    api

@@ -18,6 +18,8 @@ The ``AgentRole`` class is your main entry point for defining agents and roles (
 
 You can also control in which phases the agent will act by listing them in the ``task_phases`` attribute (or excluding them via ``excluded_phases``).
 
+If you want behavioral or demographic variation across agents that share the same role, attach a **persona** — see the :doc:`Personas <Personas>` section. When a persona is attached, ``AgentRole`` auto-appends a standard "About You" block to the system prompt; you can opt out with ``auto_render_persona = False`` and use ``{{ persona }}`` in Jinja for custom rendering.
+
 When a phase begins, the agent checks:
 
 1. **Phase eligibility** (based on the above lists).
