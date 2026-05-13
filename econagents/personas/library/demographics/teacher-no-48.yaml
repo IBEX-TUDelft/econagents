@@ -1,0 +1,8 @@
+# Quoted country code "NO" so YAML doesn't coerce it to boolean False.
+id: teacher-no-48
+demographics:
+  age: 48
+  gender: male
+  country: "NO"
+  education: graduate
+  occupation: teacher

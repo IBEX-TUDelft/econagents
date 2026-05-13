@@ -1,0 +1,6 @@
+# Punishes uncooperative partners even at cost to self.
+id: spiteful
+traits:
+  cooperativeness: medium
+  retaliation: high
+  reciprocity: high

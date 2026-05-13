@@ -1,0 +1,6 @@
+# Maximizes own payoff; defects when defection is profitable.
+id: free-rider
+traits:
+  cooperativeness: low
+  reciprocity: low
+  self_interest: high

@@ -1,0 +1,6 @@
+# Prioritizes others' welfare even at personal cost.
+id: altruist
+traits:
+  cooperativeness: high
+  altruism: high
+  self_interest: low

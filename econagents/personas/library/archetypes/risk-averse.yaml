@@ -1,0 +1,5 @@
+# Conservative under uncertainty; avoids gambles even with positive expected value.
+id: risk-averse
+traits:
+  risk_tolerance: low
+  patience: high

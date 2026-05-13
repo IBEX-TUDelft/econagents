@@ -1,0 +1,6 @@
+# Dislikes payoff asymmetry; sacrifices own gains to reduce inequity (Fehr & Schmidt 1999).
+id: inequity-averse
+traits:
+  fairness_threshold: high
+  cooperativeness: medium
+  retaliation: medium

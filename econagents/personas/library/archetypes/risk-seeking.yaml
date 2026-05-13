@@ -1,0 +1,5 @@
+# Gambles for upside; tolerates losses for chance at large gains.
+id: risk-seeking
+traits:
+  risk_tolerance: high
+  patience: low

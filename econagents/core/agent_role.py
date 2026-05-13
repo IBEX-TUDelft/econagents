@@ -12,8 +12,33 @@ from pydantic import BaseModel, ValidationError
 from econagents.core.logging_mixin import LoggerMixin
 from econagents.core.state.game import GameStateProtocol
 from econagents.llm.base import BaseLLM
+from econagents.personas import Persona
 
 StateT_contra = TypeVar("StateT_contra", bound=GameStateProtocol, contravariant=True)
+
+
+def _format_persona_block(persona: Persona) -> str:
+    """Render a Persona as a standard prompt-friendly markdown block.
+
+    Sections with empty underlying data are omitted, so the output is a tight
+    block with no placeholder noise. Returns an empty string if the persona
+    has no demographics, traits, or bio populated.
+    """
+    parts: list[str] = []
+    if persona.demographics:
+        parts.append("## About You")
+        parts.append("")
+        for key, value in persona.demographics.items():
+            parts.append(f"- {key.replace('_', ' ')}: {value}")
+        parts.append("")
+    if persona.traits:
+        parts.append("Tendencies:")
+        for trait, level in persona.traits.items():
+            parts.append(f"- {trait.replace('_', ' ')}: {level}")
+        parts.append("")
+    if persona.bio:
+        parts.append(persona.bio.rstrip())
+    return "\n".join(parts).rstrip()
 
 
 class AgentProtocol(Protocol):
@@ -59,9 +84,19 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
     _RESPONSE_PARSER_PATTERN: ClassVar[Pattern] = re.compile(r"parse_phase_(\d+)_llm_response")
     _PHASE_HANDLER_PATTERN: ClassVar[Pattern] = re.compile(r"handle_phase_(\d+)$")
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    persona: Optional[Persona] = None
+    """Optional persona injected into the Jinja prompt context as ``persona``."""
+    auto_render_persona: ClassVar[bool] = True
+    """When ``True`` and a persona is attached, append a standard markdown block
+    describing the persona to the end of the system prompt. Set to ``False`` to
+    take full control via ``{{ persona }}`` in your own template."""
+
+    def __init__(self, logger: Optional[logging.Logger] = None, persona: Optional[Persona] = None):
         if logger:
             self.logger = logger
+
+        if persona is not None:
+            self.persona = persona
 
         # Validate that only one of task_phases or task_phases_excluded is specified
         if self.task_phases and self.task_phases_excluded:
@@ -260,6 +295,15 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
         self._phase_handlers[phase] = handler
         self.logger.debug(f"Registered phase handler for phase {phase}")
 
+    def _build_context(self, state: StateT_contra) -> dict:
+        """Build the Jinja render context from state plus optional persona.
+
+        State keys win on collision; persona is decoration.
+        """
+        context: dict = {"persona": self.persona.model_dump() if self.persona is not None else None}
+        context.update(state.model_dump())
+        return context
+
     def get_phase_system_prompt(self, state: StateT_contra, prompts_path: Path) -> str:
         """Get the system prompt for the current phase.
 
@@ -276,9 +320,14 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
         phase = state.meta.phase
         if phase in self._system_prompt_handlers:
             return self._system_prompt_handlers[phase](state)
-        return self.render_prompt(
-            context=state.model_dump(), prompt_type="system", phase=phase, prompts_path=prompts_path
+        rendered = self.render_prompt(
+            context=self._build_context(state), prompt_type="system", phase=phase, prompts_path=prompts_path
         )
+        if self.auto_render_persona and self.persona is not None:
+            block = _format_persona_block(self.persona)
+            if block:
+                rendered = rendered.rstrip() + "\n\n" + block
+        return rendered
 
     def get_phase_user_prompt(self, state: StateT_contra, prompts_path: Path) -> str:
         """Get the user prompt for the current phase.
@@ -297,7 +346,7 @@ class AgentRole(ABC, Generic[StateT_contra], LoggerMixin):
         if phase in self._user_prompt_handlers:
             return self._user_prompt_handlers[phase](state)
         return self.render_prompt(
-            context=state.model_dump(), prompt_type="user", phase=phase, prompts_path=prompts_path
+            context=self._build_context(state), prompt_type="user", phase=phase, prompts_path=prompts_path
         )
 
     def parse_phase_llm_response(self, response: Union[str, BaseModel], state: StateT_contra) -> dict:

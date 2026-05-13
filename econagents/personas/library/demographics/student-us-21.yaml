@@ -1,0 +1,7 @@
+id: student-us-21
+demographics:
+  age: 21
+  gender: female
+  country: US
+  education: college
+  occupation: student

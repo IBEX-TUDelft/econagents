@@ -1,0 +1,6 @@
+# Starts cooperative, mirrors partner's behavior thereafter (tit-for-tat-like).
+id: conditional-cooperator
+traits:
+  cooperativeness: high
+  reciprocity: high
+  self_interest: medium

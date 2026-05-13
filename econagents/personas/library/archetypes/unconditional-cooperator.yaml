@@ -1,0 +1,6 @@
+# Always cooperates / gives generously regardless of partner behavior.
+id: unconditional-cooperator
+traits:
+  cooperativeness: high
+  reciprocity: low
+  self_interest: low

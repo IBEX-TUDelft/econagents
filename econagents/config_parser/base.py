@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Literal, Optional, Type, cast
 from datetime import datetime, date, time
 
 import yaml
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, create_model, model_validator
 
 from econagents.core.game_runner import (
     GameRunner,
@@ -27,6 +27,7 @@ from econagents.core.state.game import (
     PublicInformation,
 )
 from econagents.core.agent_role import AgentRole
+from econagents.personas import Persona, load_persona
 
 TYPE_MAPPING = {
     "str": str,
@@ -62,7 +63,7 @@ class AgentRoleConfig(BaseModel):
     task_phases: List[int] = Field(default_factory=list)
     task_phases_excluded: List[int] = Field(default_factory=list)
 
-    def create_agent_role(self) -> AgentRole:
+    def create_agent_role(self, persona: Optional[Persona] = None) -> AgentRole:
         """Create an AgentRole instance from this configuration."""
         # Dynamically create the LLM provider
         llm_class = getattr(importlib.import_module("econagents.llm"), self.llm_type)
@@ -82,14 +83,32 @@ class AgentRoleConfig(BaseModel):
             agent_role_attrs,
         )
 
-        return agent_role()
+        return agent_role(persona=persona)
 
 
 class AgentMappingConfig(BaseModel):
-    """Configuration mapping agent IDs to role IDs."""
+    """Configuration mapping agent IDs to role IDs.
+
+    A persona may be attached in one of two ways, mutually exclusive:
+    - ``persona_id``: reference to a YAML file resolved from ``personas_dir`` or
+      the bundled library.
+    - ``persona``: inline persona payload — useful for single-file experiments
+      where you don't want a separate ``personas/`` directory.
+    """
 
     id: int
     role_id: int
+    persona_id: Optional[str] = None
+    persona: Optional[Persona] = None
+
+    @model_validator(mode="after")
+    def _check_persona_specified_once(self) -> "AgentMappingConfig":
+        if self.persona is not None and self.persona_id is not None:
+            raise ValueError(
+                f"Agent {self.id}: specify either 'persona' (inline) or "
+                "'persona_id' (reference), not both."
+            )
+        return self
 
 
 class AgentConfig(BaseModel):
@@ -362,6 +381,7 @@ class ExperimentConfig(BaseModel):
     state: StateConfig
     manager: ManagerConfig
     runner: RunnerConfig
+    personas_dir: Optional[Path] = None
     _temp_prompts_dir: Optional[Path] = None
 
     def _compile_inline_prompts(self) -> Path:
@@ -419,7 +439,7 @@ class ExperimentConfig(BaseModel):
                 "Configuration has 'agents' but no 'agent_roles'. Cannot determine agent role configurations."
             )
 
-        agent_to_role_map = {agent_map.id: agent_map.role_id for agent_map in self.agents}
+        agent_mappings = {agent_map.id: agent_map for agent_map in self.agents}
 
         # Create managers for each agent
         agents = []
@@ -428,14 +448,21 @@ class ExperimentConfig(BaseModel):
             if agent_id is None:
                 raise ValueError(f"Login payload missing 'agent_id' field: {payload}")
 
-            role_id = agent_to_role_map.get(agent_id)
-            if role_id is None:
+            mapping = agent_mappings.get(agent_id)
+            if mapping is None:
                 raise ValueError(f"No role_id mapping found for agent {agent_id}")
 
+            role_id = mapping.role_id
             if role_id not in role_configs:
                 raise ValueError(f"No agent role configuration found for role_id {role_id}")
 
-            agent_role_instance = role_configs[role_id].create_agent_role()
+            if mapping.persona is not None:
+                persona = mapping.persona
+            elif mapping.persona_id is not None:
+                persona = load_persona(mapping.persona_id, self.personas_dir)
+            else:
+                persona = None
+            agent_role_instance = role_configs[role_id].create_agent_role(persona=persona)
 
             agents.append(
                 self.manager.create_manager(
@@ -493,7 +520,13 @@ class BaseConfigParser:
                 config_data["agent_roles"] = config_data.pop("agents")
                 config_data["agents"] = []
 
-        return ExperimentConfig(**config_data)
+        config = ExperimentConfig(**config_data)
+
+        # Resolve personas_dir relative to the YAML file location if it's relative.
+        if config.personas_dir is not None and not config.personas_dir.is_absolute():
+            config.personas_dir = (self.config_path.parent / config.personas_dir).resolve()
+
+        return config
 
     def create_manager(
         self,
