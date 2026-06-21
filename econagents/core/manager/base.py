@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional
 
 
 from econagents.core.events import Message
-from econagents.core.transport import WebSocketTransport, AuthenticationMechanism, SimpleLoginPayloadAuth
+from econagents.core.transport import WebSocketTransport, AuthenticationMechanism, JoinPayloadAuth
 from econagents.core.logging_mixin import LoggerMixin
 
 
@@ -26,7 +26,7 @@ class AgentManager(LoggerMixin):
 
         - manager.url = "wss://example.com/ws"
 
-        - manager.auth_mechanism = SimpleLoginPayloadAuth()
+        - manager.auth_mechanism = JoinPayloadAuth()
 
         - manager.auth_mechanism_kwargs = {"username": "user", "password": "pass"}
 
@@ -150,15 +150,20 @@ class AgentManager(LoggerMixin):
         return None
 
     def _extract_message_data(self, raw_message: str) -> Optional[Message]:
+        """Parse an inbound message envelope into a :class:`Message`.
+
+        The server speaks ``{"meta": {"type": ...}, "payload": {...}}``,
+        so ``meta.type`` becomes the event type and ``payload`` the data.
+        Every inbound message is treated as an event.
+        """
         try:
             msg = json.loads(raw_message)
-            message_type = msg.get("type", "")
-            event_type = msg.get("eventType", "")
-            data = msg.get("data", {})
+            event_type = (msg.get("meta") or {}).get("type", "")
+            data = msg.get("payload") or {}
         except json.JSONDecodeError:
             self.logger.error("Invalid JSON received.")
             return None
-        return Message(message_type=message_type, event_type=event_type, data=data)
+        return Message(message_type="event", event_type=event_type, data=data)
 
     @property
     def end_game_event_type(self) -> str:

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from econagents.core.manager.phase import PhaseManager
 from econagents.core.state.game import GameState
-from econagents.core.transport import AuthenticationMechanism, SimpleLoginPayloadAuth
+from econagents.core.transport import AuthenticationMechanism, JoinPayloadAuth
 from econagents.llm.observability import get_observability_provider
 
 ctx_agent_id: ContextVar[str] = ContextVar("agent_id", default="N/A")
@@ -46,8 +46,8 @@ class GameRunnerConfig(BaseModel):
     prompts_dir: Path = Path.cwd() / "prompts"
 
     # Authentication
-    auth_mechanism: Optional[AuthenticationMechanism] = SimpleLoginPayloadAuth()
-    """Authentication mechanism to use"""
+    auth_mechanism: Optional[AuthenticationMechanism] = JoinPayloadAuth()
+    """Authentication mechanism to use. Defaults to the join handshake."""
 
     # Phase transition configuration
     phase_transition_event: str = "phase-transition"

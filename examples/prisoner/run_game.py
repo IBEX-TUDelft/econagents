@@ -19,35 +19,27 @@ async def main():
     load_dotenv()
 
     game_specs = create_game_from_specs()
-    login_payloads = [
-        {"type": "join", "gameId": game_specs["game_id"], "recovery": code} for code in game_specs["recovery_codes"]
-    ]
 
-    # Create config and runner
+    # Create config and runner. The framework defaults handle authentication
+    # (the `join` handshake), message parsing (the `{"meta": ..., "payload": ...}`
+    # envelope), and the introduction -> ready handshake, so no custom auth
+    # mechanism or message parser is needed.
     config = TurnBasedGameRunnerConfig(
-        # Game configuration
         game_id=game_specs["game_id"],
         logs_dir=Path(__file__).parent / "logs",
         prompts_dir=Path(__file__).parent / "prompts",
         log_level=logging.INFO,
-        # Server configuration
         hostname="localhost",
         port=8765,
-        path="wss",
-        # State configuration
+        path="",
         state_class=PDGameState,
-        # Phase transition configuration
-        phase_transition_event="round-started",
-        phase_identifier_key="round",
-        # Observability configuration
-        observability_provider="langfuse",
     )
     agents = [
         PDManager(
             game_id=game_specs["game_id"],
-            auth_mechanism_kwargs=payload,
+            auth_mechanism_kwargs={"gameId": game_specs["game_id"], "recovery": code},
         )
-        for payload in login_payloads
+        for code in game_specs["recovery_codes"]
     ]
     runner = GameRunner(config=config, agents=agents)
 

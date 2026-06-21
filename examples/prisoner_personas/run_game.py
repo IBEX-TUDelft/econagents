@@ -28,8 +28,8 @@ from dotenv import load_dotenv
 
 from econagents.core.game_runner import GameRunner, TurnBasedGameRunnerConfig
 from econagents.personas import load_persona
+from examples.prisoner.manager import PDManager
 from examples.prisoner.state import PDGameState
-from examples.prisoner_personas.manager import PDManager
 
 logger = logging.getLogger("prisoners_dilemma_personas")
 
@@ -39,38 +39,36 @@ PERSONAS_DIR = Path(__file__).parent / "personas"
 async def main(
     game_id: int,
     recovery_codes: list[str],
-    personas: list[str]
+    personas: list[str],
+    hostname: str,
+    port: int,
 ) -> None:
     logger.info("Starting persona-driven Prisoner's Dilemma game")
     load_dotenv()
-
-    login_payloads = [
-        {"type": "join", "gameId": game_id, "recovery": code}
-        for code in recovery_codes 
-    ]
 
     config = TurnBasedGameRunnerConfig(
         game_id=game_id,
         logs_dir=Path(__file__).parent / "logs",
         prompts_dir=Path(__file__).parent / "prompts",
         log_level=logging.INFO,
-        hostname="localhost",
-        port=8765,
-        path="wss",
+        hostname=hostname,
+        port=port,
+        path="",
         state_class=PDGameState,
-        phase_transition_event="round-started",
-        phase_identifier_key="round",
-        observability_provider="langsmith",
     )
 
-    agents = [
-        PDManager(
+    agents = []
+    for i, (recovery_code, persona_id) in enumerate(zip(recovery_codes, personas)):
+        agent = PDManager(
             game_id=game_id,
-            auth_mechanism_kwargs=payload,
-            persona=load_persona(persona_id),
+            auth_mechanism_kwargs={
+                "meta": {"type": "join"},
+                "payload": {"recovery": recovery_code},
+            },
         )
-        for payload, persona_id in zip(login_payloads, personas)
-    ]
+        if persona_id:
+            agent.agent_role.persona = load_persona(persona_id, user_dir=PERSONAS_DIR)
+        agents.append(agent)
 
     runner = GameRunner(config=config, agents=agents)
     await runner.run_game()
@@ -90,7 +88,7 @@ def parse_args() -> argparse.Namespace:
         "--persona",
         dest="personas",
         action="append",
-        required=True,
+        default=[],
         metavar="PERSONA_ID",
         help="Persona id for an agent. Repeat once per agent, in agent order.",
     )
@@ -102,6 +100,17 @@ def parse_args() -> argparse.Namespace:
         metavar="CODE",
         help="Recovery code for an agent. Repeat once per agent, in agent order.",
     )
+    parser.add_argument(
+        "--hostname",
+        default="localhost",
+        help="Game server hostname.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=3000,
+        help="Game server port.",
+    )
     return parser.parse_args()
 
 
@@ -112,21 +121,18 @@ if __name__ == "__main__":
       --game-id 1 \
       --persona conditional-cooperator \
       --persona marcus-strategic-44 \
-      --persona tit-for-tat \
       --recovery-code CODE1 \
-      --recovery-code CODE2 \
-      --recovery-code CODE3
+      --recovery-code CODE2
     """
     args = parse_args()
-    if len(args.personas) != len(args.recovery_codes):
-        raise SystemExit(
-            "The number of --persona and --recovery-code arguments must match "
-            f"(got {len(args.personas)} personas and {len(args.recovery_codes)} codes)."
-        )
+    # Pad personas with empty strings so the list is always as long as recovery_codes.
+    personas = args.personas + [""] * (len(args.recovery_codes) - len(args.personas))
     asyncio.run(
         main(
             game_id=args.game_id,
             recovery_codes=args.recovery_codes,
-            personas=args.personas,
+            personas=personas,
+            hostname=args.hostname,
+            port=args.port,
         )
     )

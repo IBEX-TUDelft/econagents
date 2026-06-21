@@ -68,9 +68,12 @@ Here's a conceptual example of how you might run an experiment using a YAML file
 
         # For demonstration, using placeholder values:
         game_id = 12345  # Replace with actual game ID
+        # Each payload needs an `agent_id` (used to map the agent to its role).
+        # The remaining fields become the `join` envelope payload sent by the
+        # default JoinPayloadAuth (typically just a recovery code).
         login_payloads = [
-            {"agent_id": 1, "type": "join", "gameId": game_id, "recovery": "recovery_code_agent1"},
-            {"agent_id": 2, "type": "join", "gameId": game_id, "recovery": "recovery_code_agent2"},
+            {"agent_id": 1, "recovery": "recovery_code_agent1"},
+            {"agent_id": 2, "recovery": "recovery_code_agent2"},
             # Add more agent login payloads as needed
         ]
 

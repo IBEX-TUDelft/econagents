@@ -4,13 +4,18 @@ import logging
 import random
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from econagents.core.agent_role import AgentRole
 from econagents.core.events import Message
 from econagents.core.manager.base import AgentManager
+from econagents.core.protocol import INTRODUCTION_PHASE, ready_message
 from econagents.core.state.game import GameState
 from econagents.core.transport import AuthenticationMechanism
+
+#: A phase identifier. The server uses string phase names (e.g.
+#: ``"introduction"``, ``"decision"``); custom servers may use ints.
+Phase = Union[int, str]
 
 
 class PhaseManager(AgentManager, ABC):
@@ -86,6 +91,9 @@ class PhaseManager(AgentManager, ABC):
         # set up global pre-event hook for state updates if state is provided
         if self._state:
             self.register_global_pre_event_hook(self._update_state)
+
+        # Resolve which player this agent is from any event carrying a players list.
+        self.register_global_event_handler(self._resolve_player_number)
 
     @property
     def agent_role(self) -> Optional[AgentRole]:
@@ -205,6 +213,35 @@ class PhaseManager(AgentManager, ABC):
             self._state.update(message)
             self.logger.debug(f"Updated state: {self._state}")
 
+    async def _resolve_player_number(self, message: Message):
+        """Resolve which player this agent is and record it in the state.
+
+        The server identifies players in events that carry a ``players`` list
+        (e.g. the ibex ``snapshot``), each entry exposing a ``playerNumber`` and
+        the ``recovery`` code used to authenticate. This matches the recovery
+        passed via ``auth_mechanism_kwargs`` against that list and stores the
+        result in ``state.meta.player_number`` once it is known.
+
+        No-op when there is no state, no ``meta.player_number`` field, no
+        recovery code, or the event carries no matching ``players`` entry.
+        """
+        if not self._state:
+            return
+        meta = getattr(self._state, "meta", None)
+        if meta is None or not hasattr(meta, "player_number") or meta.player_number:
+            return
+
+        kwargs = self._auth_mechanism_kwargs or {}
+        recovery = kwargs.get("recovery") or (kwargs.get("payload") or {}).get("recovery")
+        if not recovery:
+            return
+
+        for player in message.data.get("players", []) or []:
+            if player.get("recovery") == recovery:
+                meta.player_number = player.get("playerNumber")
+                self.logger.debug(f"Resolved player number: {meta.player_number}")
+                break
+
     async def _on_phase_transition_event(self, message: Message):
         """
         Process a phase transition event.
@@ -303,6 +340,21 @@ class PhaseManager(AgentManager, ABC):
             self._continuous_task = None
         await super().stop()
 
+    async def _handle_introduction(self, phase: Any, state: GameState) -> dict:
+        """Default handshake: declare the agent ready in the introduction phase.
+
+        Concrete managers register this for :data:`INTRODUCTION_PHASE`. Override
+        it by registering your own handler for that phase.
+
+        Args:
+            phase (Any): The introduction phase identifier.
+            state (GameState): Current game state.
+
+        Returns:
+            dict: The ``ready`` envelope.
+        """
+        return ready_message()
+
 
 class TurnBasedPhaseManager(PhaseManager):
     """
@@ -349,7 +401,9 @@ class TurnBasedPhaseManager(PhaseManager):
             prompts_dir=prompts_dir,
         )
         # Register phase handlers
-        self._phase_handlers: dict[int, Callable[[int, Any], Any]] = {}
+        self._phase_handlers: dict[Phase, Callable[[Phase, Any], Any]] = {}
+        # Default handshake: declare ready during the introduction phase.
+        self.register_phase_handler(INTRODUCTION_PHASE, self._handle_introduction)
 
     async def execute_phase_action(self, phase: int):
         """
@@ -372,13 +426,13 @@ class TurnBasedPhaseManager(PhaseManager):
         if payload:
             await self.send_message(json.dumps(payload))
 
-    def register_phase_handler(self, phase: int, handler: Callable[[int, Any], Any]):
+    def register_phase_handler(self, phase: Phase, handler: Callable[[Phase, Any], Any]):
         """
         Register a custom handler for a specific phase.
 
         Args:
-            phase (int): The phase number
-            handler (Callable[[int, Any], Any]): The function to call when this phase is active
+            phase (Phase): The phase identifier (int or string phase name).
+            handler (Callable[[Phase, Any], Any]): The function to call when this phase is active
         """
         self._phase_handlers[phase] = handler
         self.logger.debug(f"Registered handler for phase {phase}")
@@ -440,7 +494,9 @@ class HybridPhaseManager(PhaseManager):
             prompts_dir=prompts_dir,
         )
         # Register phase handlers
-        self._phase_handlers: dict[int, Callable[[int, Any], Any]] = {}
+        self._phase_handlers: dict[Phase, Callable[[Phase, Any], Any]] = {}
+        # Default handshake: declare ready during the introduction phase.
+        self.register_phase_handler(INTRODUCTION_PHASE, self._handle_introduction)
 
     async def execute_phase_action(self, phase: int):
         """
@@ -463,13 +519,13 @@ class HybridPhaseManager(PhaseManager):
         if payload:
             await self.send_message(json.dumps(payload))
 
-    def register_phase_handler(self, phase: int, handler: Callable[[int, Any], Any]):
+    def register_phase_handler(self, phase: Phase, handler: Callable[[Phase, Any], Any]):
         """
         Register a custom handler for a specific phase.
 
         Args:
-            phase (int): The phase number
-            handler (Callable[[int, Any], Any]): The function to call when this phase is active
+            phase (Phase): The phase identifier (int or string phase name).
+            handler (Callable[[Phase, Any], Any]): The function to call when this phase is active
         """
         self._phase_handlers[phase] = handler
         self.logger.debug(f"Registered handler for phase {phase}")
