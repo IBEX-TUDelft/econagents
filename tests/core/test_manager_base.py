@@ -38,14 +38,20 @@ class TestMessageHandling:
     """Tests for message handling."""
 
     def test_extract_message_data(self, agent_manager):
-        """Test that _extract_message_data correctly parses JSON messages."""
-        # Valid message
-        valid_json = json.dumps({"type": "event", "eventType": "test-event", "data": {"key": "value"}})
+        """Test that _extract_message_data parses the message envelope."""
+        # Valid envelope: {"meta": {"type": ...}, "payload": {...}}
+        valid_json = json.dumps({"meta": {"type": "test-event"}, "payload": {"key": "value"}})
         message = agent_manager._extract_message_data(valid_json)
         assert isinstance(message, Message)
         assert message.message_type == "event"
         assert message.event_type == "test-event"
         assert message.data == {"key": "value"}
+
+        # Missing meta/payload should degrade gracefully, not raise.
+        sparse = agent_manager._extract_message_data(json.dumps({}))
+        assert sparse is not None
+        assert sparse.event_type == ""
+        assert sparse.data == {}
 
         # Invalid JSON
         invalid_json = "not valid json"

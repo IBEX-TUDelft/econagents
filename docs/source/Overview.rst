@@ -12,13 +12,25 @@ econagents is a framework that lets you use LLM agents in economic experiments. 
 There's a couple of default assumptions econagents makes about the game server:
 
 1. The server uses WebSockets to send messages to the client
-2. The server sends messages in the following JSON format:
+2. Messages use a uniform JSON envelope in both directions:
 
 .. code-block:: text
 
-    {"message_type": <game_id>, "type": <event_type>, "data": <event_data>}
+    {"meta": {"type": <event_type>, "component": {...}}, "payload": <event_data>}
 
-However, if the server doesn't use that format of messages, you can customize the `on_message_callback` of the `WebSocketTransport` to adjust the message parsing, so that it can be used with the rest of the framework.
+   * ``meta.type`` is the event/message discriminator (it becomes the event type the framework routes on).
+   * ``meta.component`` (optional) routes the message to a server-side component, e.g. ``{"type": "standard:coordination"}``.
+   * ``payload`` carries the message data (it becomes ``message.data`` for state mapping and handlers).
+
+3. The connection authenticates by sending a ``join`` envelope as the first message. The default
+   :class:`~econagents.JoinPayloadAuth` builds it from ``auth_mechanism_kwargs`` — typically
+   ``{"recovery": "<code>"}`` — producing ``{"meta": {"type": "join"}, "payload": {"recovery": "<code>"}}``.
+
+Build outbound envelopes with the helpers in :mod:`econagents.core.protocol`
+(``build_message``, ``join_message``, ``ready_message``). If the server uses a different
+message shape, override ``_extract_message_data`` on your manager (or customize the
+``on_message_callback`` of the ``WebSocketTransport``) to adjust the parsing, and set a
+different ``auth_mechanism`` such as :class:`~econagents.SimpleLoginPayloadAuth`.
 
 Aside from that, the framework only assumes that you have a description of the game including:
    - the roles that agents can take,

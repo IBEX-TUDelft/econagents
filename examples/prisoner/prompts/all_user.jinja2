@@ -21,6 +21,13 @@ This is the first round.
 
 Based on the current game state and your strategy, choose whether to **cooperate** or **defect** in this round.
 
-- `gameId` must be {{ meta.game_id }}.
-- `type` must be `choice`.
-- `choice` must be either `COOPERATE` (remain silent) or `DEFECT` (testify).
+Respond with a JSON message of exactly this shape:
+
+```json
+{
+    "meta": {"type": "submit-choice", "component": {"type": "standard:coordination"}},
+    "payload": {"choice": "COOPERATE"}
+}
+```
+
+`payload.choice` must be either `COOPERATE` (remain silent) or `DEFECT` (testify).

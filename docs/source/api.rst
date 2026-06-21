@@ -6,6 +6,16 @@ API
    :undoc-members:
    :show-inheritance:
 
+Protocol
+--------
+
+Helpers for building the WebSocket message envelope used by default.
+
+.. automodule:: econagents.core.protocol
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Personas
 --------
 

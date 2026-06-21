@@ -1,9 +1,8 @@
 import asyncio
 import json
 import logging
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import websockets
 from websockets.asyncio.server import serve, ServerConnection
@@ -50,11 +49,11 @@ SPECS_PATH = Path(__file__).parent / "games"
 class PrisonersDilemmaGame:
     """Represents a single Prisoner's Dilemma game with multiple rounds."""
 
-    def __init__(self, game_id: int, rounds: int = 10):
+    def __init__(self, game_id: int, rounds: int = 5):
         self.game_id = game_id
         self.players: dict[int, Optional[ServerConnection]] = {}
         self.player_names: dict[int, str] = {}
-        self.player_recovery_codes: dict[int, str] = {}
+        self.player_ready: dict[int, bool] = {}
         self.state = WAITING
         self.current_round = 0
         self.total_rounds = rounds
@@ -66,13 +65,18 @@ class PrisonersDilemmaGame:
         """Add a player to the game."""
         self.players[player_number] = websocket
         self.player_names[player_number] = name
+        self.player_ready[player_number] = False
         self.player_choices[player_number] = {}
         self.player_scores[player_number] = 0
         logger.info(f"Added player {player_number} ({name}) to game {self.game_id}")
 
-    def is_ready(self) -> bool:
-        """Check if the game is ready to start (has 2 players)."""
+    def has_two_players(self) -> bool:
+        """Check if the game has the two players it needs."""
         return len(self.players) == 2
+
+    def all_players_ready(self) -> bool:
+        """Check if every player has declared themselves ready."""
+        return self.has_two_players() and all(self.player_ready.values())
 
     def record_choice(self, player_number: int, choice: str) -> None:
         """Record a player's choice for the current round."""
@@ -82,7 +86,7 @@ class PrisonersDilemmaGame:
         if choice.lower() not in [COOPERATE, DEFECT]:
             raise ValueError(f"Invalid choice: {choice}")
 
-        self.player_choices[player_number][self.current_round] = choice
+        self.player_choices[player_number][self.current_round] = choice.lower()
         logger.info(f"Player {player_number} chose {choice} in round {self.current_round}")
 
     def all_players_made_choice(self) -> bool:
@@ -96,8 +100,8 @@ class PrisonersDilemmaGame:
             raise ValueError("Need exactly 2 players to calculate results")
 
         player1_id, player2_id = player_numbers
-        player1_choice = self.player_choices[player1_id][self.current_round].lower()
-        player2_choice = self.player_choices[player2_id][self.current_round].lower()
+        player1_choice = self.player_choices[player1_id][self.current_round]
+        player2_choice = self.player_choices[player2_id][self.current_round]
 
         player1_payoff, player2_payoff = PAYOFF_MATRIX[player1_choice][player2_choice]
 
@@ -105,17 +109,10 @@ class PrisonersDilemmaGame:
         self.player_scores[player1_id] += player1_payoff
         self.player_scores[player2_id] += player2_payoff
 
-        # Create result object
         result = {
             "round": self.current_round,
-            "choices": {
-                player1_id: player1_choice,
-                player2_id: player2_choice,
-            },
-            "payoffs": {
-                player1_id: player1_payoff,
-                player2_id: player2_payoff,
-            },
+            "choices": {player1_id: player1_choice, player2_id: player2_choice},
+            "payoffs": {player1_id: player1_payoff, player2_id: player2_payoff},
             "total_scores": {
                 player1_id: self.player_scores[player1_id],
                 player2_id: self.player_scores[player2_id],
@@ -140,7 +137,11 @@ class PrisonersDilemmaGame:
 
 
 class PrisonersDilemmaServer:
-    """WebSocket server for the Prisoner's Dilemma experiment."""
+    """WebSocket server for the Prisoner's Dilemma experiment.
+
+    Speaks the standard message envelope ``{"meta": {"type": ...}, "payload": ...}``
+    in both directions, matching the econagents framework defaults.
+    """
 
     def __init__(self, host: str = "localhost", port: int = 8765):
         self.host = host
@@ -157,65 +158,34 @@ class PrisonersDilemmaServer:
                 try:
                     data = json.loads(message)
                     logger.debug(f"Message: {data}")
-                    msg_type = data.get("type", "")
+                    meta = data.get("meta") or {}
+                    msg_type = meta.get("type", "")
+                    payload = data.get("payload") or {}
 
                     if msg_type == "join":
-                        game_id = data.get("gameId")
-                        recovery = data.get("recovery")
+                        game, player_number = await self.handle_join(websocket, payload)
 
-                        if not game_id and not recovery:
-                            await self.send_error(websocket, "Game ID and recovery code are required")
+                    elif msg_type == "ready":
+                        if not game or not player_number:
+                            await self.send_error(websocket, "Join the game before declaring ready")
                             continue
-
-                        game_specs_path = SPECS_PATH / f"game_{game_id}.json"
-
-                        if not game_specs_path.exists():
-                            await self.send_error(websocket, f"Game {game_id} does not exist")
-                            continue
-
-                        with game_specs_path.open("r") as f:
-                            game_specs = json.load(f)
-
-                        if recovery not in game_specs["recovery_codes"]:
-                            await self.send_error(websocket, f"Invalid recovery code: {recovery}")
-                            continue
-
-                        if game_id in self.games:
-                            game = self.games[game_id]
-                        else:
-                            game = PrisonersDilemmaGame(game_id, 5)
-                            self.games[game_id] = game
-
-                        if game.num_players >= 2:
-                            await self.send_error(websocket, f"Game {game_id} is full")
-                            continue
-
-                        player_number = game.num_players + 1
-                        player_name = f"Player {player_number}"
-
-                        game.add_player(player_number, websocket, player_name)
-                        await self.send_assign_name_message(websocket, player_name, player_number)
-
-                        if game.is_ready():
+                        game.player_ready[player_number] = True
+                        logger.info(f"Player {player_number} is ready in game {game.game_id}")
+                        if game.all_players_ready() and game.state == WAITING:
                             await self.start_game(game)
 
-                    elif msg_type == "choice":
+                    elif msg_type == "submit-choice":
                         if not game or not player_number:
                             await self.send_error(websocket, "Game not found")
                             continue
-
                         if game.state != PLAYING:
                             await self.send_error(websocket, "Game not in playing state")
                             continue
-
                         try:
-                            choice = data.get("choice")
-                            game.record_choice(player_number, choice)
+                            game.record_choice(player_number, payload.get("choice"))
                         except ValueError as e:
                             await self.send_error(websocket, str(e))
                             continue
-
-                        # If all players have made their choice, calculate results and move to next round
                         if game.all_players_made_choice():
                             await self.process_round_completion(game)
 
@@ -231,183 +201,140 @@ class PrisonersDilemmaServer:
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"Connection closed for player {player_number}")
         finally:
-            # Handle player disconnection
-            if game and player_number is not None:
-                # Keep player in game but mark as disconnected
-                if player_number in game.players:
-                    game.players[player_number] = None
+            if game and player_number is not None and player_number in game.players:
+                game.players[player_number] = None
                 logger.info(f"Player {player_number} disconnected from game {game.game_id}")
 
+    async def handle_join(self, websocket: ServerConnection, payload: Dict[str, Any]):
+        """Validate a join request, register the player, and open the introduction phase."""
+        game_id = payload.get("gameId")
+        recovery = payload.get("recovery")
+
+        if not game_id or not recovery:
+            await self.send_error(websocket, "Game ID and recovery code are required")
+            return None, None
+
+        game_specs_path = SPECS_PATH / f"game_{game_id}.json"
+        if not game_specs_path.exists():
+            await self.send_error(websocket, f"Game {game_id} does not exist")
+            return None, None
+
+        with game_specs_path.open("r") as f:
+            game_specs = json.load(f)
+
+        if recovery not in game_specs["recovery_codes"]:
+            await self.send_error(websocket, f"Invalid recovery code: {recovery}")
+            return None, None
+
+        game = self.games.get(game_id)
+        if game is None:
+            game = PrisonersDilemmaGame(game_id, rounds=5)
+            self.games[game_id] = game
+
+        if game.num_players >= 2:
+            await self.send_error(websocket, f"Game {game_id} is full")
+            return None, None
+
+        player_number = game.num_players + 1
+        game.add_player(player_number, websocket, f"Player {player_number}")
+
+        # Open the introduction phase; the agent replies with a `ready` message.
+        await self.send_phase_transition(websocket, "introduction", {"player_number": player_number})
+        return game, player_number
+
     async def start_game(self, game: PrisonersDilemmaGame) -> None:
-        """Start a new game."""
+        """Start the game once both players are ready."""
         game.state = PLAYING
         game.current_round = 0
-
-        for player_number, websocket in game.players.items():
-            if websocket:
-                await self.send_game_started(websocket, game, player_number)
-
         logger.info(f"Game {game.game_id} started with players {list(game.players.keys())}")
+        await self.broadcast_decision_phase(game)
+
+    async def broadcast_decision_phase(self, game: PrisonersDilemmaGame) -> None:
+        """Tell every player to make a choice for the current round."""
+        for websocket in game.players.values():
+            if websocket:
+                await self.send_phase_transition(
+                    websocket,
+                    "decision",
+                    {"round": game.current_round + 1, "total_rounds": game.total_rounds},
+                )
 
     async def process_round_completion(self, game: PrisonersDilemmaGame) -> None:
         """Process the completion of a round."""
-        # Calculate round results
         result = game.calculate_round_results()
 
-        # Send round-result event to all players
         for player_number, websocket in game.players.items():
             if websocket:
                 await self.send_round_result(websocket, game, player_number, result)
 
-        # Move to next round or end game
         if game.next_round():
-            # Start next round
-            for player_number, websocket in game.players.items():
-                if websocket:
-                    await self.send_round_started(websocket, game, player_number)
+            await self.broadcast_decision_phase(game)
         else:
-            # End game
             for player_number, websocket in game.players.items():
                 if websocket:
-                    await self.send_game_ended(websocket, game, player_number)
+                    await self.send_game_over(websocket, game, player_number)
 
     # Message sending helpers
-    async def send_message(self, websocket: ServerConnection, message: Dict[str, Any]) -> None:
-        """Send a message to a client."""
-        await websocket.send(json.dumps(message))
+    async def send_event(self, websocket: ServerConnection, event_type: str, payload: Dict[str, Any]) -> None:
+        """Send a message using the standard ``{"meta": ..., "payload": ...}`` envelope."""
+        await websocket.send(json.dumps({"meta": {"type": event_type}, "payload": payload}))
 
     async def send_error(self, websocket: ServerConnection, error_message: str) -> None:
         """Send an error message to a client."""
-        await self.send_message(
-            websocket,
-            {
-                "type": "error",
-                "message": error_message,
-            },
-        )
+        await self.send_event(websocket, "error", {"message": error_message})
 
-    async def send_assign_name_message(
-        self, websocket: ServerConnection, player_name: str, player_number: Optional[int]
+    async def send_phase_transition(
+        self, websocket: ServerConnection, phase: str, extra: Optional[Dict[str, Any]] = None
     ) -> None:
-        """Send an assign-name message to a player when they first connect."""
-        await self.send_message(
-            websocket,
-            {
-                "type": "event",
-                "eventType": "assign-name",
-                "data": {
-                    "player_name": player_name,
-                    "player_number": player_number,
-                },
-            },
-        )
-
-    async def send_game_started(
-        self, websocket: ServerConnection, game: PrisonersDilemmaGame, player_number: int
-    ) -> None:
-        """Send a game-started message to a player."""
-        other_id = next(pid for pid in game.players if pid != player_number)
-
-        await self.send_message(
-            websocket,
-            {
-                "type": "event",
-                "eventType": "game-started",
-                "data": {
-                    "game_id": game.game_id,
-                    "player_number": player_number,
-                    "player_name": game.player_names[player_number],
-                    "opponent_number": other_id,
-                    "opponent_name": game.player_names[other_id],
-                    "rounds": game.total_rounds,
-                    "payoff_matrix": PAYOFF_MATRIX,
-                },
-            },
-        )
-
-        # Also send the first round-started event
-        await self.send_round_started(websocket, game, player_number)
-
-    async def send_round_started(
-        self, websocket: ServerConnection, game: PrisonersDilemmaGame, player_number: int
-    ) -> None:
-        """Send a round-started message to a player."""
-        await self.send_message(
-            websocket,
-            {
-                "type": "event",
-                "eventType": "round-started",
-                "data": {
-                    "gameId": game.game_id,
-                    "round": game.current_round + 1,
-                    "total_rounds": game.total_rounds,
-                },
-            },
-        )
+        """Send a phase-transition event. ``phase`` becomes the manager's current phase."""
+        await self.send_event(websocket, "phase-transition", {"phase": phase, **(extra or {})})
 
     async def send_round_result(
         self, websocket: ServerConnection, game: PrisonersDilemmaGame, player_number: int, result: Dict[str, Any]
     ) -> None:
-        """Send a round-result message to a player."""
+        """Send a round-result event to a player."""
         other_id = next(pid for pid in game.players if pid != player_number)
 
-        await self.send_message(
+        await self.send_event(
             websocket,
+            "round-result",
             {
-                "type": "event",
-                "eventType": "round-result",
-                "data": {
-                    "gameId": game.game_id,
-                    "round": result["round"] + 1,  # 1-indexed for display
-                    "choices": result["choices"],
-                    "payoffs": result["payoffs"],
-                    "total_score": result["total_scores"][player_number],
-                    "history": [
-                        {
-                            "round": r["round"] + 1,  # 1-indexed for display
-                            "my_choice": r["choices"][player_number],
-                            "opponent_choice": r["choices"][other_id],
-                            "my_payoff": r["payoffs"][player_number],
-                            "opponent_payoff": r["payoffs"][other_id],
-                        }
-                        for r in game.round_results
-                    ],
-                },
+                "gameId": game.game_id,
+                "round": result["round"] + 1,  # 1-indexed for display
+                "total_rounds": game.total_rounds,
+                "choices": result["choices"],
+                "payoffs": result["payoffs"],
+                "total_score": result["total_scores"][player_number],
+                "history": [
+                    {
+                        "round": r["round"] + 1,
+                        "my_choice": r["choices"][player_number],
+                        "opponent_choice": r["choices"][other_id],
+                        "my_payoff": r["payoffs"][player_number],
+                        "opponent_payoff": r["payoffs"][other_id],
+                    }
+                    for r in game.round_results
+                ],
             },
         )
 
-    async def send_game_ended(
+    async def send_game_over(
         self, websocket: ServerConnection, game: PrisonersDilemmaGame, player_number: int
     ) -> None:
-        """Send a game-ended message to a player."""
+        """Send a game-over event to a player."""
         other_id = next(pid for pid in game.players if pid != player_number)
-
         my_score = game.player_scores[player_number]
         opponent_score = game.player_scores[other_id]
-
         result = "win" if my_score > opponent_score else "lose" if my_score < opponent_score else "tie"
 
-        await self.send_message(
+        await self.send_event(
             websocket,
+            "game-over",
             {
-                "type": "event",
-                "eventType": "game-over",
-                "data": {
-                    "gameId": game.game_id,
-                    "result": result,
-                    "myFinalScore": my_score,
-                    "opponentFinalScore": opponent_score,
-                    "history": [
-                        {
-                            "round": r["round"] + 1,  # 1-indexed for display
-                            "myChoice": r["choices"][player_number],
-                            "opponentChoice": r["choices"][other_id],
-                            "myPayoff": r["payoffs"][player_number],
-                            "opponentPayoff": r["payoffs"][other_id],
-                        }
-                        for r in game.round_results
-                    ],
-                },
+                "gameId": game.game_id,
+                "result": result,
+                "myFinalScore": my_score,
+                "opponentFinalScore": opponent_score,
             },
         )
 
@@ -415,7 +342,6 @@ class PrisonersDilemmaServer:
         """Start the WebSocket server."""
         async with serve(self.handle_websocket, self.host, self.port):
             logger.info(f"Prisoner's Dilemma WebSocket server started on {self.host}:{self.port}")
-            # Keep the server running until interrupted
             await asyncio.Future()  # Run forever
 
     @classmethod
