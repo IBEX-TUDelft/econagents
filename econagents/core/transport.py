@@ -9,6 +9,7 @@ from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
 from econagents.core.logging_mixin import LoggerMixin
+from econagents.core.protocol import join_message
 
 
 class AuthenticationMechanism(ABC):
@@ -33,6 +34,26 @@ class SimpleLoginPayloadAuth(AuthenticationMechanism):
         """Send the login payload as a JSON message."""
         initial_message = json.dumps(kwargs)
         await transport.send(initial_message)
+        return True
+
+
+class JoinPayloadAuth(AuthenticationMechanism):
+    """Default authentication mechanism.
+
+    Sends a ``join`` envelope as the first message on the connection::
+
+        {"meta": {"type": "join"}, "payload": {<kwargs>}}
+
+    The keyword arguments passed via ``auth_mechanism_kwargs`` become the
+    ``payload`` (typically ``{"recovery": "<code>"}``). If the kwargs already
+    contain a ``meta`` key they are treated as a fully-formed envelope and sent
+    as-is, so callers may still pass an explicit envelope when needed.
+    """
+
+    async def authenticate(self, transport: "WebSocketTransport", **kwargs) -> bool:
+        """Send the join envelope as a JSON message."""
+        envelope = kwargs if "meta" in kwargs else join_message(**kwargs)
+        await transport.send(json.dumps(envelope))
         return True
 
 

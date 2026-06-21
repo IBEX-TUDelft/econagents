@@ -70,9 +70,8 @@ For example, in our server implementation, the server sends events like after ea
 .. code-block:: json
 
     {
-        "type": "event",
-        "eventType": "round-result",
-        "data": {
+        "meta": {"type": "round-result"},
+        "payload": {
             "gameId": 1743761219,
             "round": 1,
             "choices": {
@@ -90,7 +89,7 @@ For example, in our server implementation, the server sends events like after ea
         }
     }
 
-In this case, the ``EventField`` system updates the phase (using the ``round`` key) in ``PDMeta``, ``total_score`` in ``PDPrivate``, and ``history`` in ``PDPublic`` state. The ``payoffs`` key is ignored, because it was not included in the state definition.
+The framework reads the event type from ``meta.type`` and the event data from ``payload``. In this case, the ``EventField`` system updates the phase (using the ``round`` key) in ``PDMeta``, ``total_score`` in ``PDPrivate``, and ``history`` in ``PDPublic`` state. The ``payoffs`` key is ignored, because it was not included in the state definition.
 
 
 Agent Manager Implementation
@@ -115,16 +114,35 @@ The ``PDManager`` class in ``examples/prisoner/manager.py`` extends the ``TurnBa
                 agent_role=Prisoner(),
             )
             self.game_id = game_id
-            self.register_event_handler("assign-name", self._handle_name_assignment)
-
-        async def _handle_name_assignment(self, message: Message) -> None:
-            """Handle the name assignment event."""
-            ready_msg = {"gameId": self.game_id, "type": "player-is-ready"}
-            await self.send_message(json.dumps(ready_msg))
 
 The manager connects to the game server, maintains the game state, and orchestrates the agent's actions based on server events. When a new round starts, the manager updates the state and prompts the agent to make a decision.
 
-In this example, the server assigns a name to the agent, and then expects the agent to send a ``player-is-ready`` event when it's ready to start the game. This is handled by the ``_handle_name_assignment`` method.
+The connection authenticates with the default :class:`~econagents.JoinPayloadAuth`, which
+sends ``{"meta": {"type": "join"}, "payload": {...}}`` built from ``auth_mechanism_kwargs``.
+During the ``introduction`` phase the manager declares itself ready automatically: both
+``TurnBasedPhaseManager`` and ``HybridPhaseManager`` register a default handler for
+``INTRODUCTION_PHASE`` that returns ``ready_message()``
+(``{"meta": {"type": "ready", "component": {"type": "standard:ready"}}, "payload": {}}``).
+
+To customize the handshake — for example, if the server signals readiness with a different
+event — register your own handler:
+
+.. code-block:: python
+
+    from econagents import INTRODUCTION_PHASE, build_message
+
+    class PDManager(TurnBasedPhaseManager):
+        def __init__(self, game_id: int, auth_mechanism_kwargs: dict[str, Any]):
+            super().__init__(
+                auth_mechanism_kwargs=auth_mechanism_kwargs,
+                state=PDGameState(game_id=game_id),
+                agent_role=Prisoner(),
+            )
+            self.game_id = game_id
+            self.register_phase_handler(INTRODUCTION_PHASE, self._handle_introduction)
+
+        async def _handle_introduction(self, phase, state) -> dict:
+            return build_message("ready", component="standard:ready")
 
 Prompt System and Agent Behavior
 --------------------------------
@@ -177,17 +195,11 @@ The Prisoner's Dilemma example uses template-based prompts located in ``examples
     1. "COOPERATE" - if you choose to remain silent (cooperate)
     2. "DEFECT" - if you choose to testify against the other player (defect)
 
-    Provide your choice as a JSON object with the following fields:
-    - `gameId`: The ID of the game
-    - `type`: The type of message, which should be "choice"
-    - `choice`: The choice you made
-
-    Example:
+    Respond with a JSON message of exactly this shape:
     ```json
     {
-        "gameId": {{ meta.game_id }},
-        "type": "choice",
-        "choice": "COOPERATE",
+        "meta": {"type": "submit-choice", "component": {"type": "standard:coordination"}},
+        "payload": {"choice": "COOPERATE"}
     }
     ```
 
@@ -196,7 +208,41 @@ These templates leverage Jinja2 to dynamically insert the current game state. Th
 1. The system looks for phase-specific prompts first
 2. If none are found, it falls back to general prompts
 3. The LLM receives both system and user prompts and generates a response
-4. The response is assumed to be a JSON object, which is parsed into a dictionary and sent as is to the server
+4. The response is parsed into a dictionary by the default ``parse_phase_llm_response`` and sent to the server
+
+Rather than writing a custom parser, make the **response schema** the outbound message
+envelope. The default ``parse_phase_llm_response`` returns ``response.model_dump()`` for a
+structured response, so the validated schema *is* the message that gets sent — no custom
+parser needed:
+
+.. code-block:: python
+
+    from typing import Literal
+
+    from pydantic import BaseModel, Field
+    from econagents import AgentRole
+
+    class Component(BaseModel):
+        type: Literal["standard:coordination"] = "standard:coordination"
+
+    class ChoiceMeta(BaseModel):
+        type: Literal["submit-choice"] = "submit-choice"
+        component: Component = Field(default_factory=Component)
+
+    class ChoicePayload(BaseModel):
+        choice: Literal["COOPERATE", "DEFECT"]
+
+    class SubmitChoice(BaseModel):
+        meta: ChoiceMeta = Field(default_factory=ChoiceMeta)
+        payload: ChoicePayload
+
+    class Prisoner(AgentRole):
+        role = 1
+        name = "Prisoner"
+        llm = ChatOpenAI()
+        default_response_schema = SubmitChoice
+
+The LLM produces ``{"meta": {"type": "submit-choice", "component": {"type": "standard:coordination"}}, "payload": {"choice": "COOPERATE"}}`` directly.
 
 Running the Experiment
 ----------------------

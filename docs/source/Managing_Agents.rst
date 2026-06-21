@@ -51,14 +51,13 @@ Example usage:
 .. code-block:: python
 
     # Create a turn-based phase manager
+    # The default authentication mechanism (JoinPayloadAuth) sends a `join`
+    # envelope; the kwargs become its payload (typically a recovery code).
     manager = TurnBasedPhaseManager(
         url="wss://game-server.example.com",
         phase_transition_event="phase_change",
         phase_identifier_key="phase_number",
-        auth_mechanism=SimpleLoginPayloadAuth(),
-        auth_mechanism_kwargs={
-            "login_payload": {"username": "agent1", "password": "secret"},
-        },
+        auth_mechanism_kwargs={"recovery": "<recovery-code>"},
         state=game_state,
         agent_role=agent,
         logger=logging.getLogger("agent"),
@@ -70,6 +69,14 @@ Example usage:
 
     # Start the manager
     await manager.start()
+
+.. note::
+
+    ``TurnBasedPhaseManager`` and ``HybridPhaseManager`` register a default handler
+    for the ``introduction`` phase that declares the agent ready (it returns
+    ``ready_message()``). Register your own handler for ``INTRODUCTION_PHASE`` to
+    override it. To authenticate against a server that expects a flat login payload
+    instead of the ``join`` envelope, pass ``auth_mechanism=SimpleLoginPayloadAuth()``.
 
 ``HybridPhaseManager``
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -92,10 +99,7 @@ Example usage:
         continuous_phases={3, 5},  # Phases 3 and 5 are continuous
         min_action_delay=10,       # Minimum 10 seconds between actions
         max_action_delay=20,       # Maximum 20 seconds between actions
-        auth_mechanism=SimpleLoginPayloadAuth(),
-        auth_mechanism_kwargs={
-            "login_payload": {"username": "agent1", "password": "secret"},
-        },
+        auth_mechanism_kwargs={"recovery": "<recovery-code>"},
         state=game_state,
         agent_role=agent,
         logger=logging.getLogger("agent"),
