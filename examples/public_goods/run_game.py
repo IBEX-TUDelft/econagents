@@ -5,10 +5,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from typing_extensions import Literal
 
-from econagents.core.game_runner import GameRunner, TurnBasedGameRunnerConfig
-from examples.public_goods.manager import PublicGoodsManager
+from econagents.adapters.transport import SimpleLoginPayloadAuth
+from econagents.runtime.game_runner import GameRunner, TurnBasedGameRunnerConfig
+from examples.public_goods.agents import create_public_goods_agents
 from examples.public_goods.server.create_game import create_game_from_specs
-from examples.public_goods.state import PGGameState
 
 logger = logging.getLogger("public_goods_game")
 
@@ -35,10 +35,6 @@ async def main():
         public_good_efficiency=public_good_efficiency,
     )
 
-    login_payloads = [
-        {"type": "join", "gameId": game_specs["game_id"], "recovery": code} for code in game_specs["recovery_codes"]
-    ]
-
     config = TurnBasedGameRunnerConfig(
         game_id=game_specs["game_id"],
         logs_dir=Path(__file__).parent / "logs",
@@ -47,22 +43,14 @@ async def main():
         hostname="localhost",
         port=8765,
         path="wss",
-        state_class=PGGameState,
+        auth_mechanism=SimpleLoginPayloadAuth(),
         phase_transition_event="phase-started",
         phase_identifier_key="phase",
         observability_provider="langsmith",
     )
 
-    # Create agents for all players
-    agents = [
-        PublicGoodsManager(
-            game_id=game_specs["game_id"],
-            auth_mechanism_kwargs=login_payloads[i],
-            player_number=i + 1,
-            personality=get_personality(i + 1),
-        )
-        for i in range(num_players)
-    ]
+    personalities = [get_personality(i + 1) for i in range(num_players)]
+    agents = create_public_goods_agents(config, game_specs["recovery_codes"], personalities)
 
     runner = GameRunner(config=config, agents=agents)
     await runner.run_game()

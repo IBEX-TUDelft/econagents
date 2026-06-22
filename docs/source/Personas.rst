@@ -74,7 +74,7 @@ If you need to reference a bundled archetype by id, or to load personas from ext
 Attaching personas via code
 ---------------------------
 
-In code-driven experiments, use :func:`econagents.personas.load_persona` and pass the resolved persona to your role's constructor (or to a manager that wraps it).
+In code-driven experiments, use :func:`econagents.personas.load_persona` and pass the resolved persona to your role's constructor before creating the runtime.
 
 .. code-block:: python
 
@@ -123,11 +123,11 @@ When a persona is attached to a role, the library **automatically appends a stan
 
 Sections with empty underlying data are omitted, so an archetype-only persona (no demographics, no bio) produces just the ``Tendencies:`` list and nothing else.
 
-This behavior is controlled by ``AgentRole.auto_render_persona`` (default ``True``):
+This behavior is controlled by ``Role.auto_render_persona`` (default ``True``):
 
 .. code-block:: python
 
-    class MyRole(AgentRole):
+    class MyRole(Role):
         auto_render_persona = False   # take full control via {{ persona }}
 
 When disabled, the rendered system prompt is exactly what your template produces. The persona dict is still injected into the Jinja context as ``{{ persona }}``, so you can format it however you want:
@@ -204,6 +204,6 @@ End-to-end examples
 Two examples in the repository demonstrate the entry-point split:
 
 - ``examples/prisoner_personas/prisoner.yaml`` — YAML-driven, personas declared in the top-level ``personas:`` list and referenced by id from each agent. All in one file.
-- ``examples/prisoner_personas/run_game.py`` + ``manager.py`` — code-driven, bundled and file-based personas via ``load_persona``.
+- ``examples/prisoner_personas/run_game.py`` + ``agents.py`` — code-driven, bundled and file-based personas via ``load_persona`` and agent-runtime factories.
 
 Both reuse the prisoner server from ``examples/prisoner/``, so the only difference between the two examples is *how* personas are attached.

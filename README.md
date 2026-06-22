@@ -15,14 +15,15 @@
 
 # econagents
 
-econagents is a Python library that lets you use LLM agents in economic experiments. The framework connects LLM agents to game servers through WebSockets and provides a flexible architecture for designing, customizing, and running economic simulations.
+econagents is a Python library that lets you use LLM agents in economic experiments. The framework connects agents to game servers, projects server events into typed game state, asks role-specific LLM policies for actions, and sends those actions back through protocol adapters.
 
 ## Key Features
 
-- **Flexible Agent Customization**: Customize agent behavior with Jinja templates or custom Python methods
-- **Persistent personality can be set**: Built-in support to assign personalities to LLM players, example shown in Public goods game
-- **Event-Driven State Management**: Automatically update game state based on server events
-- **Turn-Based and Continuous Action Support**: Handle both turn-based games and continuous action phases
+- **Agent Runtime**: Run one explicit `Agent` per simulated player.
+- **Ports and Adapters**: Swap protocol codecs, transports, prompt renderers, response parsers, and state projectors.
+- **Flexible Agent Customization**: Customize behavior with Jinja templates, response schemas, personas, or custom Python phase handlers.
+- **Event-Driven State Management**: Project server events into typed public, private, and meta state.
+- **Turn-Based and Continuous Action Support**: Handle one-shot phase decisions and repeated continuous-phase actions.
 
 ## Installation
 
@@ -36,12 +37,14 @@ pip install git+https://github.com/IBEX-TUDelft/econagents.git
 
 ## Framework Components
 
-econagents consists of four key components:
+econagents consists of these main components:
 
-1. **Agent Roles**: Define player roles with customizable behaviors using a flexible prompt system.
-2. **Game State**: Hierarchical state management with automatic event-driven updates.
-3. **Agent Managers**: Manage agent connections to game servers and handle event processing.
-4. **Game Runner**: Orchestrates experiments by gluing together the other components.
+1. **Domain Types**: `Event`, `Action`, `PhaseId`, and `AgentContext`.
+2. **Ports**: Interfaces for codecs, transports, prompt rendering, response parsing, and state projection.
+3. **Adapters**: IBEX envelopes, WebSocket transport, Jinja prompts, JSON response parsing, and `EventField` state projection.
+4. **Roles**: Role-specific LLM policies and phase participation rules.
+5. **Agents**: One runtime per simulated player.
+6. **Game Runner**: Supervises agents, logging, timeout, and cleanup.
 
 ## Example Experiments
 

@@ -1,142 +1,95 @@
-Agent Managers
+Agents
 ==============
 
-Overview
---------
+``Agent`` is the runtime for one simulated player. It composes the
+transport, protocol codec, state projector, phase engine, role, and prompt
+directory into a single event loop.
 
-Agent Managers in the econagents framework provide the infrastructure for connecting agents to game servers, handling events, and managing agent lifecycles. This document explains the agent manager architecture and its key components.
+Responsibilities
+----------------
 
-Core Components
----------------
+An agent:
 
-Base Agent Manager
-~~~~~~~~~~~~~~~~~~
+* receives raw messages from ``WebSocketTransport``;
+* decodes them with a ``MessageCodec`` such as ``IbexMessageCodec``;
+* applies each event to ``GameState`` through a ``StateProjector``;
+* detects phase transitions;
+* executes role actions once for turn-based phases or repeatedly for
+  continuous phases;
+* encodes outbound actions and sends them through the transport;
+* stops itself when the configured end-game event arrives.
 
-The ``AgentManager`` class serves as the foundation for all agent managers in the system, providing:
-
-* **WebSocket Communication**: Handles connections to game servers
-* **Event Handling**: A robust event handling system with hooks and handlers
-* **Message Processing**: Parses and routes messages from the server
-
-Key features of the base manager include:
-
-* **Pre and Post Event Hooks**: Custom hooks that run before and after specific events
-* **Global Event Handling**: Handlers that process all events regardless of type
-* **Event-specific Handlers**: Custom handlers for specific event types
-
-However, you'd rarely need to use the ``AgentManager`` class directly. Instead, you'd use one of the specialized manager classes that inherit from it.
-
-``PhaseManager``
-^^^^^^^^^^^^^^^^
-
-This abstract base class provides the foundation for all phase-based managers:
-
-* **Phase Transition Handling**: Core mechanism for handling phase changes
-* **Continuous-time Phase Support**: Built-in support for phases requiring periodic actions
-* **Flexible Configuration**: Property setters for dynamic configuration
-* **State Management**: Automatic game state updates via event hooks
-
-``TurnBasedPhaseManager``
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-This concrete implementation handles turn-based games:
-
-* **Phase Action Execution**: Delegates phase actions to registered handlers or the agent
-* **Custom Phase Handlers**: Register specialized handlers for specific phases
-* **Agent Integration**: Automatically forwards phase actions to the agent when no handler exists
-* **All phases are turn-based**: All phases in this manager are treated as turn-based by default, with actions taken only when explicitly triggered
-
-Example usage:
+Creating An Agent
+-----------------
 
 .. code-block:: python
 
-    # Create a turn-based phase manager
-    # The default authentication mechanism (JoinPayloadAuth) sends a `join`
-    # envelope; the kwargs become its payload (typically a recovery code).
-    manager = TurnBasedPhaseManager(
-        url="wss://game-server.example.com",
-        phase_transition_event="phase_change",
-        phase_identifier_key="phase_number",
-        auth_mechanism_kwargs={"recovery": "<recovery-code>"},
-        state=game_state,
-        agent_role=agent,
-        logger=logging.getLogger("agent"),
-        prompts_dir=Path("prompts"),
-    )
+   from pathlib import Path
+   from econagents import Agent, PhaseEngine, create_game_state
 
-    # Register a custom phase handler
-    manager.register_phase_handler(2, handle_bidding_phase)
+   agent = Agent(
+       url="ws://localhost:8765",
+       state=create_game_state(MyState, game_id=1),
+       role=MyRole(),
+       prompts_dir=Path("prompts"),
+       auth_mechanism_kwargs={"recovery": "<code>"},
+       phase_transition_event="phase-started",
+       phase_identifier_key="phase",
+   )
 
-    # Start the manager
-    await manager.start()
+   await agent.start()
 
-.. note::
+Continuous Phases
+-----------------
 
-    ``TurnBasedPhaseManager`` and ``HybridPhaseManager`` register a default handler
-    for the ``introduction`` phase that declares the agent ready (it returns
-    ``ready_message()``). Register your own handler for ``INTRODUCTION_PHASE`` to
-    override it. To authenticate against a server that expects a flat login payload
-    instead of the ``join`` envelope, pass ``auth_mechanism=SimpleLoginPayloadAuth()``.
-
-``HybridPhaseManager``
-^^^^^^^^^^^^^^^^^^^^^^
-
-This manager handles games that combine turn-based and continuous action phases:
-
-* **Continuous-time Phase Configuration**: By default, all phases are treated as turn-based unless explicitly specified in the ``continuous_phases`` parameter
-* **Configurable Action Timing**: Control the frequency of actions in continuous-time phases
-* **Shared Implementation**: Leverages the same phase action execution mechanism as TurnBasedPhaseManager
-
-Example usage:
+Use ``PhaseEngine`` when an agent should keep acting while a phase remains
+active:
 
 .. code-block:: python
 
-    # Create a hybrid phase manager
-    manager = HybridPhaseManager(
-        url="wss://game-server.example.com",
-        phase_transition_event="phase_change",
-        phase_identifier_key="phase_number",
-        continuous_phases={3, 5},  # Phases 3 and 5 are continuous
-        min_action_delay=10,       # Minimum 10 seconds between actions
-        max_action_delay=20,       # Maximum 20 seconds between actions
-        auth_mechanism_kwargs={"recovery": "<recovery-code>"},
-        state=game_state,
-        agent_role=agent,
-        logger=logging.getLogger("agent"),
-        prompts_dir=Path("prompts"),
-    )
+   agent = Agent(
+       url="ws://localhost:8765",
+       state=create_game_state(MyState, game_id=1),
+       role=MyRole(),
+       prompts_dir=Path("prompts"),
+       auth_mechanism_kwargs={"recovery": "<code>"},
+       phase_engine=PhaseEngine(
+           continuous_phases={"market"},
+           min_action_delay=5,
+           max_action_delay=10,
+       ),
+   )
 
-    # Register a custom phase handler
-    manager.register_phase_handler(2, handle_bidding_phase)
+Phase Handlers
+--------------
 
-    # Start the manager
-    await manager.start()
+Register a phase handler when a phase should be handled by application code
+instead of the role's LLM decision path:
 
-Event Handling Architecture
----------------------------
+.. code-block:: python
 
-The event handling system follows this sequence for each event:
+   async def submit_ready(phase, state):
+       return {"meta": {"type": "ready"}, "payload": {}}
 
-1. **Global Pre-Event Hooks**: Run for all events first
-2. **Event-Specific Pre-Event Hooks**: Run for specific event types
-3. **Global Event Handlers**: Process all events
-4. **Event-Specific Handlers**: Process specific event types
-5. **Event-Specific Post-Event Hooks**: Run after specific event handlers
-6. **Global Post-Event Hooks**: Run after all event processing
+   agent.register_phase_handler("setup", submit_ready)
 
-This architecture allows for a flexible event handling system that can be customized for specific needs.
+Event Handlers
+--------------
 
-Phase Transition Process
-------------------------
+Register event handlers for side effects that should run after state
+projection:
 
-When using phase-based managers, phase transitions follow this sequence:
+.. code-block:: python
 
-1. **Phase Transition Event**: Server sends an event indicating a phase change
-2. **Current Phase Shutdown**: If in a continuous-time phase, any pending phase actions are cancelled
-3. **Phase Update**: The current phase is updated to the new phase
-4. **Phase Type Determination**:
-   * For turn-based phases (default): An initial action is executed once
-   * For continuous-time phases (if specified in ``continuous_phases``): A background task is started that will repeatedly execute actions with random delays between ``min_action_delay`` and ``max_action_delay``
-5. **Initial Action**: An initial action is executed for the new phase
+   async def log_assignment(event):
+       print(event.data)
 
-This systematic approach ensures smooth transitions between different types of game phases. To designate specific phases as continuous, use the ``HybridPhaseManager`` and specify them in the ``continuous_phases`` parameter. By default, all phases are treated as turn-based.
+   agent.register_event_handler("assign-role", log_assignment)
+
+Runner Supervision
+------------------
+
+``GameRunner`` supervises agents. It assigns per-agent loggers, starts all
+agents concurrently, enforces ``max_game_duration``, and stops running
+agents during cleanup. Agent construction belongs in code or YAML assembly;
+the runner does not build or mutate agents.

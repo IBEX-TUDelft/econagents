@@ -2,8 +2,8 @@ from typing import Any
 
 from pydantic import Field
 
-from econagents.core.state.fields import EventField
-from econagents.core.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
+from econagents.domain.state.fields import EventField
+from econagents.domain.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
 
 
 class PDMeta(MetaInformation):

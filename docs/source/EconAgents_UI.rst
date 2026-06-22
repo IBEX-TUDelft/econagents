@@ -15,7 +15,7 @@ What is EconAgents UI?
 EconAgents UI is a web-based graphical user interface designed to streamline the setup of economic experiments for the `econagents` Python library. It allows researchers and developers to:
 
 - Manage multiple experiment configurations (projects).
-- Define agent roles, including their names, IDs, LLM models, and task phases.
+- Define roles, including their names, IDs, LLM models, and task phases.
 - Structure the game state, detailing meta, private, and public information fields.
 - Create and manage system and user prompts using Jinja templating, with support for reusable partials.
 - Configure game runner settings, such as connection details and phase management.
@@ -28,7 +28,7 @@ Workflow: From UI Configuration to Experiment Execution
 The general workflow for using the EconAgents UI with the `econagents` library is as follows:
 
 1.  **Configure in the UI**:
-    Use the EconAgents UI to create a new project or modify an existing one. Define all aspects of your experiment, including agent roles, game state definitions, prompts for various phases, and overall runner configurations.
+    Use the EconAgents UI to create a new project or modify an existing one. Define all aspects of your experiment, including roles, game state definitions, prompts for various phases, and overall runner configurations.
 
 2.  **Obtain the YAML Configuration File**:
     The UI will manage and allow you to access the YAML configuration file that represents your experiment setup. This file encapsulates all the settings you've defined. Examples of such configuration files can be seen in the `econagents` library under `examples/prisoner/prisoner.yaml` or `examples/ibex_tudelft/futarchy_yaml/futarchy_config.yaml`.
@@ -39,7 +39,7 @@ The general workflow for using the EconAgents UI with the `econagents` library i
 Running an Experiment from a YAML Configuration File
 ----------------------------------------------------
 
-The `econagents` library provides a convenient function, `run_experiment_from_yaml`, to load an experiment configuration from a YAML file and execute it. This function handles the parsing of the YAML, initialization of agents, managers, and the game runner according to the specifications in the file.
+The `econagents` library provides a convenient function, `run_experiment_from_yaml`, to load an experiment configuration from a YAML file and execute it. This function handles YAML parsing, role creation, runtime creation, and game runner supervision according to the specifications in the file.
 
 Here's a conceptual example of how you might run an experiment using a YAML file:
 
@@ -47,7 +47,7 @@ Here's a conceptual example of how you might run an experiment using a YAML file
 
     import asyncio
     from pathlib import Path
-    from econagents.config_parser.base import run_experiment_from_yaml
+    from econagents.adapters.config import run_experiment_from_yaml
     # You'll typically have a helper script to create the game on your server
     # and get necessary details like game_id and login_payloads.
     # For instance:

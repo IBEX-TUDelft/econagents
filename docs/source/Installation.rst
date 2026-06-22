@@ -79,10 +79,10 @@ You can combine multiple optional dependencies:
 
       pip install econagents[ollama,langfuse]
 
-Core Dependencies
------------------
+Runtime Dependencies
+--------------------
 
-The core package depends on the following packages:
+The package depends on the following libraries:
 
 - ``pydantic``: For data validation and parsing
 - ``requests``: For HTTP requests

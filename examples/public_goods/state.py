@@ -1,8 +1,8 @@
 from pydantic import Field
 from traitlets import Any
 
-from econagents.core.state.fields import EventField
-from econagents.core.state.game import (
+from econagents.domain.state.fields import EventField
+from econagents.domain.state.game import (
     GameState,
     MetaInformation,
     PrivateInformation,

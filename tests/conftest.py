@@ -7,9 +7,11 @@ from typing import ClassVar, Dict, Optional
 import nest_asyncio
 from pytest_mock import MockFixture
 
-from econagents.core.agent_role import AgentRole
-from econagents.core.state.game import GameState, GameStateProtocol
-from econagents.llm.openai import ChatOpenAI
+from econagents.adapters.parsing import JsonResponseParser
+from econagents.adapters.prompts import JinjaPromptRenderer
+from econagents.adapters.llm.openai import ChatOpenAI
+from econagents.domain.role import Role
+from econagents.domain.state.game import GameState, GameStateProtocol
 
 # Apply nest_asyncio to allow running asyncio code in pytest
 nest_asyncio.apply()
@@ -32,12 +34,14 @@ class MockLLM(ChatOpenAI):
         ]
 
 
-class MockAgentRole(AgentRole[GameStateProtocol]):
+class MockRole(Role[GameStateProtocol]):
     llm = MockLLM()
     role: ClassVar[int] = 1
-    name: ClassVar[str] = "test_agent"
+    name: ClassVar[str] = "test_role"
     task_phases: ClassVar[list[int]] = []
     task_phases_excluded: ClassVar[list[int]] = []
+    prompt_renderer = JinjaPromptRenderer()
+    response_parser = JsonResponseParser()
 
     async def get_response_for_testing(self, response_text: str):
         """Helper method for testing custom responses."""
@@ -57,17 +61,17 @@ def prompts_path(tmp_path):
     prompts_dir.mkdir()
 
     # Create some test prompt templates
-    system_prompt = prompts_dir / "test_agent_system.jinja2"
+    system_prompt = prompts_dir / "test_role_system.jinja2"
     system_prompt.write_text("System prompt for {{ meta.phase }}")
 
-    user_prompt = prompts_dir / "test_agent_user.jinja2"
+    user_prompt = prompts_dir / "test_role_user.jinja2"
     user_prompt.write_text("User prompt for {{ meta.phase }}")
 
     # Phase-specific prompts
-    phase_system_prompt = prompts_dir / "test_agent_system_phase_1.jinja2"
+    phase_system_prompt = prompts_dir / "test_role_system_phase_1.jinja2"
     phase_system_prompt.write_text("Phase 1 system prompt")
 
-    phase_user_prompt = prompts_dir / "test_agent_user_phase_1.jinja2"
+    phase_user_prompt = prompts_dir / "test_role_user_phase_1.jinja2"
     phase_user_prompt.write_text("Phase 1 user prompt")
 
     # General prompts for all roles
@@ -83,7 +87,7 @@ def prompts_path(tmp_path):
     partial_file.write_text("Shared info: game ID is {{ meta.game_id }}")
 
     # Prompt that uses the partial
-    user_prompt_with_partial = prompts_dir / "test_agent_user_phase_2.jinja2"
+    user_prompt_with_partial = prompts_dir / "test_role_user_phase_2.jinja2"
     user_prompt_with_partial.write_text(
         "Phase 2 instructions.\n{% include '_partials/shared_info.jinja2' %}\nMore instructions."
     )
@@ -93,9 +97,9 @@ def prompts_path(tmp_path):
 
 
 @pytest.fixture
-def mock_agent_role(logger):
-    """Provide a mock agent instance."""
-    return MockAgentRole(logger=logger)
+def mock_role(logger):
+    """Provide a mock role instance."""
+    return MockRole(logger=logger)
 
 
 @pytest.fixture

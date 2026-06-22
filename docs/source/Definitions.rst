@@ -1,108 +1,76 @@
 Definitions
 ===========
 
-This document provides formal definitions for the key components, terminology, and architecture of the econagents framework.
-
-.. contents:: Table of Contents
-   :depth: 3
-   :local:
-
+This document defines the main concepts in econagents.
 
 Game Structure
 --------------
 
 **Game**
-    An economic experiment that consists of a set of players following a game description. A game consists of a set of phases and a set of roles assigned to players, and a set of information available to players per state of world. A game has at least one phase and one role.
+    An economic experiment with players, phases, roles, actions, and state.
 
 **Game Server**
-    The server that hosts the game and manages the game state, player interactions, and experiment logic.
+    The external server that owns the authoritative game state and emits
+    protocol messages.
 
-**Middleware**
-    The infrastructure that connects LLM agents and the game server, including:
+**Agent**
+    The runtime for one simulated player. It receives events, maintains that
+    player's local state, triggers role decisions, and sends actions.
 
-    * **econagents library**: Connects LLM agents and the game server based on experimenter settings
-    * **GUI (TBD)**: Provides an interface for experimenters to configure experiments
+**Game Runner**
+    The supervisor for a collection of agents. It starts agents,
+    manages logging, enforces timeouts, and stops agents during cleanup.
 
-Naming and Organization
------------------------
+Domain Concepts
+---------------
+
+**Event**
+    A decoded server message represented by ``Event(type, data)``.
+
+**Action**
+    A role decision before it is encoded for the wire protocol.
 
 **Phase**
-    A distinct temporal segment of a game during which specific actions are available to players. Phases follow each other sequentially in time. Two primary types exist:
+    A temporal segment of a game. A phase id can be a string or integer.
 
-    * **Turn-based Phase**: Discrete phases where agents take actions in turns or at specific moments. **By default, all phases are assumed to be turn-based.**
-    * **Continuous-time Phase**: Phases where agents can act continuously within time constraints. To designate specific phases as continuous, use the ``HybridPhaseManager`` and specify the continuous-time phases via the ``continuous_phases`` parameter.
+**Turn-based Phase**
+    A phase where an agent acts once when the phase begins.
+
+**Continuous Phase**
+    A phase where an agent acts repeatedly until the phase changes.
 
 **Role**
-    A set of tasks specified per phase of the game that defines player capabilities. Several players can have the same role. Roles encapsulate:
+    A player task definition. In code this is a ``Role`` with a role id,
+    name, LLM provider, phase participation settings, prompts, and response
+    parsing behavior.
 
-    * The agent's identity and responsibilities
-    * Available actions in each phase
-    * Specialized knowledge or capabilities
+State
+-----
 
-**Task/Action**
-    The specific choices available to players of a particular role in a phase. Tasks may be:
+**Meta Information**
+    Administrative state such as game id, player number, and current phase.
 
-    * **Empty**: Some roles may have no tasks in certain phases
-    * **Numerical Input**: Values (possibly from a restricted range)
-    * **Choice Selection**: Selection from a pre-specified list of options
-    * **Free Text**: Open-ended text input (where applicable)
+**Private Information**
+    State visible to the current player.
 
-**Information Management**
-    Data available to players that can influence their choices:
+**Public Information**
+    State visible to all players.
 
-    * **Public Information**: Visible to all players and included in all prompts
-    * **Private Information**: Available only to specific players or roles
-    * **Meta Information**: Information about the game, such as the rules, the current phase, the current round, etc.
+Ports And Adapters
+------------------
 
-Agent Manager Hierarchy
------------------------
+**Transport Port**
+    Async interface for sending and receiving raw messages.
 
-The econagents system uses a hierarchical approach to agent management:
+**Message Codec**
+    Adapter that translates raw protocol messages into domain events and
+    domain actions into outbound protocol messages.
 
-**Base Agent Manager**
-    The foundation class providing core functionality for:
+**State Projector**
+    Adapter that applies an event to a ``GameState``.
 
-    * WebSocket communication with game servers
-    * Event handling and routing
-    * Message processing
+**Prompt Renderer**
+    Adapter that renders prompts for a role and phase.
 
-**Phase Manager**
-    Abstract class extending the base manager with phase-specific capabilities:
-
-    * Phase transition handling
-    * State management for game phases
-    * Lifecycle hooks for phase events
-
-**Specialized Managers**
-
-* **TurnBasedPhaseManager**: Implements logic for turn-based games
-* **HybridPhaseManager**: Handles games with both turn-based and continuous-time phases
-* **Custom Game Managers**: Game-specific implementations (e.g., PDManager for Prisoner's Dilemma)
-
-Game Runner
------------
-
-The GameRunner is the main class that connects the game server to the LLM agents. It uses the AgentManager to manage the websocket connections with the game server and the isolated connections with the individual LLMs.
-It can be configured with a `max_game_duration` to automatically stop the game and agents if it runs longer than the specified time.
-
-Prompt Structure
-----------------
-
-Prompts follow standard templates with role-specific and phase-specific variations. They allow users to include public, private, and meta information appropriately. We use system and user prompts as the main building blocks of prompts.
-
-**System Prompt**
-    The foundational instruction set that defines the agent's role, capabilities, and constraints.
-
-    * Establishes the agent's persona and behavioral framework
-    * Includes core rules, constraints, and objectives for the agent
-    * Remains relatively constant across phases (with possible extensions per phase)
-    * Contains game rules, role descriptions, and strategy guidelines
-    * Often includes meta-instructions about response formatting and reasoning approaches
-
-**User Prompt**
-    The dynamic, context-specific instructions delivered to the agent in each interaction.
-
-    * Contains the current game state and relevant information for decision-making
-    * Incorporates both public and private information appropriate to the agent's role
-    * Includes specific action options with required formatting (often JSON)
-    * Generally updated with each phase and game state change
+**Response Parser**
+    Adapter that validates and converts LLM output into an action payload.

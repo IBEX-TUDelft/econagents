@@ -3,10 +3,12 @@
 ## Project Structure & Module Organization
 
 - `econagents/`: Source package.
-  - `core/` (agent_role, manager, state, game_runner, events, transport, logging_mixin)
-  - `llm/` (openai, ollama, observability integrations)
-  - `config_parser/` and `cli.py` (entry point `econagents`)
-- `tests/`: Pytest suite mirroring package layout (see `tests/core/*`, `tests/llm/*`).
+  - `domain/` (roles, messages, events, state models)
+  - `ports/` (codec, transport, prompts, parsing, state projection contracts)
+  - `adapters/` (config, LLM providers, protocol, prompts, parsing, state projection, transport)
+  - `runtime/` (agents, phase engine, experiment factory, game runner)
+  - `cli.py` (entry point `econagents`)
+- `tests/`: Pytest suite mirroring package layout (see `tests/domain/*`, `tests/runtime/*`, `tests/adapters/*`).
 - `examples/`: Runnable experiments (`prisoner/`, `dictator/`, `public_goods/`) with local servers.
 - `docs/`: Sphinx documentation (`make html`).
 - `assets/`: Static assets (e.g., logo).
@@ -28,14 +30,14 @@
 
 ## Coding Style & Naming Conventions
 
-- Use type hints throughout. Prefer Pydantic models for validated data structures in `core/state`.
+- Use type hints throughout. Prefer Pydantic models for validated data structures in `domain/state`.
 - Naming: modules/packages `snake_case`; classes `CamelCase`; functions/vars `snake_case`; tests `test_*.py`.
 - Keep public APIs documented with concise docstrings. Avoid unused imports and dead code. Run Ruff before committing.
 - Don't use excessive comments; code should be self-explanatory. When deleting code, remove it entirely rather than commenting out. Don't add comments about code deletions.
 
 ## Testing Guidelines
 
-- Framework: Pytest (with `pytest-asyncio` when needed). Place tests under `tests/` mirroring source (e.g., `tests/core/test_game_runner.py`).
+- Framework: Pytest (with `pytest-asyncio` when needed). Place tests under `tests/` mirroring source (e.g., `tests/runtime/test_game_runner.py`).
 - Conventions: files `test_*.py`, functions `test_*`. Prefer unit tests, mock network/LLM calls, and use fixtures from `tests/conftest.py`.
 - Aim for meaningful coverage; include failure paths. Generate reports with `--cov=econagents`.
 

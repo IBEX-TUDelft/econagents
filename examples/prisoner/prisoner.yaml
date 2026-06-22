@@ -55,7 +55,7 @@ prompt_partials:
       {% endif %}
 
 
-agent_roles:
+roles:
   - role_id: 1
     name: "cooperator"
     llm_type: "ChatOpenAI"
@@ -138,8 +138,8 @@ state:
       type: "list"
       default_factory: "list"
 
-manager:
-  type: "TurnBasedPhaseManager"
+runtime:
+  mode: "turn_based"
 
 runner:
   game_id: 0

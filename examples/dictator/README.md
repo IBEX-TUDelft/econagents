@@ -35,7 +35,7 @@ python run_game.py
 ## File Structure
 
 - `state.py`: Game state management classes
-- `manager.py`: Agent manager for handling game logic
+- `agents.py`: Agent roles and runtime factories
 - `run_game.py`: Main script to run the game with agents
 - `run_server.py`: Script to run the WebSocket server
 - `server/`: Server implementation

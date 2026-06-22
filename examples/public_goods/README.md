@@ -97,7 +97,7 @@ The personality assignment logic can be modified in the `get_personality()` func
 ```
 public_goods/
 ├── state.py              # Game state definitions
-├── manager.py            # Agent role and manager classes
+├── agents.py             # Agent roles and runtime factories
 ├── run_game.py           # Main game runner script
 ├── server/
 │   ├── server.py         # WebSocket server implementation

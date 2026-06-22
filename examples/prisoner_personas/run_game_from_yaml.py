@@ -3,7 +3,7 @@
 Reuses the local game server from ``examples/prisoner/`` and dispatches via
 ``run_experiment_from_yaml``. The behavioral and demographic differences between
 the two players come entirely from their persona references in
-``prisoner.yaml`` — there is no per-agent role logic in this example.
+``prisoner.yaml`` — there is no per-role logic in this example.
 
 Server first (in another terminal):
 
@@ -17,7 +17,7 @@ Then this:
 import asyncio
 from pathlib import Path
 
-from econagents.config_parser.base import run_experiment_from_yaml
+from econagents.adapters.config import run_experiment_from_yaml
 from examples.prisoner.server.create_game import create_game_from_specs
 
 

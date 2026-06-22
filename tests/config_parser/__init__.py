@@ -1,1 +1,0 @@
-"""Tests for the configuration parser module."""

@@ -286,7 +286,7 @@ class PrisonersDilemmaServer:
     async def send_phase_transition(
         self, websocket: ServerConnection, phase: str, extra: Optional[Dict[str, Any]] = None
     ) -> None:
-        """Send a phase-transition event. ``phase`` becomes the manager's current phase."""
+        """Send a phase-transition event. ``phase`` becomes the runtime's current phase."""
         await self.send_event(websocket, "phase-transition", {"phase": phase, **(extra or {})})
 
     async def send_round_result(
@@ -318,9 +318,7 @@ class PrisonersDilemmaServer:
             },
         )
 
-    async def send_game_over(
-        self, websocket: ServerConnection, game: PrisonersDilemmaGame, player_number: int
-    ) -> None:
+    async def send_game_over(self, websocket: ServerConnection, game: PrisonersDilemmaGame, player_number: int) -> None:
         """Send a game-over event to a player."""
         other_id = next(pid for pid in game.players if pid != player_number)
         my_score = game.player_scores[player_number]
