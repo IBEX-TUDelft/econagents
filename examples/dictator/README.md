@@ -24,12 +24,12 @@ This is an implementation of the Modified Dictator Game, an economic experiment 
 
 ### 1. Start the Server
 ```bash
-python run_server.py
+uv run python examples/dictator/server/server.py
 ```
 
 ### 2. Run the Game (in another terminal)
 ```bash
-python run_game.py
+uv run python examples/dictator/run_game.py
 ```
 
 ## File Structure
@@ -37,13 +37,13 @@ python run_game.py
 - `state.py`: Game state management classes
 - `agents.py`: Agent roles and runtime factories
 - `run_game.py`: Main script to run the game with agents
-- `run_server.py`: Script to run the WebSocket server
 - `server/`: Server implementation
   - `server.py`: WebSocket server for game coordination
   - `create_game.py`: Game creation utilities
 - `prompts/`: Jinja2 templates for agent prompts
-  - `dictator_system.jinja2`, `dictator_user.jinja2`: Prompts for dictator role
-  - `receiver_system.jinja2`, `receiver_user.jinja2`: Prompts for receiver role
+  - `dictator_system.jinja2`, `dictator_user_phase_1.jinja2`, `dictator_user_phase_2.jinja2`: Prompts for dictator role
+  - `receiver_system.jinja2`, `receiver_user_phase_2.jinja2`: Prompts for receiver role
+- `verify.py`: Local end-to-end verification script with deterministic agents
 - `logs/`: Game logs (created automatically)
 
 ## Example Scenario

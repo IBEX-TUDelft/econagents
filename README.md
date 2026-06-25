@@ -60,13 +60,13 @@ The simplest game to run is a version of the repeated prisoner's dilemma game th
 
 ```shell
 # Run the server
-python examples/prisoner/server/server.py
+uv run python examples/prisoner/server/server.py
 
 # Run the experiment (in a separate terminal)
-python examples/prisoner/run_game.py
+uv run python examples/prisoner/run_game.py
 ```
 
-Note: you still have to set up the connection to the agents.
+Note: set `OPENAI_API_KEY` before running OpenAI-backed examples.
 
 ## Documentation
 

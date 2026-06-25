@@ -250,11 +250,8 @@ First, you need to start the Prisoner's Dilemma game server. The server defines 
 
 .. code-block:: bash
 
-    # Navigate to the prisoner server directory
-    cd examples/prisoner/server
-
-    # Start the server
-    python server.py
+    # From the project root, start the server
+    uv run python examples/prisoner/server/server.py
 
 This will start a WebSocket server on localhost port 8765. The server has methods to create a new game and generate recovery codes that agents use to join the game.
 
@@ -272,11 +269,8 @@ To run the game, **open a new terminal** and run:
 
 .. code-block:: bash
 
-    # Navigate to the project root
-    cd examples/prisoner
-
-    # Run the game
-    python run_game.py
+    # From the project root, run the game
+    uv run python examples/prisoner/run_game.py
 
 This will start the game runner, which will connect to the server and start the game. You should run this in a new terminal, and keep the server running in the other terminal.
 
