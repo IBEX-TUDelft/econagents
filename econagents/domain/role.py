@@ -12,6 +12,7 @@ from econagents.domain.state.game import GameStateProtocol
 from econagents.ports.llm import LLMProvider
 from econagents.ports.parsing import ResponseParserPort
 from econagents.ports.prompts import PromptRendererPort, PromptType
+from econagents.ports.tools import Tool, ToolCall, ToolContext
 from econagents.personas import Persona
 
 StateT_contra = TypeVar("StateT_contra", bound=GameStateProtocol, contravariant=True)
@@ -90,6 +91,11 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
 
     persona: Optional[Persona] = None
     """Optional persona injected into the prompt context as ``persona``."""
+    tools: ClassVar[list[Tool]] = []
+    """Read-only tools the LLM may call while handling a phase. Override per
+    role, or pass ``tools=`` to the constructor."""
+    max_tool_iterations: ClassVar[int] = 5
+    """Safety cap on tool-call rounds per LLM response."""
     auto_render_persona: ClassVar[bool] = True
     """When ``True`` and a persona is attached, append a standard markdown block
     describing the persona to the end of the system prompt. Set to ``False`` to
@@ -101,12 +107,16 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
         persona: Optional[Persona] = None,
         prompt_renderer: PromptRendererPort | None = None,
         response_parser: ResponseParserPort | None = None,
+        tools: Optional[list[Tool]] = None,
     ):
         if logger:
             self.logger = logger
 
         if persona is not None:
             self.persona = persona
+
+        resolved_tools = tools if tools is not None else self.tools
+        self._tools_by_name: Dict[str, Tool] = {tool.name: tool for tool in resolved_tools}
 
         if prompt_renderer is not None:
             self.prompt_renderer = prompt_renderer
@@ -445,6 +455,8 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
 
         messages = self.llm.build_messages(system_prompt, user_prompt)
 
+        tool_kwargs = self._build_tool_kwargs(phase, state)
+
         try:
             response = await self.llm.get_response(
                 messages=messages,
@@ -452,8 +464,36 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
                     "state": state.model_dump(),
                 },
                 response_schema=self.get_response_schema(phase),
+                **tool_kwargs,
             )
             return self.parse_phase_llm_response(response, state)
         except Exception as e:
             self.logger.error(f"Error getting LLM response: {e}")
             return {"error": str(e), "phase": phase}
+
+    def _build_tool_kwargs(self, phase: PhaseId, state: StateT_contra) -> dict[str, Any]:
+        """Build the ``tools``/``tool_executor`` kwargs for the LLM call.
+
+        Returns an empty dict when the role has no tools, leaving the plain
+        single-shot LLM path unchanged.
+        """
+        if not self._tools_by_name:
+            return {}
+
+        ctx = ToolContext(state=state, phase=phase, logger=self.logger)
+
+        async def executor(call: ToolCall) -> Any:
+            tool = self._tools_by_name.get(call.name)
+            if tool is None:
+                return {"error": f"Unknown tool: {call.name}"}
+            try:
+                return await tool.run(call.arguments, ctx)
+            except Exception as exc:  # noqa: BLE001 - surfaced back to the model
+                self.logger.error(f"Tool {call.name!r} failed: {exc}")
+                return {"error": f"Tool {call.name} failed: {exc}"}
+
+        return {
+            "tools": [tool.spec() for tool in self._tools_by_name.values()],
+            "tool_executor": executor,
+            "max_tool_iterations": self.max_tool_iterations,
+        }

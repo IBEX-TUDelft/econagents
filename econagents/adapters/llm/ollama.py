@@ -1,10 +1,15 @@
 import importlib.util
+import json
 import logging
-from typing import Any, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel
 
 from econagents.adapters.llm.base import BaseLLM
+from econagents.ports.tools import ToolCall
+
+if TYPE_CHECKING:
+    from econagents.ports.tools import ToolExecutor, ToolSpec
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +40,29 @@ class ChatOllama(BaseLLM):
         if not importlib.util.find_spec("ollama"):
             raise ImportError("Ollama is not installed. Install it with: pip install econagents[ollama]")
 
+    @staticmethod
+    def _to_ollama_tools(tools: list["ToolSpec"]) -> list[dict[str, Any]]:
+        """Convert provider-agnostic specs to Ollama tool definitions."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": spec.name,
+                    "description": spec.description,
+                    "parameters": spec.parameters,
+                },
+            }
+            for spec in tools
+        ]
+
     async def get_response(
         self,
         messages: List[Dict[str, Any]],
         tracing_extra: Dict[str, Any],
         response_schema: Optional[Type[BaseModel]] = None,
+        tools: Optional[list["ToolSpec"]] = None,
+        tool_executor: Optional["ToolExecutor"] = None,
+        max_tool_iterations: int = 5,
     ) -> str:
         """Get a response from Ollama.
 
@@ -50,6 +73,9 @@ class ChatOllama(BaseLLM):
                 schema is passed to Ollama via ``format`` so the local model
                 is guided to emit matching JSON. The raw string is still
                 returned; the agent layer handles validation.
+            tools: Optional tool specs advertised to the model.
+            tool_executor: Async callback used to run each requested tool call.
+            max_tool_iterations: Safety cap on tool-call rounds.
 
         Returns:
             The response text from Ollama.
@@ -66,21 +92,55 @@ class ChatOllama(BaseLLM):
             if response_schema is not None:
                 kwargs["format"] = response_schema.model_json_schema()
 
-            response = await client.chat(
-                model=self.model_name,
-                messages=messages,
-                **kwargs,
-            )
+            use_tools = bool(tools) and tool_executor is not None
+            if use_tools:
+                kwargs["tools"] = self._to_ollama_tools(tools)
 
-            self.observability.track_llm_call(
-                name="ollama_chat_completion",
-                model=self.model_name,
-                messages=messages,
-                response=response,
-                metadata=tracing_extra,
-            )
+            conversation: list[Any] = list(messages)
 
-            return response["message"]["content"]
+            for _ in range(max_tool_iterations + 1 if use_tools else 1):
+                response = await client.chat(
+                    model=self.model_name,
+                    messages=conversation,
+                    **kwargs,
+                )
+
+                self.observability.track_llm_call(
+                    name="ollama_chat_completion",
+                    model=self.model_name,
+                    messages=conversation,
+                    response=response,
+                    metadata=tracing_extra,
+                )
+
+                message = response["message"]
+                if not use_tools:
+                    return message["content"]
+
+                tool_calls = message.get("tool_calls") or []
+                if not tool_calls:
+                    return message["content"]
+
+                conversation.append(message)
+                for call in tool_calls:
+                    fn = call["function"]
+                    arguments = fn.get("arguments") or {}
+                    if isinstance(arguments, str):
+                        arguments = json.loads(arguments or "{}")
+                    result = await tool_executor(  # type: ignore[misc]
+                        ToolCall(id=fn["name"], name=fn["name"], arguments=arguments)
+                    )
+                    conversation.append(
+                        {
+                            "role": "tool",
+                            "tool_name": fn["name"],
+                            "content": json.dumps(result, default=str),
+                        }
+                    )
+
+            logger.warning("Max tool iterations (%s) reached; returning last response.", max_tool_iterations)
+            final = await client.chat(model=self.model_name, messages=conversation, **kwargs)
+            return final["message"]["content"]
 
         except ImportError as e:
             logger.error(f"Failed to import Ollama: {e}")

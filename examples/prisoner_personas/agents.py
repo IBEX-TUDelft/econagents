@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import Literal, Optional
 
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from econagents import Role
 from econagents.runtime import Agent, create_game_state
@@ -16,12 +16,24 @@ from examples.prisoner.state import PDGameState
 load_dotenv()
 
 
-class PrisonerChoice(BaseModel):
+class Component(BaseModel):
+    type: Literal["standard:coordination"] = "standard:coordination"
+
+
+class ChoiceMeta(BaseModel):
+    type: Literal["submit-choice"] = "submit-choice"
+    component: Component = Field(default_factory=Component)
+
+
+class ChoicePayload(BaseModel):
+    choice: Literal["COOPERATE", "DEFECT"]
+
+
+class SubmitChoice(BaseModel):
     """Structured output the prisoner emits every round."""
 
-    gameId: int
-    type: Literal["choice"]
-    choice: Literal["COOPERATE", "DEFECT"]
+    meta: ChoiceMeta = Field(default_factory=ChoiceMeta)
+    payload: ChoicePayload
 
 
 class Prisoner(Role):
@@ -30,7 +42,8 @@ class Prisoner(Role):
     role = 1
     name = "Prisoner"
     llm = ChatOpenAI(model_name="gpt-5.4-mini")
-    default_response_schema = PrisonerChoice
+    task_phases = ["decision"]
+    default_response_schema = SubmitChoice
 
 
 def create_prisoner_persona_agent(

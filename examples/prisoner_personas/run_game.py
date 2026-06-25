@@ -95,7 +95,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--port",
         type=int,
-        default=3000,
+        default=8765,
         help="Game server port.",
     )
     return parser.parse_args()

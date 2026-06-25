@@ -120,7 +120,7 @@ class PublicGoodsServer:
                         game_id = data.get("gameId")
                         recovery = data.get("recovery")
 
-                        if not game_id and not recovery:
+                        if not game_id or not recovery:
                             await self.send_error(websocket, "Game ID and recovery code are required")
                             continue
 

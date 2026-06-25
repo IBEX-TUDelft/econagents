@@ -1,5 +1,4 @@
 from pydantic import Field
-from traitlets import Any
 
 from econagents.domain.state.fields import EventField
 from econagents.domain.state.game import (
@@ -46,7 +45,3 @@ class PGGameState(GameState):
     meta: PGMeta = Field(default_factory=PGMeta)
     private_information: PGPrivate = Field(default_factory=PGPrivate)
     public_information: PGPublic = Field(default_factory=PGPublic)
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.meta.personality = kwargs["personality"]

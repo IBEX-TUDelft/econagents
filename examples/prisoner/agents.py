@@ -43,7 +43,7 @@ class SubmitChoice(BaseModel):
 class Prisoner(Role):
     role = 1
     name = "Prisoner"
-    llm = ChatOpenAI(model_name="gpt-4o-mini")
+    llm = ChatOpenAI(model_name="gpt-5.4-mini")
     task_phases = ["decision"]
     default_response_schema = SubmitChoice
 

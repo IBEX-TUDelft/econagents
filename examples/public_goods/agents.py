@@ -47,13 +47,15 @@ def create_public_goods_agent(
     personality: str,
 ) -> Agent:
     """Create one public-goods player agent."""
+    state = create_game_state(PGGameState, game_id=config.game_id)
+    state.meta.personality = personality
     return Agent(
         url=config.server_url(),
         auth_mechanism=config.auth_mechanism,
         auth_mechanism_kwargs={"type": "join", "gameId": config.game_id, "recovery": recovery_code},
         message_codec=FlatMessageCodec(),
         role=Player(),
-        state=create_game_state(PGGameState, game_id=config.game_id, personality=personality),
+        state=state,
         prompts_dir=config.prompts_dir,
         phase_transition_event=config.phase_transition_event,
         phase_identifier_key=config.phase_identifier_key,

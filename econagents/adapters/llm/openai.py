@@ -1,10 +1,15 @@
 import importlib.util
+import json
 import logging
-from typing import Any, Literal, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Type, Union
 
 from pydantic import BaseModel
 
 from econagents.adapters.llm.base import BaseLLM
+from econagents.ports.tools import ToolCall
+
+if TYPE_CHECKING:
+    from econagents.ports.tools import ToolExecutor, ToolSpec
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +70,27 @@ class ChatOpenAI(BaseLLM):
             reasoning["summary"] = self.reasoning_summary
         return reasoning
 
+    @staticmethod
+    def _to_openai_tools(tools: list["ToolSpec"]) -> list[dict[str, Any]]:
+        """Convert provider-agnostic specs to Responses API tool definitions."""
+        return [
+            {
+                "type": "function",
+                "name": spec.name,
+                "description": spec.description,
+                "parameters": spec.parameters,
+            }
+            for spec in tools
+        ]
+
     async def get_response(
         self,
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
         response_schema: Optional[Type[BaseModel]] = None,
+        tools: Optional[list["ToolSpec"]] = None,
+        tool_executor: Optional["ToolExecutor"] = None,
+        max_tool_iterations: int = 5,
     ) -> Union[str, BaseModel]:
         """Get a response from the OpenAI Responses API.
 
@@ -80,6 +101,10 @@ class ChatOpenAI(BaseLLM):
                 output format. When provided, the method returns a validated
                 instance of the model; otherwise it returns the plain text
                 output from the API.
+            tools: Optional tool specs advertised to the model via the
+                Responses API ``tools`` parameter.
+            tool_executor: Async callback used to run each requested tool call.
+            max_tool_iterations: Safety cap on tool-call rounds.
 
         Returns:
             A validated ``response_schema`` instance, or the raw text output
@@ -93,34 +118,75 @@ class ChatOpenAI(BaseLLM):
 
             client = AsyncOpenAI(api_key=self.api_key)
 
-            kwargs: dict[str, Any] = {
+            base_kwargs: dict[str, Any] = {
                 "model": self.model_name,
-                "input": messages,
                 **self._response_kwargs,
             }
             reasoning = self._build_reasoning()
             if reasoning is not None:
-                kwargs["reasoning"] = reasoning
+                base_kwargs["reasoning"] = reasoning
 
-            if response_schema is not None:
-                response = await client.responses.parse(
-                    text_format=response_schema,
-                    **kwargs,
+            use_tools = bool(tools) and tool_executor is not None
+            tool_payload = self._to_openai_tools(tools) if use_tools else None
+
+            conversation: list[Any] = list(messages)
+
+            for _ in range(max_tool_iterations + 1 if use_tools else 1):
+                kwargs = {**base_kwargs, "input": conversation}
+                if tool_payload is not None:
+                    kwargs["tools"] = tool_payload
+
+                if response_schema is not None:
+                    response = await client.responses.parse(text_format=response_schema, **kwargs)
+                else:
+                    response = await client.responses.create(**kwargs)
+
+                self.observability.track_llm_call(
+                    name="openai_responses",
+                    model=self.model_name,
+                    messages=conversation,
+                    response=response,
+                    metadata=tracing_extra,
                 )
-                parsed: Union[str, BaseModel] = response.output_parsed
-            else:
-                response = await client.responses.create(**kwargs)
-                parsed = response.output_text
 
-            self.observability.track_llm_call(
-                name="openai_responses",
-                model=self.model_name,
-                messages=messages,
-                response=response,
-                metadata=tracing_extra,
-            )
+                if not use_tools:
+                    return response.output_parsed if response_schema is not None else response.output_text
 
-            return parsed
+                function_calls = [item for item in response.output if getattr(item, "type", None) == "function_call"]
+                if not function_calls:
+                    return response.output_parsed if response_schema is not None else response.output_text
+
+                for item in function_calls:
+                    conversation.append(
+                        {
+                            "type": "function_call",
+                            "call_id": item.call_id,
+                            "name": item.name,
+                            "arguments": item.arguments,
+                        }
+                    )
+                    result = await tool_executor(  # type: ignore[misc]
+                        ToolCall(
+                            id=item.call_id,
+                            name=item.name,
+                            arguments=json.loads(item.arguments or "{}"),
+                        )
+                    )
+                    conversation.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(result, default=str),
+                        }
+                    )
+
+            logger.warning("Max tool iterations (%s) reached; forcing a final answer.", max_tool_iterations)
+            final_kwargs = {**base_kwargs, "input": conversation}
+            if response_schema is not None:
+                response = await client.responses.parse(text_format=response_schema, **final_kwargs)
+                return response.output_parsed
+            response = await client.responses.create(**final_kwargs)
+            return response.output_text
         except ImportError as e:
             logger.error(f"Failed to import OpenAI: {e}")
             raise ImportError("OpenAI is not installed. Install it with: pip install econagents[openai]") from e

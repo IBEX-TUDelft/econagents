@@ -42,11 +42,10 @@ async def main():
         log_level=logging.DEBUG,
         hostname="localhost",
         port=8765,
-        path="wss",
+        path="",
         auth_mechanism=SimpleLoginPayloadAuth(),
         phase_transition_event="phase-started",
         phase_identifier_key="phase",
-        observability_provider="langsmith",
     )
 
     personalities = [get_personality(i + 1) for i in range(num_players)]
