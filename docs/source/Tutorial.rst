@@ -199,7 +199,7 @@ The Prisoner's Dilemma example uses template-based prompts located in ``examples
     }
     ```
 
-These templates leverage Jinja2 to dynamically insert the current game state. The agent's decision-making process follows the prompt resolution logic described in :doc:`Customizing_Agent_Roles`:
+These templates leverage Jinja2 to dynamically insert the current game state. The agent's decision-making process follows the prompt resolution logic described in :doc:`Customizing_Roles`:
 
 1. The system looks for phase-specific prompts first
 2. If none are found, it falls back to general prompts
@@ -319,7 +319,7 @@ Edit the templates in ``examples/prisoner/prompts/`` to change the agent's behav
 
 You can also define new roles (e.g., ``Cooperator``) and create role-specific prompts (e.g., ``cooperator_system.jinja2``) to customize the agent's behavior.
 
-You can also use the methods described in :doc:`Customizing_Agent_Roles` to create more sophisticated agents with phase-specific behaviors.
+You can also use the methods described in :doc:`Customizing_Roles` to create more sophisticated agents with phase-specific behaviors.
 
 
 Modifying Game Rules
@@ -332,4 +332,4 @@ For more advanced usage, you can:
 3. Implement more complex game rules and state management
 4. Explore multi-agent scenarios with more than two players
 
-Refer to the documentation on :doc:`Managing_Agents`, :doc:`Managing_State`, and :doc:`Customizing_Agent_Roles` for more details.
+Refer to the documentation on :doc:`Managing_Agents`, :doc:`Managing_State`, and :doc:`Customizing_Roles` for more details.
