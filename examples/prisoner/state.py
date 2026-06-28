@@ -2,15 +2,17 @@ from typing import Any
 
 from pydantic import Field
 
-from econagents.core.state.fields import EventField
-from econagents.core.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
+from econagents.domain.messages import PhaseId
+from econagents.domain.state.fields import EventField
+from econagents.domain.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
 
 
 class PDMeta(MetaInformation):
     """Meta information for the Prisoner's Dilemma game."""
 
     game_id: int = EventField(default=0, exclude_from_mapping=True)
-    phase: int = EventField(default=0, event_key="round")
+    phase: PhaseId = EventField(default="waiting")
+    round: int = EventField(default=0, event_key="round")
     total_rounds: int = EventField(default=5)
 
 

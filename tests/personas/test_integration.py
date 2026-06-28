@@ -1,4 +1,4 @@
-"""End-to-end persona integration with config parser and AgentRole rendering."""
+"""End-to-end persona integration with YAML loading and Role rendering."""
 
 from __future__ import annotations
 
@@ -9,14 +9,16 @@ from typing import ClassVar
 import pytest
 import yaml
 
-from econagents.config_parser.base import (
-    AgentMappingConfig,
-    AgentRoleConfig,
-    BaseConfigParser,
+from econagents.adapters.config import (
+    AgentSpec,
+    RoleSpec,
+    YamlExperimentLoader,
 )
-from econagents.core.agent_role import AgentRole
-from econagents.core.state.game import GameState
-from econagents.llm.openai import ChatOpenAI
+from econagents.adapters.parsing import JsonResponseParser
+from econagents.adapters.prompts import JinjaPromptRenderer
+from econagents.domain.role import Role
+from econagents.domain.state.game import GameState
+from econagents.adapters.llm.openai import ChatOpenAI
 from econagents.personas import Persona
 
 
@@ -28,10 +30,12 @@ class _MockLLM(ChatOpenAI):
         return []
 
 
-class _PersonaAwareRole(AgentRole):
+class _PersonaAwareRole(Role):
     role: ClassVar[int] = 1
     name: ClassVar[str] = "player"
     llm = _MockLLM()
+    prompt_renderer = JinjaPromptRenderer()
+    response_parser = JsonResponseParser()
 
 
 class _NoAutoRenderRole(_PersonaAwareRole):
@@ -150,23 +154,23 @@ def test_state_key_named_persona_wins_over_injection(tmp_path: Path):
     assert rendered == "from-state"
 
 
-def test_create_agent_role_attaches_persona():
-    cfg = AgentRoleConfig(role_id=1, name="player", llm_params={"model_name": "gpt-test"})
+def test_create_role_attaches_persona():
+    cfg = RoleSpec(role_id=1, name="player", llm_params={"model_name": "gpt-test"})
     persona = Persona(id="alice", traits={"cooperativeness": "high"})
-    role = cfg.create_agent_role(persona=persona)
+    role = cfg.create_role(persona=persona)
     assert role.persona == persona
 
 
 def test_persona_id_on_agent_mapping_is_a_string_ref():
-    """persona_id is set as a string; resolution happens at ExperimentConfig level."""
-    m = AgentMappingConfig(id=1, role_id=1, persona_id="alice")
+    """persona_id is set as a string; resolution happens at ExperimentSpec level."""
+    m = AgentSpec(id=1, role_id=1, persona_id="alice")
     assert m.persona_id == "alice"
 
 
 def _make_experiment_dict(personas, agents):
     return {
         "name": "test",
-        "agent_roles": [{"role_id": 1, "name": "player", "llm_params": {"model_name": "gpt-test"}}],
+        "roles": [{"role_id": 1, "name": "player", "llm_params": {"model_name": "gpt-test"}}],
         "personas": personas,
         "agents": agents,
         "state": {
@@ -174,7 +178,7 @@ def _make_experiment_dict(personas, agents):
             "private_information": [],
             "public_information": [],
         },
-        "manager": {"type": "TurnBasedPhaseManager"},
+        "runtime": {"mode": "turn_based"},
         "runner": {
             "type": "TurnBasedGameRunner",
             "hostname": "h",
@@ -199,7 +203,7 @@ def test_top_level_personas_resolve_by_id(tmp_path: Path):
     yaml_path = tmp_path / "config.yaml"
     yaml_path.write_text(yaml.safe_dump(config_dict))
 
-    parser = BaseConfigParser(config_path=yaml_path)
+    parser = YamlExperimentLoader(config_path=yaml_path)
     assert len(parser.config.personas) == 1
     assert parser.config.personas[0].id == "shared"
     assert all(a.persona_id == "shared" for a in parser.config.agents)
@@ -214,7 +218,7 @@ def test_unknown_persona_id_is_rejected(tmp_path: Path):
     yaml_path.write_text(yaml.safe_dump(config_dict))
 
     with pytest.raises(ValueError, match="not declared in the top-level"):
-        BaseConfigParser(config_path=yaml_path)
+        YamlExperimentLoader(config_path=yaml_path)
 
 
 def test_duplicate_persona_id_is_rejected(tmp_path: Path):
@@ -229,6 +233,4 @@ def test_duplicate_persona_id_is_rejected(tmp_path: Path):
     yaml_path.write_text(yaml.safe_dump(config_dict))
 
     with pytest.raises(ValueError, match="Duplicate persona id"):
-        BaseConfigParser(config_path=yaml_path)
-
-
+        YamlExperimentLoader(config_path=yaml_path)

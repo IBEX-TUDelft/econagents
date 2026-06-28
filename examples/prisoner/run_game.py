@@ -4,10 +4,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from econagents.core.game_runner import GameRunner, TurnBasedGameRunnerConfig
-from examples.prisoner.manager import PDManager
+from econagents.runtime.game_runner import GameRunner, TurnBasedGameRunnerConfig
+from examples.prisoner.agents import create_prisoner_agents
 from examples.prisoner.server.create_game import create_game_from_specs
-from examples.prisoner.state import PDGameState
 
 logger = logging.getLogger("prisoners_dilemma")
 
@@ -20,10 +19,6 @@ async def main():
 
     game_specs = create_game_from_specs()
 
-    # Create config and runner. The framework defaults handle authentication
-    # (the `join` handshake), message parsing (the `{"meta": ..., "payload": ...}`
-    # envelope), and the introduction -> ready handshake, so no custom auth
-    # mechanism or message parser is needed.
     config = TurnBasedGameRunnerConfig(
         game_id=game_specs["game_id"],
         logs_dir=Path(__file__).parent / "logs",
@@ -32,15 +27,8 @@ async def main():
         hostname="localhost",
         port=8765,
         path="",
-        state_class=PDGameState,
     )
-    agents = [
-        PDManager(
-            game_id=game_specs["game_id"],
-            auth_mechanism_kwargs={"gameId": game_specs["game_id"], "recovery": code},
-        )
-        for code in game_specs["recovery_codes"]
-    ]
+    agents = create_prisoner_agents(config, game_specs["recovery_codes"])
     runner = GameRunner(config=config, agents=agents)
 
     # Run the game

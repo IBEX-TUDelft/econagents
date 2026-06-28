@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 
-from econagents.config_parser.base import run_experiment_from_yaml
+from econagents.adapters.config import run_experiment_from_yaml
 from examples.prisoner.server.create_game import create_game_from_specs
 
 

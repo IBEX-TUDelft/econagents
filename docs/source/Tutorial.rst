@@ -92,57 +92,53 @@ For example, in our server implementation, the server sends events like after ea
 The framework reads the event type from ``meta.type`` and the event data from ``payload``. In this case, the ``EventField`` system updates the phase (using the ``round`` key) in ``PDMeta``, ``total_score`` in ``PDPrivate``, and ``history`` in ``PDPublic`` state. The ``payoffs`` key is ignored, because it was not included in the state definition.
 
 
-Agent Manager Implementation
+Agent Implementation
 ----------------------------
 
-The ``PDManager`` class in ``examples/prisoner/manager.py`` extends the ``TurnBasedPhaseManager`` to handle the turn-based nature of the Prisoner's Dilemma game:
+The prisoner example defines a role and an agent factory:
 
 .. code-block:: python
 
-    class Prisoner(AgentRole):
-        # Define the agent role
+    from econagents import Role
+    from econagents.runtime import Agent, GameRunnerConfig, create_game_state
+
+    class Prisoner(Role):
         role = 1
         name = "Prisoner"
         llm = ChatOpenAI()
 
-    class PDManager(TurnBasedPhaseManager):
-        # Manager for the Prisoner's Dilemma game
-        def __init__(self, game_id: int, auth_mechanism_kwargs: dict[str, Any]):
-            super().__init__(
-                auth_mechanism_kwargs=auth_mechanism_kwargs,
-                state=PDGameState(game_id=game_id),
-                agent_role=Prisoner(),
-            )
-            self.game_id = game_id
+    def create_prisoner_agent(config: GameRunnerConfig, recovery_code: str):
+        return Agent(
+            url=config.server_url(),
+            auth_mechanism=config.auth_mechanism,
+            auth_mechanism_kwargs={"gameId": config.game_id, "recovery": recovery_code},
+            state=create_game_state(PDGameState, game_id=config.game_id),
+            role=Prisoner(),
+            prompts_dir=config.prompts_dir,
+            phase_transition_event=config.phase_transition_event,
+            phase_identifier_key=config.phase_identifier_key,
+        )
 
-The manager connects to the game server, maintains the game state, and orchestrates the agent's actions based on server events. When a new round starts, the manager updates the state and prompts the agent to make a decision.
+The agent connects to the game server, maintains local state, and orchestrates
+actions based on server events. When a new round starts, the agent projects the
+event into state and prompts the role to make a decision.
 
 The connection authenticates with the default :class:`~econagents.JoinPayloadAuth`, which
 sends ``{"meta": {"type": "join"}, "payload": {...}}`` built from ``auth_mechanism_kwargs``.
-During the ``introduction`` phase the manager declares itself ready automatically: both
-``TurnBasedPhaseManager`` and ``HybridPhaseManager`` register a default handler for
-``INTRODUCTION_PHASE`` that returns ``ready_message()``
+During the ``introduction`` phase the agent declares itself ready by returning
+``ready_message()``
 (``{"meta": {"type": "ready", "component": {"type": "standard:ready"}}, "payload": {}}``).
 
-To customize the handshake — for example, if the server signals readiness with a different
-event — register your own handler:
+To customize the handshake, register your own phase handler:
 
 .. code-block:: python
 
     from econagents import INTRODUCTION_PHASE, build_message
 
-    class PDManager(TurnBasedPhaseManager):
-        def __init__(self, game_id: int, auth_mechanism_kwargs: dict[str, Any]):
-            super().__init__(
-                auth_mechanism_kwargs=auth_mechanism_kwargs,
-                state=PDGameState(game_id=game_id),
-                agent_role=Prisoner(),
-            )
-            self.game_id = game_id
-            self.register_phase_handler(INTRODUCTION_PHASE, self._handle_introduction)
+    async def custom_ready(phase, state) -> dict:
+        return build_message("ready", component="standard:ready")
 
-        async def _handle_introduction(self, phase, state) -> dict:
-            return build_message("ready", component="standard:ready")
+    agent.register_phase_handler(INTRODUCTION_PHASE, custom_ready)
 
 Prompt System and Agent Behavior
 --------------------------------
@@ -203,7 +199,7 @@ The Prisoner's Dilemma example uses template-based prompts located in ``examples
     }
     ```
 
-These templates leverage Jinja2 to dynamically insert the current game state. The agent's decision-making process follows the prompt resolution logic described in :doc:`Customizing_Agent_Roles`:
+These templates leverage Jinja2 to dynamically insert the current game state. The agent's decision-making process follows the prompt resolution logic described in :doc:`Customizing_Roles`:
 
 1. The system looks for phase-specific prompts first
 2. If none are found, it falls back to general prompts
@@ -220,7 +216,7 @@ parser needed:
     from typing import Literal
 
     from pydantic import BaseModel, Field
-    from econagents import AgentRole
+    from econagents import Role
 
     class Component(BaseModel):
         type: Literal["standard:coordination"] = "standard:coordination"
@@ -236,7 +232,7 @@ parser needed:
         meta: ChoiceMeta = Field(default_factory=ChoiceMeta)
         payload: ChoicePayload
 
-    class Prisoner(AgentRole):
+    class Prisoner(Role):
         role = 1
         name = "Prisoner"
         llm = ChatOpenAI()
@@ -254,11 +250,8 @@ First, you need to start the Prisoner's Dilemma game server. The server defines 
 
 .. code-block:: bash
 
-    # Navigate to the prisoner server directory
-    cd examples/prisoner/server
-
-    # Start the server
-    python server.py
+    # From the project root, start the server
+    uv run python examples/prisoner/server/server.py
 
 This will start a WebSocket server on localhost port 8765. The server has methods to create a new game and generate recovery codes that agents use to join the game.
 
@@ -276,11 +269,8 @@ To run the game, **open a new terminal** and run:
 
 .. code-block:: bash
 
-    # Navigate to the project root
-    cd examples/prisoner
-
-    # Run the game
-    python run_game.py
+    # From the project root, run the game
+    uv run python examples/prisoner/run_game.py
 
 This will start the game runner, which will connect to the server and start the game. You should run this in a new terminal, and keep the server running in the other terminal.
 
@@ -288,8 +278,8 @@ Behind the scenes, here's what happens:
 
 1. The ``run_game.py`` script creates a game on the server via ``create_game_from_specs()``
 2. It initializes a ``TurnBasedGameRunnerConfig`` with paths to logs and prompts
-3. It creates ``PDManager`` instances for each player with appropriate authentication
-4. The ``GameRunner`` connects all managers to the server and coordinates the game flow
+3. It creates one ``Agent`` for each player with appropriate authentication
+4. The ``GameRunner`` starts all agents and supervises the game flow
 5. When a new round starts, each agent receives the current state and makes a decision
 6. The server processes the decisions and updates the game state
 7. This cycle continues until all rounds are completed
@@ -321,9 +311,9 @@ Edit the templates in ``examples/prisoner/prompts/`` to change the agent's behav
 - Modify the instructions in ``all_user.jinja2`` to guide the agent toward specific strategies
 - Create phase-specific prompts like ``all_system_phase_3.jinja2`` to change behavior in specific rounds
 
-You can also new agent roles (e.g., ``Cooperator``) and create agent-specific prompts (e.g., ``cooperator_system.jinja2``) to customize the agent's behavior.
+You can also define new roles (e.g., ``Cooperator``) and create role-specific prompts (e.g., ``cooperator_system.jinja2``) to customize the agent's behavior.
 
-You can also use the methods described in :doc:`Customizing_Agent_Roles` to create more sophisticated agents with phase-specific behaviors.
+You can also use the methods described in :doc:`Customizing_Roles` to create more sophisticated agents with phase-specific behaviors.
 
 
 Modifying Game Rules
@@ -332,8 +322,8 @@ Modifying Game Rules
 For more advanced usage, you can:
 
 1. Create your own game server for different economic experiments
-2. Customize agent roles with different personalities or strategies. For example, check out the `public goods game example <https://github.com/IBEX-TUDelft/econagents/tree/main/examples/public_goods>` for an scenario where each agent has a different personality and strategy.
+2. Customize roles with different personalities or strategies. For example, check out the `public goods game example <https://github.com/IBEX-TUDelft/econagents/tree/main/examples/public_goods>` for an scenario where each agent has a different personality and strategy.
 3. Implement more complex game rules and state management
 4. Explore multi-agent scenarios with more than two players
 
-Refer to the documentation on :doc:`Managing_Agents`, :doc:`Managing_State`, and :doc:`Customizing_Agent_Roles` for more details.
+Refer to the documentation on :doc:`Managing_Agents`, :doc:`Managing_State`, and :doc:`Customizing_Roles` for more details.

@@ -83,23 +83,17 @@ class TestLoadPersona:
         with pytest.raises(PersonaNotFoundError):
             load_persona("does-not-exist")
 
-    def test_defaults_to_cwd_personas_when_user_dir_unset(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_defaults_to_cwd_personas_when_user_dir_unset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """Without user_dir, the loader checks <cwd>/personas as a sensible default."""
         cwd_personas = tmp_path / "personas"
         cwd_personas.mkdir()
-        (cwd_personas / "neighborhood-pal.yaml").write_text(
-            "id: neighborhood-pal\ntraits: {cooperativeness: high}\n"
-        )
+        (cwd_personas / "neighborhood-pal.yaml").write_text("id: neighborhood-pal\ntraits: {cooperativeness: high}\n")
         monkeypatch.chdir(tmp_path)
         p = load_persona("neighborhood-pal")
         assert p.id == "neighborhood-pal"
         assert p.traits == {"cooperativeness": "high"}
 
-    def test_cwd_default_does_not_apply_when_no_personas_dir(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_cwd_default_does_not_apply_when_no_personas_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """If <cwd>/personas doesn't exist, the default silently falls through to bundled."""
         monkeypatch.chdir(tmp_path)
         # 'free-rider' is bundled; tmp_path has no personas/ dir, so bundled is the only source.

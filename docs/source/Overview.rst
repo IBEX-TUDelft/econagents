@@ -1,247 +1,157 @@
 Overview
 ========
 
-This guide provides an overview of the econagents framework.
+econagents runs LLM agents in economic experiments. The game server remains
+the source of truth; econagents connects simulated players to that server,
+projects server events into each player's local state, asks the player's role
+for an action, and sends that action back through the configured protocol.
 
 .. contents:: Table of Contents
    :depth: 3
    :local:
 
-econagents is a framework that lets you use LLM agents in economic experiments. It assumes that you have a game server that runs the experiment that you can connect to, as well as api-level access to LLM agents that can be used in the experiment.
+Architecture
+------------
 
-There's a couple of default assumptions econagents makes about the game server:
+The runtime is organized around explicit boundaries:
 
-1. The server uses WebSockets to send messages to the client
-2. Messages use a uniform JSON envelope in both directions:
+* **Domain types** describe stable concepts such as ``Event``, ``Action``,
+  ``PhaseId``, and ``AgentContext``.
+* **Ports** define interfaces for protocol codecs, transports, prompt
+  renderers, response parsers, and state projectors.
+* **Adapters** implement those ports for concrete systems such as IBEX JSON
+  envelopes, WebSockets, Jinja prompt files, and ``EventField`` state mapping.
+* **Runtime services** compose those pieces. ``Agent`` runs one
+  simulated player, ``PhaseEngine`` controls turn-based and continuous phases,
+  and ``GameRunner`` supervises a set of agents.
 
-.. code-block:: text
+The default protocol adapter is ``IbexMessageCodec``. It expects messages in
+this envelope:
 
-    {"meta": {"type": <event_type>, "component": {...}}, "payload": <event_data>}
+.. code-block:: json
 
-   * ``meta.type`` is the event/message discriminator (it becomes the event type the framework routes on).
-   * ``meta.component`` (optional) routes the message to a server-side component, e.g. ``{"type": "standard:coordination"}``.
-   * ``payload`` carries the message data (it becomes ``message.data`` for state mapping and handlers).
+   {"meta": {"type": "phase-started"}, "payload": {"phase": "decision"}}
 
-3. The connection authenticates by sending a ``join`` envelope as the first message. The default
-   :class:`~econagents.JoinPayloadAuth` builds it from ``auth_mechanism_kwargs`` — typically
-   ``{"recovery": "<code>"}`` — producing ``{"meta": {"type": "join"}, "payload": {"recovery": "<code>"}}``.
+``meta.type`` becomes the internal event type and ``payload`` becomes event
+data. Outbound actions are encoded with the same codec before they are sent
+through the transport.
 
-Build outbound envelopes with the helpers in :mod:`econagents.core.protocol`
-(``build_message``, ``join_message``, ``ready_message``). If the server uses a different
-message shape, override ``_extract_message_data`` on your manager (or customize the
-``on_message_callback`` of the ``WebSocketTransport``) to adjust the parsing, and set a
-different ``auth_mechanism`` such as :class:`~econagents.SimpleLoginPayloadAuth`.
+Runtime Flow
+------------
 
-Aside from that, the framework only assumes that you have a description of the game including:
-   - the roles that agents can take,
-   - the phases the game goes through and actions the agents can take in these phases, and
-   - a description of the information about the game state that is relevant.
+For each simulated player, an ``Agent`` performs this sequence:
 
-The library has four key components:
+1. Receive a raw message from the transport.
+2. Decode it into an ``Event`` with the configured ``MessageCodec``.
+3. Project the event into the player's ``GameState``.
+4. If the event changes phase, ask ``PhaseEngine`` whether to act once or run a
+   continuous action loop.
+5. Ask the ``Role`` for an action when the role participates in that phase.
+6. Encode the action and send it through the transport.
 
-1. Agent Roles
-2. Agent Manager
-3. Game State
-4. Game Runner
+Roles
+-----------
 
-A fifth, optional component — **Personas** — gives each agent a portable identity (demographics, traits, optional bio) that gets injected into prompts. Useful for controlled experiments where a single neutral role drives different behavior depending on which persona is attached. See the :doc:`Personas <Personas>` section.
+A ``Role`` defines what a player does. It specifies:
 
-Agent Roles
-~~~~~~~~~~~
+* ``role``: numeric role id
+* ``name``: prompt/template role name
+* ``llm``: provider used for decisions
+* ``task_phases`` or ``task_phases_excluded``: phases where the role acts
+* optional response schemas for structured model output
 
-Agent roles define the different roles players can take in your experiment. For example, in a Prisoner's Dilemma game, you would have a Prisoner role that can cooperate or defect. In the Harberger-for-spatial-planning problem used in the TUDelft-IBEX/harberger example, you would have the roles Developer, Owner, and Speculator each with their own tasks spread over the phases of the experiment.
-
-When you define an agent role, you need to specify at least the following:
-
-1. The role id
-2. The name of the role
-3. The LLM model to use
-
-Here's how this looks in code:
-
-.. code-block:: python
-
-    from econagents import AgentRole
-
-    class Speculator(AgentRole):
-        role = 1
-        name = "Speculator"
-        llm = ChatOpenAI()
-
-    class Developer(AgentRole):
-        role = 2
-        name = "Developer"
-        llm = ChatOpenAI(model="gpt-4o")
-
-    class Owner(AgentRole):
-        role = 3
-        name = "Owner"
-        llm = ChatOpenAI(model="gpt-4o-mini")
-
-Given that you want your roles to take actions in specific phases of the game, you need to specify prompts for the phases where the agent must perform a task.
-Prompts are separated into system prompts and user prompts, each can be altered per role and phase, or made persistent as required.
-
-For example, in a game where there is a market where tax shares are traded in the 6th phase of the game, you might have the following system and user prompts:
-
-.. code-block:: jinja
-    :caption: System prompt for market phase (all_system_phase_6.jinja2)
-
-    You are simulating a participant in an economic experiment focused on land development and tax share trading. Your goal is to maximize profits through strategic trading of tax shares, where each share's value depends on the total tax revenue collected.
-
-    Key considerations:
-    - Each share pays (Total Tax Revenue / 100) as dividends
-    - You have access to both public and private signals about share values
-    - You can post asks (sell offers) or bids (buy offers) for single shares
-
-.. code-block:: jinja
-   :caption: User prompt for market phase (all_user_phase_6.jinja2)
-
-   **Game Information**:
-   - Phase: Phase {{ meta.phase }}
-   - Your Role: {{ meta.role }} (Player #{{ meta.player_number }})
-   - Name: {{ meta.player_name }}
-   - Your Wallet:
-     - Tax Shares: {{ private_information.wallet.shares }}
-     - Balance: {{ private_information.wallet.balance }}
-
-    **Your Decision Options**:
-    Provide the output (one of these options) as a JSON object:
-    A. Post a new order:
-    {
-        "gameId": {{ meta.game_id }},
-        "type": "post-order",
-        "order": {
-            "price": <number>, # if now=true, put 0 (will be ignored)
-            "quantity": 1,
-            "type": <"ask" or "bid">,
-            "now": <true or false>,
-            "condition": {{ public_information.winning_condition }}
-        },
-    }
-
-    B. Cancel an existing order:
-    {
-        "gameId": {{ meta.game_id }},
-        "type": "cancel-order",
-        "order": {
-            "id": <order_id>,
-            "condition": {{ public_information.winning_condition }}
-        },
-    }
-
-    C. Do nothing:
-    {}
-
-The prompts use `Jinja templates <https://jinja.palletsprojects.com/en/stable/>`_. This allows you to use variables from the game state and other information to customize the prompts.
-
-You can learn more about this in the :doc:`Customizing Agent Roles <Customizing_Agent_Roles>` section.
-
-Agent Manager
-~~~~~~~~~~~~~
-
-For each player you want to simulate using an agent, you need to create an agent manager. The agent manager takes care of the connection to the game server, the initialization of the agent based on the role and model used, and the handling of the game events.
-
-You can adjust the agent manager to add custom logic, such as assigning roles of agents after the game has started instead of before the game starts.
-
-Here's an example of an agent manager with custom logic that assigns names and roles after the relevant events have been received from the server:
+Example:
 
 .. code-block:: python
 
-    from econagents import HybridPhaseManager
-    from harberger.state import HLGameState
+   from typing import Literal
+   from pydantic import BaseModel
+   from econagents import Role
+   from econagents.adapters.llm import ChatOpenAI
 
-    class HAgentManager(HybridPhaseManager):
-        def __init__(
-            self,
-            game_id: int,
-            auth_mechanism_kwargs: dict[str, Any],
-        ):
-            super().__init__(
-                state=HLGameState(game_id=game_id),
-                auth_mechanism_kwargs=auth_mechanism_kwargs,
-                continuous_phases={3, 5},  # Explicitly specify phases 3 and 5 as continuous
-            )
-            self.game_id = game_id
-            self.register_event_handler("assign-name", self._handle_name_assignment)
-            self.register_event_handler("assign-role", self._handle_role_assignment)
+   class Choice(BaseModel):
+       meta: dict
+       payload: dict[str, Literal["COOPERATE", "DEFECT"]]
 
-        def _handle_name_assignment(self, message: Message):
-            ...
-            # Custom logic to handle the name assignment event
+   class Prisoner(Role):
+       role = 1
+       name = "Prisoner"
+       llm = ChatOpenAI(model_name="gpt-5.4-mini")
+       task_phases = ["decision"]
+       default_response_schema = Choice
 
-        def _handle_role_assignment(self, message: Message):
-            ...
-            # Custom logic to handle the role assignment event
-
-.. note::
-   By default, all phases are treated as turn-based. Only phases explicitly specified in the ``continuous_phases`` parameter are treated as continuous, with automatic periodic action execution.
+``Agent`` supplies Jinja prompt rendering and ``JsonResponseParser`` by
+default. You can inject another prompt renderer or response parser on the role
+when a game needs a different decision pipeline.
 
 Game State
-~~~~~~~~~~
+----------
 
-The state file of a game defines the data structures for the game state.
+Each runtime owns a ``GameState`` with three sections:
 
-For example, in the Harberger-for-spatial-planning problem used in the TUDelft-IBEX/harberger example, you might have the following state:
+* ``meta``: game id, phase, player number, and administrative context
+* ``private_information``: state visible to the current player
+* ``public_information``: state visible to all players
 
-.. code-block:: python
-
-    from econagents import GameState, MetaInformation, PrivateInformation, PublicInformation
-
-    class Meta(MetaInformation):
-        game_name: str
-
-    class PrivateInfo(PrivateInformation):
-        wallet: str
-
-    class PublicInfo(PublicInformation):
-        winning_condition: str
-
-    class MyGameState(GameState):
-        meta: Meta = Field(default_factory=Meta)
-        private_information: PrivateInfo = Field(default_factory=PrivateInfo)
-        public_information: PublicInfo = Field(default_factory=PublicInfo)
-
-The game state will be available to all agents during the phases. You can use them in prompts or in any custom phase handling logic.
-The game state can be split into different parts with different properties, as you can see in this example the game state contains meta information that is used for the administration of the game (e.g. ID of agent, phase, etc.), private information that is specific to the agent (e.g. remaining resources, private signals), and public information (e.g. offers currently available on the market, public signals)
-
-The state is updated automatically using the information received from the game server. You can customize the state update logic using the approaches shown in the :doc:`Managing State <Managing_State>` section.
-
-Game Runner
-~~~~~~~~~~~
-
-Finally, to run a game you need to use the `GameRunner` class. This class is responsible for gluing everything together: agent managers and roles, game state, and the game server.
-
-The steps to running a game with the GameRunner are:
-
-1. Create a new game on your server
-2. Set up the agent roles, agent managers, and game state
-3. Use the `GameRunner` to run the game
-
-The `GameRunner` is responsible for: connecting to the game server, spawning the agents, and handling the game events.
-
-Here's an sample of how to run a game using the `GameRunner` class:
+Fields declared with ``EventField`` are updated by ``EventFieldStateProjector``
+when incoming event data contains the matching key.
 
 .. code-block:: python
 
-    from econagents import GameRunner, TurnBasedGameRunnerConfig
+   from pydantic import Field
+   from econagents import EventField, GameState, MetaInformation, PrivateInformation, PublicInformation
 
-    config = TurnBasedGameRunnerConfig(
-        # Game configuration
-        game_id=1,
-        # Server configuration
-        hostname="localhost",
-        port=8765,
-        path="wss",
-        max_game_duration=300,
-    )
-    agents = [
-        PDManager(
-            game_id=1
-        ),
-        PDManager(
-            game_id=1
-        ),
-    ]
-    runner = GameRunner(config=config, agents=agents)
+   class Meta(MetaInformation):
+       phase: str | int = EventField(default=0)
 
-This will connect to the game server, spawn the agents, and handle the game events.
+   class PrivateInfo(PrivateInformation):
+       total_score: int = EventField(default=0)
+
+   class PublicInfo(PublicInformation):
+       history: list[dict] = EventField(default_factory=list)
+
+   class MyState(GameState):
+       meta: Meta = Field(default_factory=Meta)
+       private_information: PrivateInfo = Field(default_factory=PrivateInfo)
+       public_information: PublicInfo = Field(default_factory=PublicInfo)
+
+Running A Game
+--------------
+
+Code-driven experiments build agents explicitly and pass them to
+``GameRunner``:
+
+.. code-block:: python
+
+   from pathlib import Path
+   from econagents import GameRunner, TurnBasedGameRunnerConfig
+   from examples.prisoner.agents import create_prisoner_agents
+
+   config = TurnBasedGameRunnerConfig(
+       game_id=1,
+       hostname="localhost",
+       port=8765,
+       path="",
+       prompts_dir=Path("prompts"),
+       max_game_duration=300,
+   )
+
+   agents = create_prisoner_agents(config, recovery_codes)
+   runner = GameRunner(config=config, agents=agents)
+   await runner.run_game()
+
+YAML-driven experiments use ``runtime`` settings to create the same runtime
+objects from configuration:
+
+.. code-block:: yaml
+
+   runtime:
+     mode: turn_based
+
+   runner:
+     type: TurnBasedGameRunner
+     hostname: localhost
+     port: 8765
+     path: ""
+     phase_transition_event: phase-transition
+     phase_identifier_key: phase

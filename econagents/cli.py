@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Any
 
-from econagents.config_parser.base import BaseConfigParser
+from econagents.adapters.config import YamlExperimentLoader
 
 
 async def async_main(args: argparse.Namespace):
@@ -22,9 +22,8 @@ async def async_main(args: argparse.Namespace):
         sys.exit(1)
 
     try:
-        # Load configuration using the base parser
-        parser = BaseConfigParser(config_path)
-        config = parser.config
+        loader = YamlExperimentLoader(config_path)
+        config = loader.config
     except Exception as e:
         print(f"Error loading or parsing config file {config_path}: {e}", file=sys.stderr)
         sys.exit(1)
@@ -66,19 +65,18 @@ async def async_main(args: argparse.Namespace):
         )
         sys.exit(1)
 
-    # Extract gameId from the first payload for display purposes (assuming all payloads are for the same game)
-    # Add basic check to ensure payloads exist and have gameId
-    game_id_display = "N/A"
-    if login_payloads and isinstance(login_payloads[0], dict) and "gameId" in login_payloads[0]:
-        game_id_display = login_payloads[0]["gameId"]
+    game_id = config.runner.game_id
+    if login_payloads and isinstance(login_payloads[0], dict):
+        game_id = login_payloads[0].get("game_id", login_payloads[0].get("gameId", game_id))
+    game_id = int(game_id)
 
-    print(f"Starting experiment '{config.name}' with Game ID: {game_id_display}...")
+    print(f"Starting experiment '{config.name}' with Game ID: {game_id}...")
     print(f"Using config: {config_path}")
     print(f"Using login payloads from: {login_payloads_path}")
     print(f"Number of agents: {len(login_payloads)}")
 
     try:
-        await parser.run_experiment(login_payloads)
+        await loader.run_experiment(login_payloads, game_id)
         print("Experiment finished.")
     except Exception as e:
         print(f"Error running experiment: {e}", file=sys.stderr)

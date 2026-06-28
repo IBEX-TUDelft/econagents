@@ -111,7 +111,7 @@ class DictatorServer:
                         game_id = data.get("gameId")
                         recovery = data.get("recovery")
 
-                        if not game_id and not recovery:
+                        if not game_id or not recovery:
                             await self.send_error(websocket, "Game ID and recovery code are required")
                             continue
 
@@ -235,15 +235,14 @@ class DictatorServer:
 
         payouts = game.calculate_payouts()
 
-        # Send phase-started event for phase 2
-        for role, websocket in game.players.items():
-            if websocket:
-                await self.send_phase_started(websocket, game, role)
-
-        # Send decision results
+        # Send decision results first so phase-2 prompts render with fresh payout state.
         for role, websocket in game.players.items():
             if websocket:
                 await self.send_decision_result(websocket, game, role, payouts)
+
+        for role, websocket in game.players.items():
+            if websocket:
+                await self.send_phase_started(websocket, game, role)
 
     async def send_message(self, websocket: ServerConnection, message: Dict[str, Any]) -> None:
         """Send a message to a client."""
@@ -350,7 +349,8 @@ class DictatorServer:
                     "money_sent": game.money_sent,
                     "money_available": game.money_available,
                     "exchange_rate": game.exchange_rate,
-                    "payouts": payouts[role],
+                    "payouts": payouts,
+                    "payout": payouts[role],
                 },
             },
         )

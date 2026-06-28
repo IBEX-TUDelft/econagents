@@ -1,9 +1,8 @@
 """Code-driven entry point for the persona-driven prisoner experiment.
 
-Mirrors ``examples/prisoner/run_game.py`` but constructs each agent's manager
-with an explicit persona loaded by id. Personas are resolved from the local
-``./personas`` directory first, falling back to the bundled library shipped
-inside ``econagents.personas``.
+Constructs each agent with an explicit persona loaded by id. Personas
+are resolved from the local ``./personas`` directory first, falling back to the
+bundled library shipped inside ``econagents.personas``.
 
 Reuses the local game server and state class from ``examples/prisoner/``.
 
@@ -26,10 +25,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from econagents.core.game_runner import GameRunner, TurnBasedGameRunnerConfig
+from econagents.runtime.game_runner import GameRunner, TurnBasedGameRunnerConfig
 from econagents.personas import load_persona
-from examples.prisoner.manager import PDManager
-from examples.prisoner.state import PDGameState
+from examples.prisoner_personas.agents import create_prisoner_persona_agents
 
 logger = logging.getLogger("prisoners_dilemma_personas")
 
@@ -54,30 +52,19 @@ async def main(
         hostname=hostname,
         port=port,
         path="",
-        state_class=PDGameState,
     )
 
-    agents = []
-    for i, (recovery_code, persona_id) in enumerate(zip(recovery_codes, personas)):
-        agent = PDManager(
-            game_id=game_id,
-            auth_mechanism_kwargs={
-                "meta": {"type": "join"},
-                "payload": {"recovery": recovery_code},
-            },
-        )
-        if persona_id:
-            agent.agent_role.persona = load_persona(persona_id, user_dir=PERSONAS_DIR)
-        agents.append(agent)
+    loaded_personas = [
+        load_persona(persona_id, user_dir=PERSONAS_DIR) if persona_id else None for persona_id in personas
+    ]
+    agents = create_prisoner_persona_agents(config, recovery_codes, loaded_personas)
 
     runner = GameRunner(config=config, agents=agents)
     await runner.run_game()
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Run the persona-driven Prisoner's Dilemma experiment."
-    )
+    parser = argparse.ArgumentParser(description="Run the persona-driven Prisoner's Dilemma experiment.")
     parser.add_argument(
         "--game-id",
         type=int,
@@ -108,7 +95,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--port",
         type=int,
-        default=3000,
+        default=8765,
         help="Game server port.",
     )
     return parser.parse_args()

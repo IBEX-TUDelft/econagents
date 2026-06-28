@@ -30,8 +30,7 @@ Where:
 First, start the WebSocket server:
 
 ```bash
-cd examples/public_goods
-python -m server.server
+uv run python examples/public_goods/server/server.py
 ```
 
 The server will start on `localhost:8765`.
@@ -41,8 +40,7 @@ The server will start on `localhost:8765`.
 In a separate terminal, run the game with AI agents:
 
 ```bash
-cd examples/public_goods
-python run_game.py
+uv run python examples/public_goods/run_game.py
 ```
 
 This will:
@@ -97,8 +95,9 @@ The personality assignment logic can be modified in the `get_personality()` func
 ```
 public_goods/
 ├── state.py              # Game state definitions
-├── manager.py            # Agent role and manager classes
+├── agents.py             # Agent roles and runtime factories
 ├── run_game.py           # Main game runner script
+├── verify.py             # Local end-to-end verification script with deterministic agents
 ├── server/
 │   ├── server.py         # WebSocket server implementation
 │   ├── create_game.py    # Game creation utilities

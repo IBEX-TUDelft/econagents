@@ -27,20 +27,17 @@ prompt_partials:
 
       Based on the current game state and the kind of person you are, choose whether to **cooperate** or **defect** in this round.
 
-      Provide your choice as a JSON object with the following fields:
-      - `gameId`: The ID of the game
-      - `type`: The type of message, which should be "choice"
-      - `choice`: The choice you made — either "COOPERATE" or "DEFECT"
+      Respond with a JSON message of exactly this shape:
 
       Example:
       ```
       {
-          "gameId": <game_id>,
-          "type": "choice",
-          "choice": "COOPERATE"
+          "meta": {"type": "submit-choice", "component": {"type": "standard:coordination"}},
+          "payload": {"choice": "COOPERATE"}
       }
       ```
 
+      `payload.choice` must be either `COOPERATE` (remain silent) or `DEFECT` (testify).
       Respond with only the JSON object. Start with `{` and end with `}`.
 
   - name: "game_history"
@@ -55,7 +52,7 @@ prompt_partials:
       {% endif %}
 
 
-agent_roles:
+roles:
   - role_id: 1
     name: "player"
     llm_type: "ChatOpenAI"
@@ -117,6 +114,10 @@ state:
       type: "list"
       default_factory: "list"
     - name: "phase"
+      type: "str"
+      default: "waiting"
+      event_key: "phase"
+    - name: "round"
       type: "int"
       default: 0
       event_key: "round"
@@ -132,15 +133,15 @@ state:
       type: "list"
       default_factory: "list"
 
-manager:
-  type: "TurnBasedPhaseManager"
+runtime:
+  mode: "turn_based"
 
 runner:
   game_id: 0
   type: "TurnBasedGameRunner"
   hostname: "localhost"
   port: 8765
-  path: "wss"
+  path: ""
   log_level: "DEBUG"
-  phase_transition_event: "round-started"
-  phase_identifier_key: "round"
+  phase_transition_event: "phase-transition"
+  phase_identifier_key: "phase"

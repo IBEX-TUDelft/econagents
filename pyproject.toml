@@ -30,8 +30,9 @@ econagents = "econagents.cli:run_cli"
 ollama = ["ollama>=0.5.1"]
 langsmith = ["langsmith>=0.4.1"]
 langfuse = ["langfuse>=3.0.3"]
+monty = ["pydantic-monty>=0.0.18"]
 standard = ["langsmith>=0.4.1"]
-all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3"]
+all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3", "pydantic-monty>=0.0.18"]
 
 [dependency-groups]
 docs = [
@@ -55,6 +56,7 @@ dev = [
     "types-requests>=2.32.4.20250913,<3",
     "pytest-asyncio>=1.2.0,<2",
     "types-pyyaml>=6.0.12.20250915,<7",
+    "pydantic-monty>=0.0.18",
 ]
 debug = [
     "ipdb>=0.13.9",
