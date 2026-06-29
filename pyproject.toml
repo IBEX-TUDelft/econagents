@@ -80,8 +80,14 @@ packages = ["econagents"]
 [tool.hatch.build.targets.sdist]
 include = [
     "/econagents",
+    "/examples",
     "/README.md",
+    "/CHANGELOG.md",
     "/LICENSE",
+]
+exclude = [
+    "/examples/**/logs",
+    "/examples/**/server/games",
 ]
 
 [tool.coverage.run]

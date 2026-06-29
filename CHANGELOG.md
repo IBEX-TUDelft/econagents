@@ -4,7 +4,21 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.3] - 2026-06-29
+
+### Added
+
+- Added a local continuous double auction example with LLM-backed traders,
+  structured market actions, a continuous `market` phase, a receive-only
+  `summary` phase, local verification, and OpenAI-backed run instructions.
+
+### Changed
+
+- Updated game runner logging so an agent's WebSocket transport uses the
+  per-agent run logger, capturing transport send/receive events in the same
+  per-game log files as agent lifecycle events.
+- Included local examples in source distributions while excluding generated
+  local run logs and game specs.
 
 ## [0.2.2] - 2026-06-25
 
@@ -45,5 +59,5 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
-[Unreleased]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.2...HEAD
+[0.2.3]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.1...v0.2.2

@@ -289,6 +289,9 @@ class GameRunner:
         """
         agent_logger = self.get_agent_logger(agent_id, self.config.game_id)
         agent.logger = agent_logger
+        transport = getattr(agent, "transport", None)
+        if transport is not None and hasattr(transport, "logger"):
+            transport.logger = agent_logger
 
     async def spawn_agent(self, agent: Agent, agent_id: int) -> None:
         """

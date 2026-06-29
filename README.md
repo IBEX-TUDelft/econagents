@@ -48,11 +48,12 @@ econagents consists of these main components:
 
 ## Example Experiments
 
-The repository includes three example games:
+The repository includes four example games:
 
 1. **`prisoner`**: An iterated Prisoner's Dilemma game with 5 rounds and 2 LLM agents, runs on a local python server (included).
 2. **`dictator`**: A modified Dictator game with 2 LLM agents that runs on a local python server (included).
 3. **`public_goods`**: A public goods game with 4 players that runs on a local python server (included).
+4. **`continuous_double_auction`**: A classical continuous double auction with LLM-backed traders using a continuous market phase.
 
 ### Running the Prisoner's Dilemma game
 

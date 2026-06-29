@@ -1,0 +1,28 @@
+Current market state:
+- Game ID: {{ meta.game_id }}
+- Trader role: {{ private_information.trader_type }}
+- Current limit price: {{ private_information.limit_price }}
+- Remaining units: {{ private_information.remaining_units }}
+- Cash balance: {{ private_information.cash_balance }}
+- Net cash flow: {{ private_information.cash_flow }}
+- Realized surplus: {{ private_information.surplus }}
+- Inventory: {{ private_information.inventory }}
+- Your actions submitted so far: {{ private_information.actions_submitted }}
+- Best bid: {{ public_information.best_bid }}
+- Best ask: {{ public_information.best_ask }}
+- Last transaction price: {{ public_information.last_price }}
+- Total orders submitted: {{ public_information.order_count }}
+- Transactions so far: {{ public_information.transactions }}
+
+Return one structured action.
+
+If you submit an order:
+- Use meta.type = "submit-order".
+- Use payload.gameId = {{ meta.game_id }}.
+- Use payload.side = "buy" if you are a buyer, or "sell" if you are a seller.
+- Use payload.price as your bid or ask.
+
+If you hold:
+- Use meta.type = "hold".
+- Use payload.gameId = {{ meta.game_id }}.
+- Use payload.reason to explain briefly.
