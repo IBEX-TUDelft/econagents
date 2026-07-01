@@ -44,6 +44,7 @@ async def main() -> None:
         min_action_delay=ACTION_DELAY_SECONDS,
         max_action_delay=ACTION_DELAY_SECONDS,
         max_game_duration=game_specs["market_duration"] + game_specs["summary_duration"] + 45,
+        observability_provider="langsmith",
     )
     agents = create_cda_agents(config, game_specs["recovery_codes"])
     runner = GameRunner(config=config, agents=agents)

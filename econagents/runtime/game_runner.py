@@ -8,6 +8,7 @@ from typing import Literal, Optional, List
 
 from pydantic import BaseModel, Field
 
+from econagents.adapters.llm.observability import get_observability_provider
 from econagents.adapters.transport import AuthenticationMechanism, JoinPayloadAuth
 from econagents.domain.messages import PhaseId
 from econagents.runtime.agent import Agent
@@ -112,6 +113,18 @@ class GameRunner:
         # Create log directories if it doesn't exist
         if self.config.logs_dir:
             self.config.logs_dir.mkdir(parents=True, exist_ok=True)
+        self._configure_observability()
+
+    def _configure_observability(self) -> None:
+        """Attach the configured observability provider to each agent LLM."""
+        if not self.config.observability_provider:
+            return
+
+        provider = get_observability_provider(self.config.observability_provider)
+        for agent in self.agents:
+            llm = getattr(getattr(agent, "role", None), "llm", None)
+            if llm is not None:
+                llm.observability = provider
 
     def _setup_game_log_queue(self, game_id: int) -> queue.Queue:
         """

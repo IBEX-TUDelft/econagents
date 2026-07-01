@@ -4,6 +4,19 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-07-01
+
+### Changed
+
+- Enabled LangSmith observability in the continuous double auction OpenAI runner
+  when the environment is configured for LangSmith.
+
+### Fixed
+
+- Fixed `observability_provider` wiring for code-created game runners so
+  manually constructed agents send LLM traces to the configured observability
+  backend instead of keeping the default no-op provider.
+
 ## [0.2.3] - 2026-06-29
 
 ### Added
@@ -59,5 +72,6 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.2.4]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.1...v0.2.2

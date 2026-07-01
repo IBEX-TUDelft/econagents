@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from econagents.runtime.game_runner import GameRunner, GameRunnerConfig
 
@@ -48,6 +48,13 @@ class MockAgent:
                 pass
 
 
+class MockRoleAgent(MockAgent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.role = MagicMock()
+        self.role.llm = MagicMock()
+
+
 @pytest.fixture
 def base_config(tmp_path):
     logs_dir = tmp_path / "logs"
@@ -64,6 +71,28 @@ def base_config(tmp_path):
         prompts_dir=prompts_dir,
         log_level=logging.DEBUG,  # Use DEBUG for more verbose test logs
     )
+
+
+def test_runner_configures_observability_provider(base_config):
+    base_config.observability_provider = "langsmith"
+    provider = MagicMock()
+    agent1 = MockRoleAgent(name="Agent1_Observability")
+    agent2 = MockRoleAgent(name="Agent2_Observability")
+
+    with patch("econagents.runtime.game_runner.get_observability_provider", return_value=provider) as get_provider:
+        GameRunner(config=base_config, agents=[agent1, agent2])
+
+    get_provider.assert_called_once_with("langsmith")
+    assert agent1.role.llm.observability is provider
+    assert agent2.role.llm.observability is provider
+
+
+def test_runner_observability_provider_tolerates_agents_without_llm(base_config):
+    base_config.observability_provider = "langsmith"
+    provider = MagicMock()
+
+    with patch("econagents.runtime.game_runner.get_observability_provider", return_value=provider):
+        GameRunner(config=base_config, agents=[MockAgent(name="AgentWithoutRole")])
 
 
 @pytest.mark.asyncio
