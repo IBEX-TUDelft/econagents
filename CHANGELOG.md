@@ -4,6 +4,14 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2026-07-14
+
+### Fixed
+
+- Fixed a race condition in per-agent log file setup where concurrent agent
+  processes sharing the same log path could crash when another process removed
+  the file first; the cleanup now tolerates an already-missing file.
+
 ## [0.2.4] - 2026-07-01
 
 ### Changed
@@ -72,6 +80,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.2.5]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.1...v0.2.2

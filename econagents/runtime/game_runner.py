@@ -202,9 +202,9 @@ class GameRunner:
         for handler in agent_logger.handlers[:]:
             agent_logger.removeHandler(handler)
 
-        # Create or clear the agent log file
-        if agent_log_file.exists():
-            agent_log_file.unlink()
+        # Create or clear the agent log file; concurrent agent processes may
+        # share this path, so tolerate another process removing it first.
+        agent_log_file.unlink(missing_ok=True)
         Path(agent_log_file).touch()
 
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] [AGENT %(agent_id)s] %(message)s")
