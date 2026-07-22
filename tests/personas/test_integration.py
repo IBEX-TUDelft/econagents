@@ -16,7 +16,7 @@ from econagents.adapters.config import (
 )
 from econagents.adapters.parsing import JsonResponseParser
 from econagents.adapters.prompts import JinjaPromptRenderer
-from econagents.domain.role import Role
+from econagents.domain.role import PERSONA_INSTRUCTION, Role
 from econagents.domain.state.game import GameState
 from econagents.adapters.llm.openai import ChatOpenAI
 from econagents.personas import Persona
@@ -105,7 +105,10 @@ def test_auto_render_appends_standard_block(trivial_prompts: Path):
     assert "- country: US" in rendered
     assert "Tendencies:" in rendered
     assert "- cooperativeness: high" in rendered
-    assert rendered.endswith("Some prose.")
+    assert "Some prose." in rendered
+    # The in-character directive closes the block, after the bio.
+    assert rendered.index("Some prose.") < rendered.index(PERSONA_INSTRUCTION)
+    assert rendered.endswith(PERSONA_INSTRUCTION)
 
 
 def test_auto_render_off_skips_block(trivial_prompts: Path):

@@ -18,12 +18,23 @@ from econagents.personas import Persona
 StateT_contra = TypeVar("StateT_contra", bound=GameStateProtocol, contravariant=True)
 
 
+PERSONA_INSTRUCTION = (
+    "Stay in character. Decide as this person would, given who they are — "
+    "their situation, tendencies, and outlook — rather than as a neutral "
+    "analyst optimising the payoff table."
+)
+"""Directive appended after the persona block so the description is treated as
+a role to inhabit rather than background colour. Override this module-level
+constant to change the wording."""
+
+
 def _format_persona_block(persona: Persona) -> str:
     """Render a Persona as a standard prompt-friendly markdown block.
 
     Sections with empty underlying data are omitted, so the output is a tight
     block with no placeholder noise. Returns an empty string if the persona
-    has no demographics, traits, or bio populated.
+    has no demographics, traits, or bio populated. When any section is present,
+    ``PERSONA_INSTRUCTION`` is appended telling the model to act in character.
     """
     parts: list[str] = []
     if persona.demographics:
@@ -39,6 +50,10 @@ def _format_persona_block(persona: Persona) -> str:
         parts.append("")
     if persona.bio:
         parts.append(persona.bio.rstrip())
+    if not parts:
+        return ""
+    parts.append("")
+    parts.append(PERSONA_INSTRUCTION)
     return "\n".join(parts).rstrip()
 
 
