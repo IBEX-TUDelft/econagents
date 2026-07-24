@@ -479,6 +479,7 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
                     "state": state.model_dump(),
                 },
                 response_schema=self.get_response_schema(phase),
+                logger=self.logger,
                 **tool_kwargs,
             )
             return self.parse_phase_llm_response(response, state)

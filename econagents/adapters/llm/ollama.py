@@ -11,7 +11,7 @@ from econagents.ports.tools import ToolCall
 if TYPE_CHECKING:
     from econagents.ports.tools import ToolExecutor, ToolSpec
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class ChatOllama(BaseLLM):
@@ -63,6 +63,7 @@ class ChatOllama(BaseLLM):
         tools: Optional[list["ToolSpec"]] = None,
         tool_executor: Optional["ToolExecutor"] = None,
         max_tool_iterations: int = 5,
+        logger: Optional[logging.Logger] = None,
     ) -> str:
         """Get a response from Ollama.
 
@@ -76,6 +77,8 @@ class ChatOllama(BaseLLM):
             tools: Optional tool specs advertised to the model.
             tool_executor: Async callback used to run each requested tool call.
             max_tool_iterations: Safety cap on tool-call rounds.
+            logger: Optional logger; when given, every full API response is
+                logged to it at DEBUG level.
 
         Returns:
             The response text from Ollama.
@@ -112,6 +115,7 @@ class ChatOllama(BaseLLM):
                     response=response,
                     metadata=tracing_extra,
                 )
+                self._log_response(response, logger)
 
                 message = response["message"]
                 if not use_tools:
@@ -138,10 +142,11 @@ class ChatOllama(BaseLLM):
                         }
                     )
 
-            logger.warning("Max tool iterations (%s) reached; returning last response.", max_tool_iterations)
+            _logger.warning("Max tool iterations (%s) reached; returning last response.", max_tool_iterations)
             final = await client.chat(model=self.model_name, messages=conversation, **kwargs)
+            self._log_response(final, logger)
             return final["message"]["content"]
 
         except ImportError as e:
-            logger.error(f"Failed to import Ollama: {e}")
+            _logger.error(f"Failed to import Ollama: {e}")
             raise ImportError("Ollama is not installed. Install it with: pip install econagents[ollama]") from e

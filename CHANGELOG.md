@@ -4,6 +4,15 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] - 2026-07-24
+
+### Added
+
+- LLM adapters now accept an optional `logger` in `get_response` and log every
+  full provider response (reasoning items, output content, usage) at DEBUG
+  level. Roles pass their per-agent logger automatically, so full LLM responses
+  appear in the per-game log files alongside the prompts.
+
 ## [0.2.5] - 2026-07-14
 
 ### Fixed

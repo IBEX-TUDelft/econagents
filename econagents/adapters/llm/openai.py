@@ -11,7 +11,7 @@ from econagents.ports.tools import ToolCall
 if TYPE_CHECKING:
     from econagents.ports.tools import ToolExecutor, ToolSpec
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 ReasoningEffort = Literal["minimal", "low", "medium", "high"]
 ReasoningSummary = Literal["auto", "concise", "detailed"]
@@ -91,6 +91,7 @@ class ChatOpenAI(BaseLLM):
         tools: Optional[list["ToolSpec"]] = None,
         tool_executor: Optional["ToolExecutor"] = None,
         max_tool_iterations: int = 5,
+        logger: Optional[logging.Logger] = None,
     ) -> Union[str, BaseModel]:
         """Get a response from the OpenAI Responses API.
 
@@ -105,6 +106,9 @@ class ChatOpenAI(BaseLLM):
                 Responses API ``tools`` parameter.
             tool_executor: Async callback used to run each requested tool call.
             max_tool_iterations: Safety cap on tool-call rounds.
+            logger: Optional logger; when given, every full API response
+                (reasoning items, output content, usage) is logged to it at
+                DEBUG level.
 
         Returns:
             A validated ``response_schema`` instance, or the raw text output
@@ -148,6 +152,7 @@ class ChatOpenAI(BaseLLM):
                     response=response,
                     metadata=tracing_extra,
                 )
+                self._log_response(response, logger)
 
                 if not use_tools:
                     return response.output_parsed if response_schema is not None else response.output_text
@@ -180,13 +185,14 @@ class ChatOpenAI(BaseLLM):
                         }
                     )
 
-            logger.warning("Max tool iterations (%s) reached; forcing a final answer.", max_tool_iterations)
+            _logger.warning("Max tool iterations (%s) reached; forcing a final answer.", max_tool_iterations)
             final_kwargs = {**base_kwargs, "input": conversation}
             if response_schema is not None:
                 response = await client.responses.parse(text_format=response_schema, **final_kwargs)
-                return response.output_parsed
-            response = await client.responses.create(**final_kwargs)
-            return response.output_text
+            else:
+                response = await client.responses.create(**final_kwargs)
+            self._log_response(response, logger)
+            return response.output_parsed if response_schema is not None else response.output_text
         except ImportError as e:
-            logger.error(f"Failed to import OpenAI: {e}")
+            _logger.error(f"Failed to import OpenAI: {e}")
             raise ImportError("OpenAI is not installed. Install it with: pip install econagents[openai]") from e

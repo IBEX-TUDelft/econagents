@@ -165,6 +165,14 @@ class TestPhaseHandling:
         mock_role.llm.build_messages.assert_called_once()
         mock_role.llm.get_response.assert_called_once()
 
+    async def test_handle_phase_passes_logger_to_llm(self, mock_role, game_state, prompts_path, mocker):
+        """The role's logger is forwarded so the adapter can log the full LLM response."""
+        spy = mocker.spy(mock_role.llm, "get_response")
+
+        await mock_role.handle_phase(0, game_state, prompts_path)
+
+        assert spy.call_args.kwargs["logger"] is mock_role.logger
+
     async def test_handle_phase_custom_handler(self, mock_role, game_state, prompts_path):
         """Test custom phase handler."""
 

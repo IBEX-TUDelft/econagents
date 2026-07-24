@@ -157,6 +157,53 @@ class TestChatOpenAI:
             assert call_kwargs["max_output_tokens"] == 200
 
     @pytest.mark.asyncio
+    async def test_full_response_logged_when_logger_given(self):
+        """The full API response (including reasoning) is logged at DEBUG level."""
+        mock_response = MagicMock()
+        mock_response.output_text = "ok"
+        mock_response.model_dump_json.return_value = '{"output": [{"type": "reasoning", "summary": "because"}]}'
+
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=mock_response)
+        log = MagicMock()
+
+        with (
+            patch("importlib.util.find_spec", return_value=True),
+            patch("openai.AsyncOpenAI", return_value=mock_client),
+        ):
+            openai = ChatOpenAI(model_name="gpt-4.1-mini")
+            openai.observability = MagicMock()
+
+            await openai.get_response([{"role": "user", "content": "hi"}], tracing_extra={}, logger=log)
+
+        mock_response.model_dump_json.assert_called_once()
+        log.debug.assert_called_once()
+        logged = log.debug.call_args.args[0]
+        assert "LLM RESPONSE" in logged
+        assert '"type": "reasoning"' in logged
+
+    @pytest.mark.asyncio
+    async def test_response_not_logged_without_logger(self):
+        """Without a logger the response is returned but nothing is serialized."""
+        mock_response = MagicMock()
+        mock_response.output_text = "ok"
+
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=mock_response)
+
+        with (
+            patch("importlib.util.find_spec", return_value=True),
+            patch("openai.AsyncOpenAI", return_value=mock_client),
+        ):
+            openai = ChatOpenAI(model_name="gpt-4.1-mini")
+            openai.observability = MagicMock()
+
+            response = await openai.get_response([{"role": "user", "content": "hi"}], tracing_extra={})
+
+        assert response == "ok"
+        mock_response.model_dump_json.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_get_response_import_error(self):
         """Raises ImportError when the openai package can't be imported at call time."""
         with (

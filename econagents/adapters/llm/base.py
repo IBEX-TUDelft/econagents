@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Optional, Type, Union
 
@@ -14,6 +15,23 @@ class BaseLLM(ABC):
     """Base class for LLM implementations."""
 
     observability: ObservabilityProvider = get_observability_provider("noop")
+
+    @staticmethod
+    def _log_response(response: Any, logger: Optional[logging.Logger]) -> None:
+        """Log a full provider response at DEBUG level.
+
+        Serializes via the SDK model's ``model_dump_json`` when available so
+        the whole response is captured — reasoning items (including any
+        summary), output content, and usage — falling back to ``str``. Logging
+        must never break the call, so serialization errors are swallowed.
+        """
+        if logger is None:
+            return
+        try:
+            serialized = response.model_dump_json(indent=2)
+        except Exception:  # noqa: BLE001
+            serialized = str(response)
+        logger.debug("\n+-----LLM RESPONSE----+\n" + f"{serialized}\n+------------------+")
 
     def build_messages(self, system_prompt: str, user_prompt: str) -> list[dict[str, Any]]:
         """Build messages for the LLM.
@@ -39,6 +57,7 @@ class BaseLLM(ABC):
         tools: Optional[list["ToolSpec"]] = None,
         tool_executor: Optional["ToolExecutor"] = None,
         max_tool_iterations: int = 5,
+        logger: Optional[logging.Logger] = None,
     ) -> Union[str, BaseModel]:
         """Get a response from the LLM.
 
@@ -54,6 +73,9 @@ class BaseLLM(ABC):
             tool_executor: Async callback that executes a single requested tool
                 call and returns its (JSON-serializable) result.
             max_tool_iterations: Safety cap on tool-call rounds per response.
+            logger: Optional logger the adapter uses to log each full provider
+                response (including reasoning and usage when available) at
+                DEBUG level. When ``None``, responses are not logged.
 
         Returns:
             Either a validated ``response_schema`` instance or a raw string,
