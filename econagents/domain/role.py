@@ -19,9 +19,9 @@ StateT_contra = TypeVar("StateT_contra", bound=GameStateProtocol, contravariant=
 
 
 PERSONA_INSTRUCTION = (
-    "Stay in character. Think through your decision in the first person, as "
-    'yourself — reason as "I", from your own situation, tendencies, and '
-    "outlook — and decide as you genuinely would."
+    "Stay in character. Decide as this person would, given who they are — "
+    "their situation, tendencies, and outlook — rather than as a neutral "
+    "analyst optimising the payoff table."
 )
 """Directive appended after the persona block so the description is treated as
 a role to inhabit rather than background colour. Override this module-level
