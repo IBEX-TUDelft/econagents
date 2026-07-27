@@ -4,6 +4,15 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8] - 2026-07-27
+
+### Changed
+
+- Reframed `PERSONA_INSTRUCTION` to first-person reasoning: the model is asked
+  to think through its decision as "I", from its own situation and outlook,
+  instead of deciding "as this person would" from the outside. Drops the
+  "neutral analyst" contrast clause.
+
 ## [0.2.7] - 2026-07-24
 
 ### Added
