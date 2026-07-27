@@ -4,6 +4,15 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.9] - 2026-07-27
+
+### Changed
+
+- Reverted the 0.2.8 first-person `PERSONA_INSTRUCTION` rewrite: it left
+  explicit-persona behaviour unchanged but substantially weakened implicit
+  persona fidelity (implicit selfish went from 0% to 44% cooperation in the
+  Prisoner's Dilemma benchmark). The directive is back to the 0.2.7 wording.
+
 ## [0.2.8] - 2026-07-27
 
 ### Changed
