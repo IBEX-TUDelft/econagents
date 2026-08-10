@@ -24,6 +24,7 @@ econagents is a Python library that lets you use LLM agents in economic experime
 - **Flexible Agent Customization**: Customize behavior with Jinja templates, response schemas, personas, or custom Python phase handlers.
 - **Event-Driven State Management**: Project server events into typed public, private, and meta state.
 - **Turn-Based and Continuous Action Support**: Handle one-shot phase decisions and repeated continuous-phase actions.
+- **Hosted and Local Models**: Use OpenAI or OpenRouter, or run local models through Ollama.
 
 ## Installation
 
@@ -68,6 +69,21 @@ uv run python examples/prisoner/run_game.py
 ```
 
 Note: set `OPENAI_API_KEY` before running OpenAI-backed examples.
+
+To route a YAML role through OpenRouter, set `OPENROUTER_API_KEY` and use an
+OpenRouter model slug:
+
+```yaml
+roles:
+  - role_id: 1
+    name: "player"
+    llm_type: "ChatOpenRouter"
+    llm_params:
+      model_name: "anthropic/claude-sonnet-4"
+```
+
+`ChatOpenRouter` supports structured outputs, tool calling, normalized
+reasoning controls, provider routing options, and optional app attribution.
 
 ## Documentation
 

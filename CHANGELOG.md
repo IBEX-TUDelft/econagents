@@ -4,6 +4,13 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.10] - 2026-08-10
+
+### Added
+
+- Added a `ChatOpenRouter` LLM adapter with structured outputs, tool calling,
+  reasoning controls, model routing options, and optional app attribution.
+
 ## [0.2.9] - 2026-07-27
 
 ### Changed
