@@ -19,12 +19,15 @@ econagents is a Python library for running economic experiments with LLM agents 
 
 ## What you can do with it
 
-- **Run classic economic games with LLM players**: Prisoner's Dilemma, Dictator, Public Goods, and a continuous double auction ship as runnable examples with local servers included.
+- **Run classic economic games with LLM players**: Prisoner's Dilemma, Dictator, Public Goods, and a continuous double auction shipped as runnable examples with local servers included.
+- **Agent runtime**: Run one explicit `Agent` per simulated player.
 - **Define experiments in YAML**: Declare roles, per-phase prompts (Jinja templates), agent assignments, and game state in a single config file, then launch with `run_experiment_from_yaml` — no framework code required for standard setups.
-- **Give agents different strategies and personas**: Vary system prompts per role or per phase (e.g., a "cooperator" and a "defector"), or assign each agent a persona file to study heterogeneous populations.
-- **Use hosted or local models**: OpenAI out of the box, local models via Ollama — configurable per role, so different players can run on different models.
+- **Ports and Adapters**: Swap protocol codecs, transports, prompt renderers, response parsers, and state projectors.
+- **Flexible agent customization**: Customize behavior with Jinja templates, response schemas, personas, or custom Python phase handlers; give agents different strategies and personas to study heterogeneous populations.
+- **Event-driven state management**: Project server events into typed public, private, and meta state.
+- **Hosted and local models**: Use OpenAI, OpenRouter, or run local models via Ollama; configurable per role so different players can run on different models.
 - **Connect to your own experiment server**: Agents talk to game servers over WebSockets. The default protocol targets IBEX-style envelopes, and codecs, transports, and parsers are swappable for other servers.
-- **Handle turn-based and continuous games**: One-shot decisions per phase, or repeated actions within a continuous market phase (as in the double auction example).
+- **Turn-based and continuous action support**: Handle one-shot phase decisions and repeated actions within continuous market phases (as in the double auction example).
 - **Trace and analyze runs**: Per-agent logs are written for every game, with optional LangSmith or Langfuse tracing of all LLM calls.
 
 ## Installation
@@ -109,6 +112,21 @@ More examples are in the [econagents cookbook](https://github.com/iwanalabs/econ
 ## How it works
 
 Each simulated player is an `Agent` that connects to the game server over a transport (WebSockets by default), decodes server events through a protocol codec, and projects them into typed public, private, and meta state. When a phase requires a decision, the agent's role renders prompts from that state, queries its LLM, parses the response into an action, and sends it back to the server. A `GameRunner` supervises all agents, logging, timeouts, and cleanup. Every piece — codec, transport, prompt renderer, response parser, state projector — sits behind a port interface, so you can swap implementations to fit your server or workflow.
+
+To route a YAML role through OpenRouter, set `OPENROUTER_API_KEY` and use an
+OpenRouter model slug:
+
+```yaml
+roles:
+  - role_id: 1
+    name: "player"
+    llm_type: "ChatOpenRouter"
+    llm_params:
+      model_name: "anthropic/claude-sonnet-4"
+```
+
+`ChatOpenRouter` supports structured outputs, tool calling, normalized
+reasoning controls, provider routing options, and optional app attribution.
 
 ## Documentation
 

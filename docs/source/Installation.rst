@@ -27,11 +27,25 @@ Note that `uv <https://docs.astral.sh/uv/>`_ is used to create and manage the vi
 Optional Dependencies
 ---------------------
 
-The base install ships with the OpenAI client, which is the default provider. Other providers
-and observability backends are available as extras so you can pick what you need.
+The base install ships with the OpenAI client. It powers both the default
+OpenAI provider and the OpenRouter provider. Other providers and observability
+backends are available as extras so you can pick what you need.
 
 LLM Providers
 ~~~~~~~~~~~~~
+
+- ``openrouter``: For routing requests across OpenRouter's model catalog. Set
+  ``OPENROUTER_API_KEY`` and use ``ChatOpenRouter`` with an OpenRouter model
+  slug:
+
+   .. code-block:: python
+
+      from econagents.adapters.llm import ChatOpenRouter
+
+      llm = ChatOpenRouter(model_name="anthropic/claude-sonnet-4")
+
+  The optional ``site_url`` and ``app_name`` constructor arguments set
+  OpenRouter's app-attribution headers. No installation extra is needed.
 
 - ``ollama``: For using locally-hosted Ollama models
 
@@ -89,7 +103,7 @@ The package depends on the following libraries:
 - ``websockets``: For WebSocket connections
 - ``jinja2``: For rendering prompt templates
 - ``pyyaml``: For parsing experiment config files
-- ``openai``: Default LLM provider client
+- ``openai``: Client for the OpenAI and OpenRouter LLM providers
 
 Known Issues
 ------------
