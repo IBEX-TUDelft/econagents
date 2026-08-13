@@ -1,10 +1,10 @@
-from typing import Literal
+from typing import Literal, get_args
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic import BaseModel
 
-from econagents.adapters.llm.openai import ChatOpenAI
+from econagents.adapters.llm.openai import ChatOpenAI, ReasoningEffort
 
 
 class _SampleSchema(BaseModel):
@@ -39,6 +39,15 @@ class TestChatOpenAI:
             assert openai.api_key == "test_api_key"
             assert openai.reasoning_effort == "medium"
             assert openai.reasoning_summary == "auto"
+
+    def test_reasoning_efforts_match_gpt_5_4_mini(self):
+        """Exposes the reasoning efforts supported by the default model."""
+        assert get_args(ReasoningEffort) == ("none", "low", "medium", "high", "xhigh")
+
+        with patch("importlib.util.find_spec", return_value=True):
+            openai = ChatOpenAI(reasoning_effort="none")
+
+        assert openai._build_reasoning() == {"effort": "none"}
 
     def test_check_openai_available_failure(self):
         """Raises ImportError when the openai package is missing."""

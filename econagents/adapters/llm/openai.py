@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
-ReasoningEffort = Literal["minimal", "low", "medium", "high"]
+ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh"]
 ReasoningSummary = Literal["auto", "concise", "detailed"]
 
 
@@ -40,8 +40,9 @@ class ChatOpenAI(BaseLLM):
             model_name: The model name to use. Defaults to ``gpt-5.4-mini``.
             api_key: The API key to use for authentication.
             reasoning_effort: Reasoning effort for reasoning-capable models.
-                One of ``minimal``, ``low``, ``medium``, ``high``. ``None``
-                omits the reasoning parameter entirely.
+                ``gpt-5.4-mini`` supports ``none``, ``low``, ``medium``,
+                ``high``, and ``xhigh``. Supported values can vary for other
+                models. Python ``None`` omits the reasoning parameter entirely.
             reasoning_summary: Whether to include a reasoning summary in the
                 response (reasoning-capable models only).
             response_kwargs: Extra keyword arguments forwarded to the
