@@ -4,6 +4,13 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.11] - 2026-08-13
+
+### Fixed
+
+- Updated `ChatOpenAI` reasoning-effort typing for `gpt-5.4-mini` to accept
+  `none` and `xhigh` and remove the unsupported `minimal` value.
+
 ## [0.2.10] - 2026-08-10
 
 ### Added
@@ -114,6 +121,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.2.11]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.10...v0.2.11
 [0.2.5]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.2...v0.2.3
