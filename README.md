@@ -101,11 +101,11 @@ When YAML isn't flexible enough â€” custom phase logic, bespoke state handling â
 
 | Example | What it shows |
 |---|---|
-| [`prisoner`](examples/prisoner/) | Iterated Prisoner's Dilemma, 2 agents, 5 rounds, local server included |
-| [`prisoner_personas`](examples/prisoner_personas/) | Same game, but each agent plays a distinct persona |
-| [`dictator`](examples/dictator/) | Modified Dictator game with 2 agents, local server included |
-| [`public_goods`](examples/public_goods/) | Public goods game with 4 players, local server included |
-| [`continuous_double_auction`](examples/continuous_double_auction/) | LLM-backed traders in a continuous market phase |
+| [`prisoner`](https://github.com/IBEX-TUDelft/econagents/tree/main/examples/prisoner/) | Iterated Prisoner's Dilemma, 2 agents, 5 rounds, local server included |
+| [`prisoner_personas`](https://github.com/IBEX-TUDelft/econagents/tree/main/examples/prisoner_personas/) | Same game, but each agent plays a distinct persona |
+| [`dictator`](https://github.com/IBEX-TUDelft/econagents/tree/main/examples/dictator/) | Modified Dictator game with 2 agents, local server included |
+| [`public_goods`](https://github.com/IBEX-TUDelft/econagents/tree/main/examples/public_goods/) | Public goods game with 4 players, local server included |
+| [`continuous_double_auction`](https://github.com/IBEX-TUDelft/econagents/tree/main/examples/continuous_double_auction/) | LLM-backed traders in a continuous market phase |
 
 More examples are in the [econagents cookbook](https://github.com/iwanalabs/econagents-cookbook/tree/main/).
 
