@@ -7,11 +7,11 @@ the two players come entirely from their persona references in
 
 Server first (in another terminal):
 
-    uv run python examples/prisoner/server/server.py
+    uv run python -m examples.prisoner.server.server
 
 Then this:
 
-    uv run python examples/prisoner_personas/run_game_from_yaml.py
+    uv run python -m examples.prisoner_personas.run_game_from_yaml
 """
 
 import asyncio

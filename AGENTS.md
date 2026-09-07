@@ -25,8 +25,8 @@
   - `uv run ruff format .`
 - Build docs: `uv run make -C docs html`
 - Run an example locally:
-  - Server: `uv run python examples/prisoner/server/server.py`
-  - Client: `uv run python examples/prisoner/run_game.py`
+  - Server: `uv run python -m examples.prisoner.server.server`
+  - Client: `uv run python -m examples.prisoner.run_game`
 
 ## Coding Style & Naming Conventions
 

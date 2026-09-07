@@ -32,7 +32,8 @@ langsmith = ["langsmith>=0.4.1"]
 langfuse = ["langfuse>=3.0.3"]
 monty = ["pydantic-monty>=0.0.18"]
 standard = ["langsmith>=0.4.1"]
-all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3", "pydantic-monty>=0.0.18"]
+examples = ["python-dotenv>=1.2.1,<2"]
+all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3", "pydantic-monty>=0.0.18", "python-dotenv>=1.2.1,<2"]
 
 [dependency-groups]
 docs = [

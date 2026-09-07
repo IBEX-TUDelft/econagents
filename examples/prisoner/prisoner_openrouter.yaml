@@ -1,5 +1,5 @@
-name: "Prisoner's Dilemma"
-description: "A simple prisoner's dilemma experiment with LLM agents"
+name: "Prisoner's Dilemma (OpenRouter)"
+description: "The prisoner's dilemma experiment with both agents routed through OpenRouter"
 
 prompt_partials:
   - name: "game_description"
@@ -55,9 +55,9 @@ prompt_partials:
 roles:
   - role_id: 1
     name: "cooperator"
-    llm_type: "ChatOpenAI"
+    llm_type: "ChatOpenRouter"
     llm_params:
-      model_name: "gpt-5.4-mini"
+      model_name: "openai/gpt-5.6-luna"
     prompts:
       - system: |
           {% include "_partials/game_description.jinja2" %}
@@ -77,9 +77,9 @@ roles:
 
   - role_id: 2
     name: "defector"
-    llm_type: "ChatOpenAI"
+    llm_type: "ChatOpenRouter"
     llm_params:
-      model_name: "gpt-5.4-mini"
+      model_name: "openai/gpt-5.6-luna"
     prompts:
       - system: |
           {% include "_partials/game_instructions.jinja2" %}

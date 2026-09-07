@@ -3,7 +3,7 @@
 Runs the bundled mock server and four agents in the same process. The LLMs are
 replaced with deterministic stand-ins, so this check needs no API key:
 
-    uv run python examples/public_goods/verify.py
+    uv run python -m examples.public_goods.verify
 """
 
 import asyncio
@@ -40,6 +40,7 @@ class PlayerStubLLM(BaseLLM):
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
         response_schema: Optional[Type[BaseModel]] = None,
+        **kwargs: Any,
     ):
         self.calls.append({"messages": messages, "tracing_extra": tracing_extra})
         state = tracing_extra["state"]

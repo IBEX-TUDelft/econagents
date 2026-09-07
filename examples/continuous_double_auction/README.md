@@ -18,13 +18,13 @@ The traders use `ChatOpenAI` and structured output for market orders, so set `OP
 Start the local WebSocket server:
 
 ```bash
-uv run python examples/continuous_double_auction/server/server.py
+uv run python -m examples.continuous_double_auction.server.server
 ```
 
 In a separate terminal, run the agents:
 
 ```bash
-uv run python examples/continuous_double_auction/run_game.py
+uv run python -m examples.continuous_double_auction.run_game
 ```
 
 The runner writes per-game and per-agent logs under `examples/continuous_double_auction/logs/game_<game_id>/`.
@@ -33,7 +33,7 @@ The local server writes submitted orders and trades to `examples/continuous_doub
 You can also run the end-to-end verification, which starts the server and agents in the same process:
 
 ```bash
-uv run python examples/continuous_double_auction/verify.py
+uv run python -m examples.continuous_double_auction.verify
 ```
 
 ## Files

@@ -4,6 +4,36 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.12] - 2026-09-07
+
+### Added
+
+- Added an `examples` extra (`pip install "econagents[examples]"`) that installs
+  the dependencies the bundled example scripts need.
+- Added `examples/prisoner/prisoner_openrouter.yaml`, a runnable OpenRouter
+  variant of the Prisoner's Dilemma experiment, and an optional config path
+  argument to `examples/prisoner/run_game_from_yaml.py`.
+
+### Changed
+
+- Relative `logs_dir` and `prompts_dir` values in a YAML `runner` section are
+  now resolved against the directory containing the YAML file instead of the
+  current working directory.
+- `prisoner.yaml` now assigns agent 2 to the defector role, matching the README.
+- Docs and docstrings invoke the examples as modules
+  (`python -m examples.prisoner.run_game`) from the repository root.
+- README, Tutorial and Installation docs describe a pip-only setup alongside
+  `uv`, drop the stale LangSmith prerequisite, and note the Debian/Ubuntu
+  `python3-venv` requirement.
+
+### Fixed
+
+- The stub LLMs in the `examples/*/verify.py` scripts accept the `logger`
+  keyword the runtime now passes, so the key-free verification runs again.
+- `WebSocketTransport` no longer tries to reconnect after `stop()` closed the
+  connection, which removed the spurious "connect failed; reconnecting" log
+  lines at the end of every game.
+
 ## [0.2.11] - 2026-08-13
 
 ### Fixed
@@ -121,6 +151,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.2.12]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.10...v0.2.11
 [0.2.5]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.3...v0.2.4

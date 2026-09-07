@@ -138,6 +138,10 @@ class WebSocketTransport(LoggerMixin):
                             self.logger.info(f"<-- Transport received: {message}")
                             await self.on_message_callback(message)
 
+                    if not self._running:
+                        self.logger.info("WebSocketTransport: stopping as requested.")
+                        break
+
                 except ConnectionClosed as e:
                     self.logger.info(f"WebSocketTransport: connection closed: ({e.code}) {e.reason}")
                     if not self._running:

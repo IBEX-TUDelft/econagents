@@ -24,12 +24,12 @@ This is an implementation of the Modified Dictator Game, an economic experiment 
 
 ### 1. Start the Server
 ```bash
-uv run python examples/dictator/server/server.py
+uv run python -m examples.dictator.server.server
 ```
 
 ### 2. Run the Game (in another terminal)
 ```bash
-uv run python examples/dictator/run_game.py
+uv run python -m examples.dictator.run_game
 ```
 
 ## File Structure
