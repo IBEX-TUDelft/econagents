@@ -4,7 +4,7 @@ Runs the local server and agents in the same process. The LLM provider is
 replaced with a deterministic stub, but actions still go through the role's
 LLM prompt and structured-output path:
 
-    uv run python examples/continuous_double_auction/verify.py
+    uv run python -m examples.continuous_double_auction.verify
 """
 
 import asyncio
@@ -39,6 +39,7 @@ class TraderStubLLM(BaseLLM):
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
         response_schema: Optional[Type[BaseModel]] = None,
+        **kwargs: Any,
     ):
         self.calls.append({"messages": messages, "tracing_extra": tracing_extra})
         state = tracing_extra["state"]

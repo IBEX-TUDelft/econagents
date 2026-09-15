@@ -40,19 +40,41 @@ pip install econagents
 pip install git+https://github.com/IBEX-TUDelft/econagents.git
 ```
 
+The runnable examples are not part of the PyPI package. To run them, clone the repository and install it with the `examples` extra as shown in the Quickstart.
+
+On Debian/Ubuntu the system Python ships without `venv` and `pip`; run `sudo apt install python3-venv python3-pip` first.
+
 ## Quickstart
 
-The fastest way to see it in action is the repeated Prisoner's Dilemma, which runs entirely on your machine (set `OPENAI_API_KEY` first):
+The fastest way to see it in action is the repeated Prisoner's Dilemma, which runs entirely on your machine:
 
 ```shell
-# Run the game server
-uv run python examples/prisoner/server/server.py
-
-# Run the experiment (in a separate terminal)
-uv run python examples/prisoner/run_game.py
+git clone https://github.com/IBEX-TUDelft/econagents.git
+cd econagents
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[examples]"
+echo 'OPENAI_API_KEY=<your-key>' > .env
 ```
 
+Then, from the repository root, start the game server and, in a second terminal, the experiment:
+
+```shell
+# Terminal 1: run the game server
+python -m examples.prisoner.server.server
+
+# Terminal 2: run the experiment
+python -m examples.prisoner.run_game
+```
+
+If you use [uv](https://docs.astral.sh/uv/), `uv sync` replaces the venv and pip steps and `uv run python ...` replaces `python ...`.
+
 Two LLM agents play five rounds against each other; per-agent logs land in `examples/prisoner/logs/`.
+
+To run the same experiment through OpenRouter, put `OPENROUTER_API_KEY` in `.env` and use the YAML-driven variant, which routes both agents through `ChatOpenRouter`:
+
+```shell
+python -m examples.prisoner.run_game_from_yaml prisoner_openrouter.yaml
+```
 
 Most of the experiment lives in a YAML file. Here's a condensed look at `examples/prisoner/prisoner.yaml`:
 
@@ -127,6 +149,10 @@ roles:
 
 `ChatOpenRouter` supports structured outputs, tool calling, normalized
 reasoning controls, provider routing options, and optional app attribution.
+`examples/prisoner/prisoner_openrouter.yaml` is a complete, runnable example.
+
+Relative `logs_dir` and `prompts_dir` values in the `runner` section of a YAML
+config are resolved against the directory containing the YAML file.
 
 ## Documentation
 

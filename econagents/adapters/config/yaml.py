@@ -292,8 +292,15 @@ class RunnerSpec(BaseModel):
     min_action_delay: int = 5
     max_action_delay: int = 10
 
-    def create_runner_config(self) -> GameRunnerConfig:
-        """Create a GameRunnerConfig instance from this configuration."""
+    def create_runner_config(self, base_dir: Optional[Path] = None) -> GameRunnerConfig:
+        """Create a GameRunnerConfig instance from this configuration.
+
+        Args:
+            base_dir: Directory that relative ``logs_dir`` and ``prompts_dir``
+                values are resolved against. Defaults to the current working
+                directory.
+        """
+        base_dir = base_dir or Path.cwd()
         # Map string log level to int
         log_levels = {
             "DEBUG": logging.DEBUG,
@@ -313,9 +320,9 @@ class RunnerSpec(BaseModel):
                 path=self.path,
                 port=self.port,
                 game_id=self.game_id,
-                logs_dir=Path.cwd() / self.logs_dir,
+                logs_dir=base_dir / self.logs_dir,
                 log_level=log_level_int,
-                prompts_dir=Path.cwd() / self.prompts_dir,
+                prompts_dir=base_dir / self.prompts_dir,
                 phase_transition_event=self.phase_transition_event,
                 phase_identifier_key=self.phase_identifier_key,
                 observability_provider=self.observability_provider,
@@ -327,9 +334,9 @@ class RunnerSpec(BaseModel):
                 path=self.path,
                 port=self.port,
                 game_id=self.game_id,
-                logs_dir=Path.cwd() / self.logs_dir,
+                logs_dir=base_dir / self.logs_dir,
                 log_level=log_level_int,
-                prompts_dir=Path.cwd() / self.prompts_dir,
+                prompts_dir=base_dir / self.prompts_dir,
                 phase_transition_event=self.phase_transition_event,
                 phase_identifier_key=self.phase_identifier_key,
                 observability_provider=self.observability_provider,
@@ -416,11 +423,19 @@ class ExperimentSpec(BaseModel):
 
         return temp_dir
 
-    async def run_experiment(self, login_payloads: List[Dict[str, Any]], game_id: int) -> None:
-        """Run the experiment from this configuration."""
+    async def run_experiment(
+        self, login_payloads: List[Dict[str, Any]], game_id: int, base_dir: Optional[Path] = None
+    ) -> None:
+        """Run the experiment from this configuration.
+
+        Args:
+            login_payloads: A list of dictionaries containing login information for each agent
+            game_id: Identifier of the game to join
+            base_dir: Directory that relative runner paths are resolved against
+        """
         state_type = self.state.create_state_class()
         role_configs = {role_config.role_id: role_config for role_config in self.roles}
-        runner_config = self.runner.create_runner_config()
+        runner_config = self.runner.create_runner_config(base_dir=base_dir)
         runner_config.game_id = game_id
 
         if any(hasattr(role, "prompts") and role.prompts for role in self.roles):
@@ -495,8 +510,12 @@ class YamlExperimentLoader:
 
         Args:
             login_payloads: A list of dictionaries containing login information for each agent
+            game_id: Identifier of the game to join
+
+        Relative ``logs_dir`` and ``prompts_dir`` values in the ``runner`` section
+        are resolved against the directory containing the YAML file.
         """
-        await self.config.run_experiment(login_payloads, game_id)
+        await self.config.run_experiment(login_payloads, game_id, base_dir=Path(self.config_path).resolve().parent)
 
 
 async def run_experiment_from_yaml(yaml_path: Path, login_payloads: List[Dict[str, Any]], game_id: int) -> None:

@@ -18,14 +18,14 @@ from econagents.personas import Persona
 StateT_contra = TypeVar("StateT_contra", bound=GameStateProtocol, contravariant=True)
 
 
+# Directive appended after the persona block so the description is treated as
+# a role to inhabit rather than background colour. Override this module-level
+# constant to change the wording.
 PERSONA_INSTRUCTION = (
     "Stay in character. Decide as this person would, given who they are — "
     "their situation, tendencies, and outlook — rather than as a neutral "
     "analyst optimising the payoff table."
 )
-"""Directive appended after the persona block so the description is treated as
-a role to inhabit rather than background colour. Override this module-level
-constant to change the wording."""
 
 
 def _format_persona_block(persona: Persona) -> str:

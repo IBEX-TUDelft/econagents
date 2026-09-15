@@ -3,7 +3,7 @@
 Runs the bundled mock server and two agents in the same process. The LLMs are
 replaced with deterministic stand-ins, so this check needs no API key:
 
-    uv run python examples/dictator/verify.py
+    uv run python -m examples.dictator.verify
 """
 
 import asyncio
@@ -40,6 +40,7 @@ class DictatorStubLLM(BaseLLM):
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
         response_schema: Optional[Type[BaseModel]] = None,
+        **kwargs: Any,
     ):
         self.calls.append({"messages": messages, "tracing_extra": tracing_extra})
         game_id = tracing_extra["state"]["meta"]["game_id"]
@@ -63,6 +64,7 @@ class ReceiverStubLLM(BaseLLM):
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
         response_schema: Optional[Type[BaseModel]] = None,
+        **kwargs: Any,
     ):
         self.calls.append({"messages": messages, "tracing_extra": tracing_extra})
         game_id = tracing_extra["state"]["meta"]["game_id"]

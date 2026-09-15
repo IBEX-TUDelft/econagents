@@ -3,7 +3,7 @@
 Runs the bundled mock server and two agents in the same process. The
 LLM is replaced with a deterministic stub, so the check needs no API key:
 
-    uv run python examples/prisoner/verify.py
+    uv run python -m examples.prisoner.verify
 """
 
 import asyncio
@@ -40,6 +40,7 @@ class StubLLM(BaseLLM):
         messages: list[dict[str, Any]],
         tracing_extra: dict[str, Any],
         response_schema: Optional[Type[BaseModel]] = None,
+        **kwargs: Any,
     ):
         self.calls.append({"messages": messages, "tracing_extra": tracing_extra})
         envelope = {

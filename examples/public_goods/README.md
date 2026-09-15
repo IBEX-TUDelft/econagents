@@ -30,7 +30,7 @@ Where:
 First, start the WebSocket server:
 
 ```bash
-uv run python examples/public_goods/server/server.py
+uv run python -m examples.public_goods.server.server
 ```
 
 The server will start on `localhost:8765`.
@@ -40,7 +40,7 @@ The server will start on `localhost:8765`.
 In a separate terminal, run the game with AI agents:
 
 ```bash
-uv run python examples/public_goods/run_game.py
+uv run python -m examples.public_goods.run_game
 ```
 
 This will:

@@ -8,11 +8,11 @@ Reuses the local game server and state class from ``examples/prisoner/``.
 
 Server (in another terminal):
 
-    uv run python examples/prisoner/server/server.py
+    uv run python -m examples.prisoner.server.server
 
 Then this:
 
-    uv run python examples/prisoner_personas/run_game.py \
+    uv run python -m examples.prisoner_personas.run_game \
         --game-id 1 \
         --persona conditional-cooperator --persona marcus-strategic-44 \
         --recovery-code CODE1 --recovery-code CODE2
@@ -104,7 +104,7 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     """
     How to run:
-      uv run python examples/prisoner_personas/run_game.py \
+      uv run python -m examples.prisoner_personas.run_game \
       --game-id 1 \
       --persona conditional-cooperator \
       --persona marcus-strategic-44 \

@@ -34,9 +34,11 @@ class MockWebSocketServer:
         self.received_messages: List[str] = []
         self.server_task = None
         self.should_run = False
+        self.connection_count = 0
 
     async def handler(self, websocket):
         """Handle incoming WebSocket connections."""
+        self.connection_count += 1
         self.connected_clients.append(websocket)
         try:
             async for message in websocket:
@@ -480,6 +482,19 @@ class TestWebSocketTransport:
                     await listen_task
                 except asyncio.CancelledError:
                     pass
+
+    @pytest.mark.asyncio
+    async def test_stop_does_not_reconnect(self, transport, ws_server):
+        """After stop() closes the socket the listen loop must exit instead of reconnecting."""
+        transport.url = ws_server.url
+        listen_task, connected = await self._start_transport_and_wait_for_connection(transport)
+        assert connected is True
+
+        await transport.stop()
+        await asyncio.wait_for(listen_task, timeout=3.0)
+
+        assert transport._running is False
+        assert ws_server.connection_count == 1
 
     @pytest.mark.asyncio
     async def test_auth_mechanism_called(self, transport, ws_server, login_payload):

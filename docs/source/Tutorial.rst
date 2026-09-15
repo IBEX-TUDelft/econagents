@@ -11,19 +11,29 @@ Prerequisites
 Before running an experiment, ensure you have:
 
 1. Python 3.10+ installed
-2. All dependencies installed
-3. Have set up API keys for OpenAI and LangSmith
+2. A clone of the repository with the ``examples`` extra installed:
 
-Create a ``.env`` file in your project root with the following variables:
+   .. code-block:: bash
+
+       git clone https://github.com/IBEX-TUDelft/econagents.git
+       cd econagents
+       python -m venv .venv && source .venv/bin/activate
+       pip install -e ".[examples]"
+
+   If you use `uv <https://docs.astral.sh/uv/>`_, ``uv sync`` does the same and ``uv run python ...`` replaces ``python ...`` in the commands below. All commands are run from the repository root.
+
+3. An API key for OpenAI (or OpenRouter, see below)
+
+Create a ``.env`` file in the project root with:
 
 .. code-block:: text
 
-    LANGCHAIN_API_KEY=<your_langsmith_api_key>
-    LANGSMITH_TRACING=true
-    LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
-    LANGSMITH_PROJECT="econagents"
-
     OPENAI_API_KEY=<your_openai_api_key>
+
+To use OpenRouter instead, set ``OPENROUTER_API_KEY`` and run
+``python -m examples.prisoner.run_game_from_yaml prisoner_openrouter.yaml``, which routes both agents through ``ChatOpenRouter``.
+
+LangSmith tracing is optional. Install ``econagents[langsmith]`` and add ``LANGSMITH_API_KEY``, ``LANGSMITH_TRACING=true`` and ``LANGSMITH_PROJECT`` to ``.env`` to enable it.
 
 Understanding the Prisoner's Dilemma Experiment
 -----------------------------------------------
@@ -251,7 +261,7 @@ First, you need to start the Prisoner's Dilemma game server. The server defines 
 .. code-block:: bash
 
     # From the project root, start the server
-    uv run python examples/prisoner/server/server.py
+    python -m examples.prisoner.server.server
 
 This will start a WebSocket server on localhost port 8765. The server has methods to create a new game and generate recovery codes that agents use to join the game.
 
@@ -270,7 +280,7 @@ To run the game, **open a new terminal** and run:
 .. code-block:: bash
 
     # From the project root, run the game
-    uv run python examples/prisoner/run_game.py
+    python -m examples.prisoner.run_game
 
 This will start the game runner, which will connect to the server and start the game. You should run this in a new terminal, and keep the server running in the other terminal.
 
@@ -290,7 +300,7 @@ Step 3: Analyzing the Results
 After the game completes, you can analyze the results by:
 
 1. Checking the logs in the ``examples/prisoner/logs`` directory
-2. In LangSmith, you can view the full interaction history and decision-making processes in your LangSmith dashboard
+2. If LangSmith tracing is enabled, viewing the full interaction history and decision-making processes in your LangSmith dashboard
 
 The logs contain detailed information about:
 - Agent decisions in each round

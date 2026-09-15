@@ -106,6 +106,24 @@ class TestYamlExperimentLoader:
         assert len(parser.config.agents) == 1
         assert isinstance(parser.config.state, StateSpec)
 
+    def test_runner_paths_resolve_relative_to_base_dir(self, config_file: Path, tmp_path: Path):
+        """Relative logs/prompts dirs are resolved against base_dir, falling back to cwd."""
+        parser = YamlExperimentLoader(config_path=config_file)
+        runner_config = parser.config.runner.create_runner_config(base_dir=tmp_path)
+        assert runner_config.logs_dir == tmp_path / "logs"
+        assert runner_config.prompts_dir == tmp_path / "prompts"
+
+        default_config = parser.config.runner.create_runner_config()
+        assert default_config.logs_dir == Path.cwd() / "logs"
+
+    @pytest.mark.asyncio
+    async def test_run_experiment_uses_yaml_directory_as_base_dir(self, config_file: Path):
+        """The loader resolves runner paths relative to the YAML file, not the cwd."""
+        parser = YamlExperimentLoader(config_path=config_file)
+        with patch.object(ExperimentSpec, "run_experiment", new=AsyncMock()) as run_experiment:
+            await parser.run_experiment([], game_id=7)
+        run_experiment.assert_awaited_once_with([], 7, base_dir=config_file.resolve().parent)
+
     def test_create_state_class_basic(self, config_file: Path):
         """Test creating the dynamic GameState class."""
         parser = YamlExperimentLoader(config_path=config_file)
