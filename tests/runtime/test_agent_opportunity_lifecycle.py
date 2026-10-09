@@ -80,6 +80,20 @@ async def settle(turns: int = 50) -> None:
         await asyncio.sleep(0)
 
 
+async def eventually(predicate, timeout: float) -> bool:
+    """Poll in real time, so a decision started after a debounce or an awaited delay is still seen."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while not predicate():
+        if loop.time() >= deadline:
+            return False
+        await asyncio.sleep(0.01)
+    return True
+
+
+OVERLAP_WINDOW = 0.3
+
+
 async def shutdown(agent: Agent, policy: GatedPolicy, tasks: list[asyncio.Task]) -> None:
     await agent.stop()
     policy.gate.set()
@@ -88,22 +102,58 @@ async def shutdown(agent: Agent, policy: GatedPolicy, tasks: list[asyncio.Task])
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("phase", [MARKET, DECLARATION], ids=["continuous-phase", "single-action-phase"])
+async def test_single_continuous_phase_snapshot_entry_action_and_loop_do_not_overlap(tmp_path: Path):
+    """Behavioral: ONE market snapshot already starts two decisions.
+
+    Agent.handle_phase_transition creates the continuous loop task and then awaits the entry action;
+    the loop's first iteration decides while the entry decision is still pending.
+    """
+    policy = GatedPolicy()
+    agent = make_agent(policy, tmp_path)
+
+    tasks = [deliver(agent, MARKET)]
+    started = await eventually(lambda: len(policy.calls) >= 1, timeout=5)
+    await eventually(lambda: policy.peak > 1, timeout=OVERLAP_WINDOW)
+    peak, calls = policy.peak, len(policy.calls)
+    await shutdown(agent, policy, tasks)
+
+    assert started, "the market snapshot started no decision at all"
+    assert peak <= 1, (
+        f"a single '{MARKET}' snapshot put {peak} decisions in flight for one actor ({calls} policy invocations): "
+        "handle_phase_transition awaits the entry action while the continuous loop it just created also decides; "
+        "Family B allows one unresolved opportunity"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "phase",
+    [DECLARATION, MARKET],
+    ids=["single-action-phase", "continuous-phase-needs-entry-vs-loop-fix-too"],
+)
 async def test_duplicate_same_phase_snapshot_starts_no_second_decision(phase, tmp_path: Path):
-    """Behavioral: the phase snapshot plus the get-snapshot reply on join must give one decision in flight."""
+    """Behavioral: the phase snapshot plus the get-snapshot reply on join must give one decision in flight.
+
+    The single-action case isolates the re-entry defect (a same-phase snapshot re-runs
+    handle_phase_transition). The continuous case also overlaps the entry action with the loop
+    (see the single-snapshot test), so it passes only once both defects are fixed.
+    """
     policy = GatedPolicy()
     agent = make_agent(policy, tmp_path)
 
     tasks = [deliver(agent, phase)]
-    await settle()
+    started = await eventually(lambda: len(policy.calls) >= 1, timeout=5)
     tasks.append(deliver(agent, phase))
-    await settle()
+    await eventually(lambda: policy.peak > 1, timeout=OVERLAP_WINDOW)
     peak, calls = policy.peak, len(policy.calls)
     await shutdown(agent, policy, tasks)
 
+    assert started, f"the first '{phase}' snapshot started no decision at all"
     assert peak <= 1, (
         f"{peak} decisions were in flight at once for one actor after two '{phase}' snapshots "
-        f"({calls} policy invocations); Family B allows one unresolved opportunity"
+        f"({calls} policy invocations); a same-phase snapshot re-ran handle_phase_transition"
+        + (" (and the entry action overlaps the continuous loop)" if phase == MARKET else "")
+        + "; Family B allows one unresolved opportunity"
     )
 
 
@@ -135,12 +185,14 @@ async def test_guard_phase_change_during_pending_decision_runs_next_phase_once(t
     agent = make_agent(policy, tmp_path)
 
     tasks = [deliver(agent, MARKET)]
+    await eventually(lambda: len(policy.calls) >= 1, timeout=5)
     await settle()
     market_calls_before_change = policy.calls.count(MARKET)
     tasks.append(deliver(agent, DECLARATION))
     await settle()
     policy.gate.set()
-    await settle()
+    await eventually(lambda: DECLARATION in policy.calls, timeout=5)
+    await asyncio.sleep(OVERLAP_WINDOW)
     calls = list(policy.calls)
     await shutdown(agent, policy, tasks)
 
