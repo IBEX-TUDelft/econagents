@@ -67,9 +67,11 @@ the current phase (for example a second snapshot after a reconnect) does not
 start another decision or another loop while one is active; it is logged at
 INFO. The current phase is identified by its phase id plus ``state.meta.round``
 when the state defines a ``round`` field, so define one if your game reuses the
-same phase id every round. Without it, a server that starts the next round
-under the same phase id before the agent has acted gets no decision for that
-round. When the phase changes, or the agent stops, the pending decision is
+same phase id every round. Without it, a next round that the server starts
+under the same phase id, with no other phase in between, is the same
+occurrence: a continuous phase's loop simply goes on, and a turn-based phase
+gets no decision for that round, neither while the previous one is in flight
+nor after it completed (see the decision gate below). When the phase changes, or the agent stops, the pending decision is
 cancelled, and a result decided in a phase the agent has since left is logged
 and dropped instead of sent. An exception raised by one continuous-phase action
 is logged and the loop continues.
@@ -145,6 +147,17 @@ a turn-based decision, and records every completed decision in it:
            journal.add(occurrence.phase, occurrence.round, outcome)  # "sent" or "hold"
 
    agent = Agent(..., decision_gate=JournalGate())
+
+The in-memory record forgets an occurrence as soon as the agent moves to
+another one, but a store keyed on ``(phase, round)`` like the one above also
+answers "decided" when the game comes back to the same phase id within one
+round. That is fine for games whose phase ids are unique within a round (the
+futarchy game is one); otherwise include something in the key that tells the
+visits apart. If ``is_decided`` raises, the agent logs the error and makes no
+decision on that transition, so a broken store cannot cause a second
+submission; the next transition into the occurrence asks again. If
+``mark_decided`` raises, the error is logged and the in-memory record still
+holds.
 
 Phase Handlers
 --------------

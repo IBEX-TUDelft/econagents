@@ -182,11 +182,19 @@ class Agent(LoggerMixin):
         self._phase_occurrence = occurrence
         if phase is None:
             return
-        if not self.phase_engine.is_continuous(phase) and self._occurrence_decided(occurrence):
-            self.logger.info(
-                f"Ignoring transition into phase {phase} (round {occurrence.round}): its decision already completed"
-            )
-            return
+        if not self.phase_engine.is_continuous(phase):
+            try:
+                decided = self._occurrence_decided(occurrence)
+            except Exception:
+                self.logger.exception(
+                    f"Decision gate failed for phase {phase} (round {occurrence.round}); not deciding on this transition"
+                )
+                return
+            if decided:
+                self.logger.info(
+                    f"Ignoring transition into phase {phase} (round {occurrence.round}): its decision already completed"
+                )
+                return
 
         epoch = self._phase_epoch
         entry = asyncio.create_task(self._execute_phase_action(phase, epoch))
@@ -290,8 +298,15 @@ class Agent(LoggerMixin):
             return
         if epoch == self._phase_epoch:
             self._decided_occurrence = occurrence
-        if self.decision_gate is not None:
+        if self.decision_gate is None:
+            return
+        try:
             self.decision_gate.mark_decided(occurrence, outcome)
+        except Exception:
+            self.logger.exception(
+                f"Decision gate failed to record the {outcome!r} decision for phase {occurrence.phase} "
+                f"(round {occurrence.round})"
+            )
 
     def _continuous_phase_active(self, epoch: int) -> bool:
         return self.in_continuous_phase and epoch == self._phase_epoch

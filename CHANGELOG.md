@@ -17,9 +17,10 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   phase is identified by the phase id plus `state.meta.round` when the state
   defines one, so a game that reuses a phase id every round still gets a new
   decision when the round changes. A game whose state has no `meta.round` and
-  that moves to the next round under the same phase id without waiting for the
-  agent's action gets no decision for that round while the old one is in
-  flight; the ignored transition is logged at INFO.
+  that moves to the next round under the same phase id, with no other phase in
+  between, stays in the same occurrence: the transition is logged at INFO and
+  ignored while the old decision or loop is active, and for a turn-based phase
+  also after the decision completed (see the decision gate below).
 - A decision that is still in flight when the phase changes is cancelled, and a
   result decided in a phase the agent has left, or after `Agent.stop()`, is
   dropped instead of sent.
@@ -42,7 +43,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   declaration was refused by the server and a second speculation replaced the
   first. A decision that raised, was dropped as stale, or whose send raised
   `ConnectionError` is decided again on the next transition. Continuous phases
-  are unchanged.
+  are unchanged. This also applies to a game without `meta.round` that reuses a
+  phase id for the next round (see Changed).
 
 ### Added
 
@@ -51,10 +53,19 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   updates after each completed one, so a store that outlives the process can
   stop a restarted agent from deciding again. Without one the gate is in
   memory, per `Agent` instance. `DecisionGate`, `DecisionOutcome` and
-  `PhaseOccurrence` are exported from `econagents`.
+  `PhaseOccurrence` are exported from `econagents`. An exception from
+  `is_decided` is logged and no decision is made on that transition; one from
+  `mark_decided` is logged.
 
 ### Changed
 
+- **Breaking:** a turn-based (non-continuous) phase occurrence, the phase id
+  plus `state.meta.round`, is decided at most once per `Agent`. A game whose
+  state has no `meta.round` and that starts the next round under the same phase
+  id, with no other phase in between, used to get a new decision once the
+  previous one had completed; it now gets none for that round. Give the state a
+  `meta.round` field (or pass through another phase) so each round is a new
+  occurrence. The bundled examples are not affected.
 - **Breaking:** `WebSocketTransport.send()` raises `TransportSendError` (a
   `ConnectionError` subclass, exported from `econagents`,
   `econagents.adapters.transport` and `econagents.ports`) when there is no open

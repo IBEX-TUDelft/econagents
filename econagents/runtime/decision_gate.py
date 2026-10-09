@@ -20,6 +20,11 @@ class DecisionGate(Protocol):
     ``Agent`` always remembers, in memory, that it completed the decision for its current occurrence.
     A gate passed as ``Agent(decision_gate=...)`` is consulted in addition, so a store that outlives the
     process (for example a response journal) can stop a restarted agent from deciding again.
+
+    The in-memory record resets whenever the agent moves to another occurrence, but a store keyed on
+    ``(phase, round)`` also answers ``True`` when a game returns to the same phase id within one round,
+    so such a game needs a key that tells those visits apart. If ``is_decided`` raises, the agent logs
+    the error and makes no decision on that transition; if ``mark_decided`` raises, the error is logged.
     """
 
     def is_decided(self, occurrence: PhaseOccurrence) -> bool:

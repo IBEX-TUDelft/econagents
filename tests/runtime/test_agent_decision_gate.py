@@ -183,6 +183,21 @@ async def test_gate_hold_counts_as_decided(tmp_path):
     assert transport.sent == []
 
 
+@pytest.mark.asyncio
+async def test_gate_without_round_the_same_phase_id_is_one_occurrence(tmp_path):
+    """Without ``state.meta.round`` a next round under the same phase id is the same occurrence."""
+    role = ScriptedRole(declaration(70), declaration(55))
+    transport = Transport()
+    agent = make_agent(role, transport, tmp_path)
+    agent.state = GameState()
+
+    await deliver(agent, snapshot(DECLARATION, round_=1))
+    await deliver(agent, snapshot(DECLARATION, round_=2))
+
+    assert len(role.calls) == 1
+    assert transport.sent == [json.dumps(declaration(70))]
+
+
 # ---------------------------------------------------------------------------
 # Guards: what must still be decided again
 # ---------------------------------------------------------------------------
@@ -303,3 +318,48 @@ async def test_hook_is_not_used_for_continuous_phases(tmp_path):
         assert gate.queries == [] and gate.marks == []
     finally:
         await agent.stop()
+
+
+class FailingGate(RecordingGate):
+    def __init__(self, fail_on: str) -> None:
+        super().__init__()
+        self.fail_on = fail_on
+
+    def is_decided(self, occurrence) -> bool:
+        if self.fail_on == "is_decided":
+            raise OSError("journal unreadable")
+        return super().is_decided(occurrence)
+
+    def mark_decided(self, occurrence, outcome) -> None:
+        if self.fail_on == "mark_decided":
+            raise OSError("journal unwritable")
+        super().mark_decided(occurrence, outcome)
+
+
+@pytest.mark.asyncio
+async def test_hook_is_decided_error_is_logged_and_no_decision_is_made(tmp_path, caplog):
+    role = ScriptedRole(declaration(70))
+    transport = Transport()
+    agent = make_agent(role, transport, tmp_path, decision_gate=FailingGate("is_decided"))
+
+    with caplog.at_level(logging.ERROR):
+        await agent.on_event(snapshot(DECLARATION))
+
+    assert role.calls == []
+    assert transport.sent == []
+    assert any(r.levelno == logging.ERROR and "Decision gate failed" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_hook_mark_decided_error_is_logged_and_the_in_memory_gate_still_holds(tmp_path, caplog):
+    role = ScriptedRole(declaration(70), declaration(55))
+    transport = Transport()
+    agent = make_agent(role, transport, tmp_path, decision_gate=FailingGate("mark_decided"))
+
+    with caplog.at_level(logging.ERROR):
+        await agent.on_event(snapshot(DECLARATION))
+        await agent.on_event(snapshot(DECLARATION))
+
+    assert role.calls == [DECLARATION]
+    assert transport.sent == [json.dumps(declaration(70))]
+    assert any(r.levelno == logging.ERROR and "failed to record" in r.message for r in caplog.records)
