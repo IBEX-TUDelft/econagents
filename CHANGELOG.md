@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-09
+
 ### Fixed
 
 - `Agent` makes one decision at a time: the phase-entry action and the
@@ -233,6 +235,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.3.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.12...v0.3.0
 [0.2.12]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.10...v0.2.11
 [0.2.5]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.4...v0.2.5
