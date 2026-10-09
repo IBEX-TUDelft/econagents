@@ -24,6 +24,15 @@ POST_ORDER = json.dumps(
 )
 
 
+async def _wait_until(pred, timeout: float) -> bool:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while not pred():
+        if asyncio.get_running_loop().time() > deadline:
+            return False
+        await asyncio.sleep(0.01)
+    return True
+
+
 async def _send_outcome(transport: WebSocketTransport, message: str) -> tuple[object, BaseException | None]:
     try:
         return await transport.send(message), None
@@ -96,15 +105,12 @@ async def test_send_on_live_socket_delivers_exact_frame():
     transport = WebSocketTransport(url=f"ws://127.0.0.1:{port}")
     task = asyncio.create_task(transport.start_listening())
     try:
-        async with asyncio.timeout(5):
-            while transport.ws is None:
-                await asyncio.sleep(0.01)
+        assert await _wait_until(lambda: transport.ws is not None, timeout=5.0), "transport never connected"
 
         result, error = await _send_outcome(transport, POST_ORDER)
 
         assert _reported_success(result, error), f"live send reported failure: result={result!r} error={error!r}"
-        async with asyncio.timeout(5):
-            await arrived.wait()
+        await asyncio.wait_for(arrived.wait(), timeout=5.0)
         assert received == [POST_ORDER]
     finally:
         await transport.stop()
