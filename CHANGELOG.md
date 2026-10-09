@@ -6,6 +6,31 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `max_game_duration` now bounds gameplay only: the `GameRunner` watchdog
+  counts time from the first phase outside `GameRunnerConfig.pre_game_phases`
+  (default `{"introduction"}`) that an agent reports, and pauses while a later
+  round is back in a pre-game phase, so waiting for players to join and ready
+  no longer uses up the budget (IBEX-game_suite#5). Phases are tracked per
+  round and phase, so a phase replayed after a join or reconnect neither starts
+  nor restarts the clock. Behaviour change: a run that waits in `introduction`
+  is no longer stopped after `max_game_duration`. If no agent reports a phase,
+  for example agents without `register_event_handler`, the budget still counts
+  from the start of the run. The timeout warning still starts with
+  `Game <id> reached maximum duration of <N>s` and now names the phase the
+  gameplay clock started in.
+
+### Added
+
+- `GameRunnerConfig.max_pre_game_duration` (seconds, default `None`:
+  unbounded) stops a run whose wait before gameplay, summed over the run,
+  exceeds it, with a distinct `pre-game wait timeout` warning.
+- `GameRunner.timeout_reason`: `"gameplay"`, `"pre_game"` or `None` after
+  `run_game()`.
+- A single `Gameplay started (phase=...)` log record per run, plus
+  `Gameplay clock paused`/`resumed` records around later pre-game phases.
+
 ## [0.3.0] - 2026-10-09
 
 ### Fixed

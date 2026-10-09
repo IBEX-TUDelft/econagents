@@ -19,9 +19,8 @@ rather than hardcode the futarchy wiring.
 The role is stubbed (no LLM): ``role.handle_phase`` calls record which phases each agent acted in.
 Time is scaled down: a 0.5 s budget stands for the 780 s budget of Game 16.
 
-Open decision (Dylan): the behavioural checks assume the gameplay clock is on by default, i.e.
-``max_game_duration`` counts from the first post-introduction phase without extra configuration.
-If the fix makes it opt-in instead, name the switch once in ``GAMEPLAY_CLOCK_OPT_IN``.
+Decided (Dylan): the gameplay clock is on by default, i.e. ``max_game_duration`` counts from the
+first post-introduction phase without extra configuration, so ``GAMEPLAY_CLOCK_OPT_IN`` stays empty.
 """
 
 import asyncio
@@ -35,10 +34,12 @@ from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from pydantic import Field
 
 from econagents import Agent, GameRunner, HybridGameRunnerConfig, PhaseEngine
 from econagents.domain.role import Role
-from econagents.domain.state.game import GameState
+from econagents.domain.state.fields import EventField
+from econagents.domain.state.game import GameState, MetaInformation
 
 GAME_ID = 16
 PRE_GAME_PHASE = "introduction"
@@ -629,3 +630,176 @@ async def test_decision_pre_game_wait_has_its_own_timeout(tmp_path, caplog):
     assert not [m for m in warnings if "gameplay" in m.lower()], f"pre-game timeout logged as gameplay: {warnings}"
     reason = getattr(outcome.runner, "timeout_reason", "<no timeout_reason attribute>")
     assert reason == "pre_game", f"runner.timeout_reason is {reason!r}, expected 'pre_game'"
+
+
+# --- Later rounds: a second introduction pauses the gameplay clock ------------------------------
+
+ROUND_KEYS = (
+    pytest.param("snapshot", "currentPhase", True, "currentRound", id="futarchy-snapshot-currentPhase"),
+    pytest.param("phase-transition", "phase", False, "round", id="phase-transition-phase-no-phase-snapshots"),
+)
+
+
+class MultiRoundFakeIbexServer(FakeIbexServer):
+    """The same flow over several rounds; every round starts in ``introduction`` and waits for every ready.
+    The human seat readies ``human_ready_after[round]`` seconds after that round's introduction began."""
+
+    def __init__(self, *, rounds: int, human_ready_after: dict[int, float], **kwargs: Any) -> None:
+        super().__init__(human_ready_after=None, human_join_after=0.0, **kwargs)
+        self.rounds = rounds
+        self.round_ready_after = human_ready_after
+        self.current_round = 1
+        self.round_started_at: dict[int, float] = {}
+
+    def snapshot_for(self, player_number: int) -> dict[str, Any]:
+        return {**super().snapshot_for(player_number), "currentRound": self.current_round}
+
+    async def authenticate(self, connection: FakeConnection) -> None:
+        self.connections[connection.player_number] = connection
+        await self._broadcast_joined(connection.player_number)
+        await connection.push(
+            envelope(
+                "phase-transition", round=self.current_round, phase=self.current_phase, transitionedAt=self._millis()
+            )
+        )
+
+    async def _enter_phase(self, phase: str) -> None:
+        self.current_phase = phase
+        transition = envelope("phase-transition", round=self.current_round, phase=phase, transitionedAt=self._millis())
+        for connection in list(self.connections.values()):
+            await connection.push(transition)
+        if self.per_phase_snapshots:
+            for connection in list(self.connections.values()):
+                await connection.push(envelope("snapshot", **self.snapshot_for(connection.player_number)))
+
+    async def _human_ready(self, round_number: int) -> None:
+        await asyncio.sleep(self.round_ready_after[round_number])
+        self._mark_ready(HUMAN_SEAT[0])
+
+    async def run(self) -> None:
+        human = asyncio.create_task(self._human())
+        await asyncio.sleep(0)
+        try:
+            for round_number in range(1, self.rounds + 1):
+                self.current_round = round_number
+                self.round_started_at[round_number] = self.now()
+                self.ready = set()
+                self.all_ready = asyncio.Event()
+                if round_number > 1:
+                    await self._enter_phase(PRE_GAME_PHASE)
+                ready = asyncio.create_task(self._human_ready(round_number))
+                try:
+                    await self.all_ready.wait()
+                finally:
+                    ready.cancel()
+                for phase in GAMEPLAY_PHASES:
+                    if self.gameplay_started_at is None:
+                        self.gameplay_started_at = self.now()
+                    phase_started = self.now()
+                    await self._enter_phase(phase)
+                    await asyncio.sleep(max(0.0, phase_started + self.phase_seconds[phase] - self.now()))
+            self.current_phase = None
+            self.game_over_at = self.now()
+            for connection in list(self.connections.values()):
+                await connection.push(envelope("game-over"))
+        finally:
+            human.cancel()
+
+
+async def play_rounds(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    *,
+    budget: float,
+    human_ready_after: dict[int, float],
+    phase_seconds: dict[str, float],
+    phase_signal: tuple[str, str],
+    per_phase_snapshots: bool,
+    round_key: str,
+) -> tuple[GameRunner, MultiRoundFakeIbexServer, list[tuple[Agent, FakeConnection]]]:
+    """Two rounds; agents keep ``meta.round`` from ``round_key`` so each round's phases are new occurrences."""
+    caplog.set_level(logging.DEBUG)
+
+    class RoundMeta(MetaInformation):
+        round: int = EventField(default=0, event_key=round_key)
+
+    class RoundState(GameState):
+        meta: RoundMeta = Field(default_factory=RoundMeta)
+
+    server = MultiRoundFakeIbexServer(
+        rounds=len(human_ready_after),
+        human_ready_after=human_ready_after,
+        phase_seconds=phase_seconds,
+        per_phase_snapshots=per_phase_snapshots,
+    )
+    built = [build_agent(server, number, tmp_path, phase_signal) for number in AGENT_SEATS]
+    for agent, _ in built:
+        agent.state = RoundState()
+    runner = GameRunner(config=runner_config(tmp_path, budget, phase_signal), agents=[agent for agent, _ in built])
+
+    server_task = asyncio.create_task(server.run())
+    try:
+        await asyncio.wait_for(runner.run_game(), timeout=RUN_TIMEOUT)
+    finally:
+        server_task.cancel()
+        await asyncio.gather(server_task, return_exceptions=True)
+    return runner, server, built
+
+
+def phase_calls(agent: Agent, phase: str) -> int:
+    return sum(1 for call in agent.role.handle_phase.call_args_list if call.args[0] == phase)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("event", "key", "per_phase_snapshots", "round_key"), ROUND_KEYS)
+async def test_second_round_introduction_does_not_consume_gameplay_budget(
+    tmp_path, caplog, event, key, per_phase_snapshots, round_key
+):
+    """Two rounds of ~0.18 s gameplay each (0.36 s < 0.6 s budget); the human readies the second
+    round's introduction only after 1.5 s. The second introduction pauses the clock, so every agent
+    plays both rounds and stops on game-over."""
+    runner, server, built = await play_rounds(
+        tmp_path,
+        caplog,
+        budget=0.6,
+        human_ready_after={1: 0.05, 2: 1.5},
+        phase_seconds=phase_plan(0.02),
+        phase_signal=(event, key),
+        per_phase_snapshots=per_phase_snapshots,
+        round_key=round_key,
+    )
+
+    for agent, connection in built:
+        assert connection.game_over_received, (
+            f"agent {connection.player_number} was stopped at +{connection.stopped_at:.2f}s in "
+            f"{connection.stopped_in_phase!r} (round 2 introduction began at +{server.round_started_at[2]:.2f}s)"
+        )
+        assert phase_calls(agent, "results") == 2, agent.role.handle_phase.call_args_list
+    assert runner.timeout_reason is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("event", "key", "per_phase_snapshots", "round_key"), ROUND_KEYS)
+async def test_gameplay_budget_accumulates_across_rounds(tmp_path, caplog, event, key, per_phase_snapshots, round_key):
+    """The clock pauses but never resets: two rounds of ~0.36 s gameplay with a 1 s second
+    introduction exceed the 0.5 s budget in the second round's gameplay, ~0.14 s after it began."""
+    budget = 0.5
+    runner, server, built = await play_rounds(
+        tmp_path,
+        caplog,
+        budget=budget,
+        human_ready_after={1: 0.05, 2: 1.0},
+        phase_seconds=phase_plan(0.04),
+        phase_signal=(event, key),
+        per_phase_snapshots=per_phase_snapshots,
+        round_key=round_key,
+    )
+
+    assert runner.timeout_reason == "gameplay"
+    for _, connection in built:
+        assert not connection.game_over_received
+        assert connection.stopped_at is not None and connection.stopped_at > server.round_started_at[2] + 1.0, (
+            f"stopped at +{connection.stopped_at}s in {connection.stopped_in_phase!r}; round 2 introduction began at "
+            f"+{server.round_started_at[2]:.2f}s and lasted ~1 s"
+        )
+        assert connection.stopped_in_phase in GAMEPLAY_PHASES[:5], connection.stopped_in_phase

@@ -4,14 +4,16 @@ import queue
 from contextvars import ContextVar
 from logging.handlers import QueueHandler, QueueListener
 from pathlib import Path
-from typing import Literal, Optional, List
+from typing import Any, Literal, Optional, List
 
 from pydantic import BaseModel, Field
 
 from econagents.adapters.llm.observability import get_observability_provider
+from econagents.adapters.protocol import INTRODUCTION_PHASE
 from econagents.adapters.transport import AuthenticationMechanism, JoinPayloadAuth
-from econagents.domain.messages import PhaseId
+from econagents.domain.messages import Event, PhaseId
 from econagents.runtime.agent import Agent
+from econagents.runtime.game_clock import GameClock, TimeoutReason
 
 ctx_agent_id: ContextVar[str] = ContextVar("agent_id", default="N/A")
 
@@ -61,7 +63,22 @@ class GameRunnerConfig(BaseModel):
 
     max_game_duration: int = Field(
         default=600,
-        description="Maximum game duration in seconds. Default is 600 (10 minutes). Set to 0 or a negative value to disable the timeout.",
+        description=(
+            "Maximum gameplay duration in seconds. Default is 600 (10 minutes). Only time spent in phases outside "
+            "pre_game_phases counts, from the first such phase an agent reports; if no agent has reported a phase "
+            "yet, it counts from the start of the run. Set to 0 or a negative value to disable the timeout."
+        ),
+    )
+    max_pre_game_duration: Optional[float] = Field(
+        default=None,
+        description=(
+            "Maximum time in seconds spent waiting before gameplay: before the first reported phase and in "
+            "pre_game_phases, summed over the run. None (the default), 0 or a negative value means no limit."
+        ),
+    )
+    pre_game_phases: set[PhaseId] = Field(
+        default_factory=lambda: {INTRODUCTION_PHASE},
+        description="Phases in which the game waits for players (join and ready); they do not count as gameplay.",
     )
 
     # Agent stop configuration
@@ -109,11 +126,39 @@ class GameRunner:
         self.agents = agents
         self.game_log_queues: dict[int, queue.Queue] = {}
         self.game_log_listeners: dict[int, QueueListener] = {}
+        self.timeout_reason: Optional[TimeoutReason] = None
+        """Which budget stopped the last run: ``"gameplay"``, ``"pre_game"``, or None if none did."""
+        self._clock: Optional[GameClock] = None
 
         # Create log directories if it doesn't exist
         if self.config.logs_dir:
             self.config.logs_dir.mkdir(parents=True, exist_ok=True)
         self._configure_observability()
+        self._observe_agent_phases()
+
+    def _observe_agent_phases(self) -> None:
+        """Feed each agent's phase events into the game clock.
+
+        Agents without ``register_event_handler`` report nothing; if none reports a phase, the gameplay
+        budget counts from the start of the run.
+        """
+        for agent in self.agents:
+            register = getattr(agent, "register_event_handler", None)
+            if register is None:
+                continue
+            event_type = getattr(agent, "phase_transition_event", self.config.phase_transition_event)
+            phase_key = getattr(agent, "phase_identifier_key", self.config.phase_identifier_key)
+
+            def observe(event: Event, agent: Agent = agent, phase_key: str = phase_key) -> None:
+                if self._clock is not None:
+                    self._clock.observe(self._event_round(agent, event), event.data.get(phase_key))
+
+            register(event_type, observe)
+
+    @staticmethod
+    def _event_round(agent: Agent, event: Event) -> Any:
+        meta_round = getattr(getattr(getattr(agent, "state", None), "meta", None), "round", None)
+        return meta_round if meta_round is not None else event.data.get("round")
 
     def _configure_observability(self) -> None:
         """Attach the configured observability provider to each agent LLM."""
@@ -330,19 +375,20 @@ class GameRunner:
             agent.logger.info(f"Agent {agent_id} spawn_agent task finished. Agent running state: {agent.running}")
             ctx_agent_id.reset(token)
 
-    async def _timeout_watchdog(self, game_logger: logging.Logger, agent_tasks: List[asyncio.Task]) -> None:
+    async def _timeout_watchdog(
+        self, clock: GameClock, game_logger: logging.Logger, agent_tasks: List[asyncio.Task]
+    ) -> None:
         """
-        Timeout watchdog that monitors game duration and initiates shutdown when exceeded.
+        Timeout watchdog that stops the agents once the gameplay or pre-game budget is used up.
 
         Args:
+            clock: Game clock that tracks both budgets
             game_logger: Logger instance for the game
             agent_tasks: List of agent tasks to cancel if timeout occurs
         """
         try:
-            await asyncio.sleep(self.config.max_game_duration)
-            game_logger.warning(
-                f"Game {self.config.game_id} reached maximum duration of {self.config.max_game_duration}s. Initiating shutdown."
-            )
+            self.timeout_reason = await clock.wait_for_timeout()
+            game_logger.warning(self._timeout_message(clock))
 
             stop_agent_tasks = []
             for idx, agent in enumerate(self.agents):
@@ -381,10 +427,22 @@ class GameRunner:
         """Run a game using provided game data."""
 
         game_logger = self.get_game_logger(self.config.game_id)
-        game_logger.info(f"Running game with ID: {self.config.game_id}. Max duration: {self.config.max_game_duration}s")
+        pre_game_wait = self.config.max_pre_game_duration
+        game_logger.info(
+            f"Running game with ID: {self.config.game_id}. Max gameplay duration: {self.config.max_game_duration}s, "
+            f"max pre-game wait: {f'{pre_game_wait}s' if pre_game_wait and pre_game_wait > 0 else 'unlimited'}"
+        )
 
         agent_tasks: List[asyncio.Task] = []
         timeout_monitor_task: Optional[asyncio.Task] = None
+        self.timeout_reason = None
+        clock = GameClock(
+            max_game_duration=self.config.max_game_duration,
+            max_pre_game_duration=self.config.max_pre_game_duration,
+            pre_game_phases=self.config.pre_game_phases,
+            logger=game_logger,
+        )
+        self._clock = clock
 
         try:
             game_logger.info("Configuring and starting agents...")
@@ -392,9 +450,10 @@ class GameRunner:
                 task = asyncio.create_task(self.spawn_agent(agent, i), name=f"AgentTask-{self.config.game_id}-{i}")
                 agent_tasks.append(task)
 
-            if self.config.max_game_duration is not None and self.config.max_game_duration > 0:
+            if clock.enabled:
                 timeout_monitor_task = asyncio.create_task(
-                    self._timeout_watchdog(game_logger, agent_tasks), name=f"TimeoutWatchdog-{self.config.game_id}"
+                    self._timeout_watchdog(clock, game_logger, agent_tasks),
+                    name=f"TimeoutWatchdog-{self.config.game_id}",
                 )
 
             if agent_tasks:
@@ -428,5 +487,24 @@ class GameRunner:
                 await asyncio.gather(*final_stop_tasks, return_exceptions=True)
                 game_logger.info(f"Game {self.config.game_id}: Final agent stop tasks completed.")
 
+            self._clock = None
             self.cleanup_logging()
             game_logger.info(f"Game {self.config.game_id} finished and cleaned up.")
+
+    def _timeout_message(self, clock: GameClock) -> str:
+        game_id = self.config.game_id
+        if self.timeout_reason == "pre_game":
+            where = "before any phase was reported" if clock.phase is None else f"in phase {clock.phase}"
+            return (
+                f"Game {game_id}: pre-game wait timeout after {clock.pre_game_budget}s (max_pre_game_duration), "
+                f"{where}. Initiating shutdown."
+            )
+        if clock.gameplay_start_phase is None:
+            return (
+                f"Game {game_id} reached maximum duration of {clock.gameplay_budget}s, counted from the start of the "
+                "run because no agent reported a phase. Initiating shutdown."
+            )
+        return (
+            f"Game {game_id} reached maximum duration of {clock.gameplay_budget}s of gameplay, counted from phase "
+            f"{clock.gameplay_start_phase}. Initiating shutdown."
+        )
