@@ -10,6 +10,20 @@ from econagents.adapters.transport import JoinPayloadAuth, WebSocketTransport
 
 RECOVERY = "rec-abc"
 JOIN = {"meta": {"type": "join"}, "payload": {"recovery": RECOVERY}}
+# Frame shapes as emitted by WebSocketService.logIn / handleGetSnapshot on origin/futharcy-agents (ce5a4e0).
+PLAYER_JOINED = {
+    "meta": {"type": "player-joined"},
+    "payload": {"playerNumber": 2, "role": "developer", "joinedPlayers": 1, "totalPlayers": 12},
+}
+
+
+def phase_transition(phase: str) -> dict:
+    return {"meta": {"type": "phase-transition"}, "payload": {"round": 1, "phase": phase, "transitionedAt": 0}}
+
+
+def snapshot(phase: str) -> dict:
+    players = [{"playerNumber": 2, "role": "developer", "recovery": RECOVERY}]
+    return {"meta": {"type": "snapshot"}, "payload": {"currentRound": 1, "currentPhase": phase, "players": players}}
 
 
 class FakeIbexServer:
@@ -32,12 +46,12 @@ class FakeIbexServer:
                 mtype = msg.get("meta", {}).get("type")
                 if mtype == "join" and msg.get("payload", {}).get("recovery") == RECOVERY:
                     conn["authed"] = True
-                    await ws.send(json.dumps({"meta": {"type": "player-joined"}, "payload": {"playerNumber": 2}}))
-                    await ws.send(json.dumps({"meta": {"type": "phase-transition"}, "payload": {"phase": self.phase}}))
+                    await ws.send(json.dumps(PLAYER_JOINED))
+                    await ws.send(json.dumps(phase_transition(self.phase)))
                 elif not conn["authed"]:
                     conn["dropped"].append(msg)
                 elif mtype == "get-snapshot":
-                    await ws.send(json.dumps({"meta": {"type": "snapshot"}, "payload": {"currentPhase": self.phase}}))
+                    await ws.send(json.dumps(snapshot(self.phase)))
         except websockets.ConnectionClosed:
             pass
 
@@ -67,9 +81,10 @@ async def wait_for(pred, timeout=5.0):
 async def test_transport_reauthenticates_after_unexpected_close():
     srv = FakeIbexServer()
     await srv.start()
+    received: list[dict] = []
 
-    async def on_msg(_message):
-        return None
+    async def on_msg(message):
+        received.append(json.loads(message))
 
     transport = WebSocketTransport(
         url=f"ws://127.0.0.1:{srv.port}",
@@ -82,12 +97,18 @@ async def test_transport_reauthenticates_after_unexpected_close():
         assert await wait_for(lambda: srv.conns and srv.conns[0]["authed"])
         srv.drop_current()
         assert await wait_for(lambda: len(srv.conns) >= 2), "client did not reconnect"
-        await transport.send(json.dumps({"meta": {"type": "get-snapshot"}, "payload": {}}))
-        await asyncio.sleep(0.2)
         second = srv.conns[1]
+        await wait_for(lambda: bool(second["received"]), timeout=1.0)
+        snapshots_before = sum(1 for m in received if m["meta"]["type"] == "snapshot")
+        await transport.send(json.dumps({"meta": {"type": "get-snapshot"}, "payload": {}}))
+        await wait_for(lambda: any(m["meta"]["type"] == "get-snapshot" for m in second["received"]), timeout=2.0)
         assert second["received"], "reconnected socket sent nothing"
         assert second["received"][0] == JOIN, f"first frame after reconnect was {second['received'][0]}, not join"
         assert second["authed"], f"no join on reconnect; server dropped: {second['dropped']}"
+        got_snapshot = await wait_for(
+            lambda: sum(1 for m in received if m["meta"]["type"] == "snapshot") > snapshots_before, timeout=2.0
+        )
+        assert got_snapshot, "get-snapshot after reconnect got no reply"
     finally:
         await transport.stop()
         task.cancel()
