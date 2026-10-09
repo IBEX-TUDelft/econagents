@@ -76,7 +76,9 @@ class Agent(LoggerMixin):
         self._continuous_task: asyncio.Task | None = None
         self._entry_task: asyncio.Task | None = None
         self._phase_epoch = 0
+        self._phase_occurrence: tuple[PhaseId | None, Any] | None = None
         self._decision_lock = asyncio.Lock()
+        self._decision_owner: asyncio.Task | None = None
         self._event_handlers: dict[str, list[EventHandler]] = {}
         self._phase_handlers: dict[PhaseId, PhaseHandler] = {
             INTRODUCTION_PHASE: self._handle_introduction,
@@ -106,6 +108,7 @@ class Agent(LoggerMixin):
     async def stop(self) -> None:
         """Stop the agent and transport."""
         self.running = False
+        self._phase_epoch += 1
         self._cancel_phase_tasks()
         await self.transport.stop()
 
@@ -139,19 +142,28 @@ class Agent(LoggerMixin):
     async def handle_phase_transition(self, phase: PhaseId | None) -> None:
         """Move to a new phase and execute the appropriate action behavior.
 
-        A transition into the phase the agent is already in does not start a new decision while
-        one is in flight or while that phase's continuous loop is running. A transition into a
-        different phase cancels the previous phase's pending decision and loop.
+        A phase occurrence is identified by the phase id and, when the state has one, ``state.meta.round``.
+        A transition into the current occurrence does not start a new decision while one is in flight or
+        while that phase's continuous loop is running. A transition into a different occurrence cancels
+        the previous one's pending decision and loop. Must not be awaited from inside a phase decision.
         """
-        if phase == self.current_phase:
+        if self._decision_owner is not None and self._decision_owner is asyncio.current_task():
+            raise RuntimeError("handle_phase_transition cannot be awaited from inside a phase decision")
+
+        occurrence = (phase, self._current_round())
+        if occurrence == self._phase_occurrence:
             if self._phase_busy():
-                self.logger.debug(f"Phase {phase} re-entered while its decision or loop is active; ignoring")
+                self.logger.info(
+                    f"Ignoring transition into phase {phase}: the agent is already in it and its decision or loop "
+                    "is active"
+                )
                 return
         else:
             self._phase_epoch += 1
             self._cancel_phase_tasks()
 
         self.current_phase = phase
+        self._phase_occurrence = occurrence
         if phase is None:
             return
 
@@ -173,30 +185,43 @@ class Agent(LoggerMixin):
     async def execute_phase_action(self, phase: PhaseId) -> None:
         """Execute one action for a phase.
 
-        Decisions are single-flight per agent: this waits until no other decision is in flight.
-        A result is not sent if the agent has moved to another phase while it was being decided.
+        Decisions are single-flight per agent: this waits until no other decision is in flight, except
+        when called from inside a phase handler or role decision, where it runs inline. The result is
+        dropped instead of sent if the agent moves to another phase occurrence, or stops, while it is
+        being decided.
         """
         await self._execute_phase_action(phase, self._phase_epoch)
 
     async def _execute_phase_action(self, phase: PhaseId, epoch: int) -> None:
+        current = asyncio.current_task()
+        if self._decision_owner is not None and self._decision_owner is current:
+            await self._decide_and_send(phase, epoch)
+            return
         async with self._decision_lock:
-            if epoch != self._phase_epoch:
-                self.logger.debug(f"Skipping decision for phase {phase}: the phase ended before it started")
-                return
+            self._decision_owner = current
+            try:
+                await self._decide_and_send(phase, epoch)
+            finally:
+                self._decision_owner = None
 
-            if phase in self._phase_handlers:
-                payload = await self._phase_handlers[phase](phase, self.state)
-            else:
-                payload = await self.role.handle_phase(phase, self.state, self.prompts_dir)
+    async def _decide_and_send(self, phase: PhaseId, epoch: int) -> None:
+        if epoch != self._phase_epoch:
+            self.logger.debug(f"Skipping decision for phase {phase}: the phase ended before it started")
+            return
 
-            if not payload:
-                return
-            if epoch != self._phase_epoch:
-                self.logger.warning(
-                    f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
-                )
-                return
-            await self.transport.send(self.message_codec.encode_action(payload))
+        if phase in self._phase_handlers:
+            payload = await self._phase_handlers[phase](phase, self.state)
+        else:
+            payload = await self.role.handle_phase(phase, self.state, self.prompts_dir)
+
+        if not payload:
+            return
+        if epoch != self._phase_epoch:
+            self.logger.warning(
+                f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
+            )
+            return
+        await self.transport.send(self.message_codec.encode_action(payload))
 
     async def _continuous_phase_loop(self, phase: PhaseId, epoch: int, entry: asyncio.Task | None = None) -> None:
         """Run repeated actions, after the phase-entry action, while the phase remains active."""
@@ -213,6 +238,9 @@ class Agent(LoggerMixin):
                     self.logger.exception(f"Action in continuous phase {phase} failed; continuing")
         except asyncio.CancelledError:
             self.logger.debug(f"Continuous phase {phase} cancelled")
+
+    def _current_round(self) -> Any:
+        return getattr(getattr(self.state, "meta", None), "round", None)
 
     def _continuous_phase_active(self, epoch: int) -> bool:
         return self.in_continuous_phase and epoch == self._phase_epoch

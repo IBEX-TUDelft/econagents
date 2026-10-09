@@ -64,10 +64,19 @@ An agent makes one decision at a time. The phase-entry action and the
 continuous loop share a single decision slot, and the loop waits for the
 phase-entry action to finish before its first delay. A repeated transition into
 the current phase (for example a second snapshot after a reconnect) does not
-start another decision or another loop while one is active. When the phase
-changes, the pending decision is cancelled, and a result decided in a phase the
-agent has since left is logged and dropped instead of sent. An exception raised
-by one continuous-phase action is logged and the loop continues.
+start another decision or another loop while one is active; it is logged at
+INFO. The current phase is identified by its phase id plus ``state.meta.round``
+when the state defines a ``round`` field, so define one if your game reuses the
+same phase id every round. Without it, a server that starts the next round
+under the same phase id before the agent has acted gets no decision for that
+round. When the phase changes, or the agent stops, the pending decision is
+cancelled, and a result decided in a phase the agent has since left is logged
+and dropped instead of sent. An exception raised by one continuous-phase action
+is logged and the loop continues.
+
+``execute_phase_action`` uses the same decision slot. A phase handler may call
+it to run another phase's action inline, but must not await
+``handle_phase_transition``, which raises ``RuntimeError`` inside a decision.
 
 Phase Handlers
 --------------
