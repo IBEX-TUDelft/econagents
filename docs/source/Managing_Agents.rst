@@ -89,8 +89,18 @@ decision or continuous loop is still active, the rule above ignores it, so the
 reconnect does not start a second decision or loop. A replayed turn-based phase
 whose decision already finished is decided again.
 
-``transport.send()`` raises ``TransportSendError``, a ``ConnectionError``, when
-the message was not transmitted. The agent logs such an action at ERROR as not
+The first reconnect after a connection that stayed open for
+``stable_connection_seconds`` (default 5) is immediate. Connections that close
+sooner, for example because the server answers the ``join`` with an
+``auth-error`` and closes the socket after a server restart, are retried with
+an exponential backoff with jitter that starts at ``reconnect_delay`` (default
+0.5 s) and is capped at ``max_reconnect_delay`` (default 30 s). All three are
+``WebSocketTransport`` constructor arguments, and ``stop()`` interrupts a
+pending backoff.
+
+``transport.send()`` raises ``TransportSendError`` (``from econagents import
+TransportSendError``), a ``ConnectionError``, when the message was not
+transmitted. The agent logs such an action at ERROR as not
 transmitted and does not retry it; a continuous phase goes on with its next
 decision. Event handlers that call ``agent.transport.send()`` themselves should
 catch ``ConnectionError``.

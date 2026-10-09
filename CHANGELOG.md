@@ -28,13 +28,20 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `auth_mechanism`) message again before reading, so the server no longer drops
   everything the agent sends after a reconnect (IBEX-game_suite#8). A connection
   lost while authenticating is retried instead of stopping the transport.
+  Reconnects back off: the first one after a connection that stayed open for
+  `stable_connection_seconds` (default 5) is immediate, and connections that
+  close sooner (for example a `join` rejected with `auth-error` after a server
+  restart) are retried with exponential backoff and jitter from
+  `reconnect_delay` (default 0.5 s) up to `max_reconnect_delay` (default 30 s),
+  all three new `WebSocketTransport` arguments.
 
 ### Changed
 
 - **Breaking:** `WebSocketTransport.send()` raises `TransportSendError` (a
-  `ConnectionError` subclass, exported from `econagents.adapters.transport` and
-  `econagents.ports`) when there is no open connection, or when the connection
-  closes or the socket fails while writing the frame. It used to log and return
+  `ConnectionError` subclass, exported from `econagents`,
+  `econagents.adapters.transport` and `econagents.ports`) when there is no open
+  connection, or when the connection closes or the socket fails while writing
+  the frame. It used to log and return
   `None`, so a lost message was invisible to the caller. `TransportPort.send()`
   documents the same contract. `Agent` catches it and logs the action at ERROR
   as not transmitted, without retrying; code that calls `agent.transport.send()`

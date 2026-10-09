@@ -125,3 +125,121 @@ async def test_send_does_not_relabel_a_programming_error_as_not_transmitted():
 
     with pytest.raises(TypeError):
         await transport.send({"not": "a string"})
+
+
+class RejectingServer:
+    """Answers every join like IBEX logIn with an unknown recovery key: auth-error, then close."""
+
+    def __init__(self, clean: bool):
+        self.clean = clean
+        self.connections: list[list[dict]] = []
+        self.server = None
+        self.url = ""
+
+    async def handler(self, ws):
+        received: list[dict] = []
+        self.connections.append(received)
+        try:
+            async for raw in ws:
+                received.append(json.loads(raw))
+                await ws.send(json.dumps({"meta": {"type": "auth-error"}, "payload": {"reason": "unknown"}}))
+                if self.clean:
+                    await ws.close(1000)
+                else:
+                    ws.transport.abort()
+                return
+        except websockets.ConnectionClosed:
+            pass
+
+    async def start(self):
+        self.server = await websockets.serve(self.handler, "127.0.0.1", 0)
+        self.url = f"ws://127.0.0.1:{self.server.sockets[0].getsockname()[1]}"
+
+    async def stop(self):
+        self.server.close()
+        await self.server.wait_closed()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("clean", [False, True])
+async def test_rejected_join_backs_off_instead_of_reconnecting_in_a_hot_loop(clean):
+    srv = RejectingServer(clean=clean)
+    await srv.start()
+    delivered: list[str] = []
+
+    async def on_message(raw):
+        delivered.append(raw)
+
+    transport = WebSocketTransport(
+        url=srv.url,
+        auth_mechanism=JoinPayloadAuth(),
+        auth_mechanism_kwargs={"recovery": "stale"},
+        on_message_callback=on_message,
+    )
+    task = asyncio.create_task(transport.start_listening())
+    try:
+        await asyncio.sleep(2.0)
+        assert 2 <= len(srv.connections) <= 8, f"{len(srv.connections)} connections in 2 s"
+        assert all(frames and frames[0]["meta"]["type"] == "join" for frames in srv.connections)
+        assert not task.done()
+    finally:
+        await _shutdown(transport, task)
+        await srv.stop()
+
+
+@pytest.mark.asyncio
+async def test_stop_interrupts_a_reconnect_backoff():
+    srv = RejectingServer(clean=True)
+    await srv.start()
+    transport = WebSocketTransport(
+        url=srv.url,
+        auth_mechanism=JoinPayloadAuth(),
+        auth_mechanism_kwargs={"recovery": "stale"},
+        reconnect_delay=60.0,
+        max_reconnect_delay=60.0,
+    )
+    task = asyncio.create_task(transport.start_listening())
+    try:
+        assert await wait_for(lambda: len(srv.connections) >= 2 and srv.connections[1])
+        await asyncio.sleep(0.1)
+        await transport.stop()
+        await asyncio.wait_for(task, timeout=1.0)
+        assert len(srv.connections) == 2
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await srv.stop()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_after_a_stable_connection_is_immediate():
+    connections: list[list[dict]] = []
+
+    async def close_after_half_a_second(ws):
+        received: list[dict] = []
+        connections.append(received)
+        try:
+            await asyncio.wait_for(_collect(ws, received), timeout=0.5)
+        except asyncio.TimeoutError:
+            await ws.close(1001)
+
+    async def _collect(ws, received):
+        async for raw in ws:
+            received.append(json.loads(raw))
+
+    server = await websockets.serve(close_after_half_a_second, "127.0.0.1", 0)
+    transport = WebSocketTransport(
+        url=f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}",
+        auth_mechanism=JoinPayloadAuth(),
+        auth_mechanism_kwargs={"recovery": "r"},
+        reconnect_delay=60.0,
+        stable_connection_seconds=0.3,
+    )
+    task = asyncio.create_task(transport.start_listening())
+    try:
+        assert await wait_for(lambda: len(connections) >= 4, timeout=4.0), f"{len(connections)} connections"
+        assert all(frames and frames[0]["meta"]["type"] == "join" for frames in connections[:3])
+    finally:
+        await _shutdown(transport, task)
+        server.close()
+        await server.wait_closed()

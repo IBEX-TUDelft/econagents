@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import asyncio
 import json
 import logging
+import random
 from typing import Any, Callable, Optional
 
 import websockets
@@ -71,6 +72,9 @@ class WebSocketTransport(LoggerMixin):
         auth_mechanism: Optional[AuthenticationMechanism] = None,
         auth_mechanism_kwargs: Optional[dict[str, Any]] = None,
         on_message_callback: Optional[Callable[[str], Any]] = None,
+        reconnect_delay: float = 0.5,
+        max_reconnect_delay: float = 30.0,
+        stable_connection_seconds: float = 5.0,
     ):
         """
         Initialize the WebSocket transport.
@@ -82,6 +86,10 @@ class WebSocketTransport(LoggerMixin):
             auth_mechanism_kwargs: (Optional) Keyword arguments to pass to auth_mechanism during authentication
             on_message_callback: Callback function that receives raw message strings.
                                Can be synchronous or asynchronous.
+            reconnect_delay: Base delay in seconds of the reconnect backoff.
+            max_reconnect_delay: Upper bound in seconds of the reconnect backoff.
+            stable_connection_seconds: How long an authenticated connection must stay open before its close
+                resets the backoff, so the next reconnect is immediate.
         """
         self.url = url
         self.auth_mechanism = auth_mechanism
@@ -89,10 +97,35 @@ class WebSocketTransport(LoggerMixin):
         if logger:
             self.logger = logger
         self.on_message_callback = on_message_callback
+        self.reconnect_delay = reconnect_delay
+        self.max_reconnect_delay = max_reconnect_delay
+        self.stable_connection_seconds = stable_connection_seconds
         self.ws: Optional[ClientConnection] = None
         self._running = False
         self._listening = False
         self._authenticated = False
+        self._reconnect_attempts = 0
+        self._stop_requested: Optional[asyncio.Event] = None
+
+    def _next_reconnect_delay(self, connection_was_stable: bool) -> float:
+        """Delay before the next reconnect: none after a stable connection, then a capped, jittered backoff."""
+        if connection_was_stable:
+            self._reconnect_attempts = 0
+        attempt = self._reconnect_attempts
+        self._reconnect_attempts += 1
+        if attempt == 0:
+            return 0.0
+        delay = min(self.reconnect_delay * 2 ** min(attempt - 1, 32), self.max_reconnect_delay)
+        return random.uniform(delay / 2, delay)
+
+    async def _wait_before_reconnect(self, delay: float) -> None:
+        if delay <= 0 or self._stop_requested is None:
+            return
+        self.logger.info(f"WebSocketTransport: reconnecting in {delay:.1f}s.")
+        try:
+            await asyncio.wait_for(self._stop_requested.wait(), timeout=delay)
+        except asyncio.TimeoutError:
+            pass
 
     async def _authenticate(self) -> bool:
         """Authenticate the current connection.
@@ -118,8 +151,10 @@ class WebSocketTransport(LoggerMixin):
         """Connect and dispatch received messages until stopped.
 
         Every connection, including each one opened after an unexpected or clean close, is authenticated
-        before its messages are read. Only one listen loop runs per transport: a second call while one is
-        active returns immediately.
+        before its messages are read. The first reconnect after a connection that stayed up for
+        ``stable_connection_seconds`` is immediate; further reconnects back off exponentially, with jitter,
+        up to ``max_reconnect_delay``, so a server that rejects the join and closes is not hammered. Only
+        one listen loop runs per transport: a second call while one is active returns immediately.
         """
         if self._listening:
             self.logger.warning("WebSocketTransport: already listening; ignoring second start_listening().")
@@ -127,6 +162,9 @@ class WebSocketTransport(LoggerMixin):
         self.logger.info("WebSocketTransport: starting to listen.")
         self._listening = True
         self._running = True
+        self._reconnect_attempts = 0
+        self._stop_requested = asyncio.Event()
+        loop = asyncio.get_running_loop()
 
         try:
             async for websocket in websockets.connect(self.url):
@@ -136,10 +174,12 @@ class WebSocketTransport(LoggerMixin):
 
                 self.ws = websocket
                 self._authenticated = False
+                authenticated_at: Optional[float] = None
                 try:
                     if not await self._authenticate():
                         self.logger.error("Authentication failed. Stopping transport.")
                         break
+                    authenticated_at = loop.time()
 
                     async for message in websocket:
                         if not self._running:
@@ -171,6 +211,14 @@ class WebSocketTransport(LoggerMixin):
                         self.logger.info("WebSocketTransport: connection closed.")
                     except Exception as e:
                         self.logger.debug(f"Error closing websocket: {e}")
+
+                stable = (
+                    authenticated_at is not None and loop.time() - authenticated_at >= self.stable_connection_seconds
+                )
+                await self._wait_before_reconnect(self._next_reconnect_delay(stable))
+                if not self._running:
+                    self.logger.info("WebSocketTransport: stopping as requested.")
+                    break
         except Exception as e:
             self.logger.exception(f"Error in start_listening: {e}")
         finally:
@@ -199,6 +247,8 @@ class WebSocketTransport(LoggerMixin):
         self.logger.info("WebSocketTransport: stopping...")
         self._running = False
         self._authenticated = False
+        if self._stop_requested is not None:
+            self._stop_requested.set()
         if self.ws:
             try:
                 await self.ws.close()
