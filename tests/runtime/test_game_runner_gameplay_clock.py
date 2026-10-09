@@ -12,14 +12,23 @@ server. The fake server reproduces the message flow that server emits for a futa
 * finally ``game-over``.
 
 Agents act on ``snapshot`` with ``currentPhase``, exactly as futarchy-agents configures them. The
-role is stubbed (no LLM): ``role.handle_phase`` calls record which phases each agent acted in.
+clock checks also run with the econagents defaults (``phase-transition`` / ``phase``) against a
+server that, like the econagents example servers, sends no per-phase ``snapshot`` (only the
+``get-snapshot`` reply), so a fix must follow ``phase_transition_event`` / ``phase_identifier_key``
+rather than hardcode the futarchy wiring.
+The role is stubbed (no LLM): ``role.handle_phase`` calls record which phases each agent acted in.
 Time is scaled down: a 0.5 s budget stands for the 780 s budget of Game 16.
+
+Open decision (Dylan): the behavioural checks assume the gameplay clock is on by default, i.e.
+``max_game_duration`` counts from the first post-introduction phase without extra configuration.
+If the fix makes it opt-in instead, name the switch once in ``GAMEPLAY_CLOCK_OPT_IN``.
 """
 
 import asyncio
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -50,6 +59,13 @@ HUMAN_SEAT = (3, "speculator")
 GET_SNAPSHOT = json.dumps({"meta": {"type": "get-snapshot"}, "payload": {}})
 RUN_TIMEOUT = 15.0
 
+GAMEPLAY_CLOCK_OPT_IN: dict[str, Any] = {}
+
+PHASE_SIGNALS = (
+    pytest.param("snapshot", "currentPhase", True, id="futarchy-snapshot-currentPhase"),
+    pytest.param("phase-transition", "phase", False, id="phase-transition-phase-no-phase-snapshots"),
+)
+
 
 def envelope(message_type: str, **payload: Any) -> str:
     return json.dumps({"meta": {"type": message_type}, "payload": payload})
@@ -67,6 +83,7 @@ class FakeConnection:
         self.stopped_in_phase: Optional[str] = None
         self.game_over_received = False
         self.snapshot_phases: list[str] = []
+        self.transition_phases: list[str] = []
 
     async def start_listening(self) -> None:
         await self.server.authenticate(self)
@@ -90,6 +107,8 @@ class FakeConnection:
             self.game_over_received = True
         elif message_type == "snapshot":
             self.snapshot_phases.append(message["payload"]["currentPhase"])
+        elif message_type == "phase-transition":
+            self.transition_phases.append(message["payload"]["phase"])
         await self.on_message(raw)
 
 
@@ -101,17 +120,23 @@ class FakeIbexServer:
         *,
         phase_seconds: dict[str, float],
         human_ready_after: Optional[float],
+        human_join_after: Optional[float] = None,
         rejoins: tuple[tuple[str, float], ...] = (),
+        per_phase_snapshots: bool = True,
     ) -> None:
         self.phase_seconds = phase_seconds
+        self.per_phase_snapshots = per_phase_snapshots
         self.human_ready_after = human_ready_after
+        self.human_join_after = human_ready_after if human_join_after is None else human_join_after
         self.rejoins = rejoins
         self.seats = {**AGENT_SEATS, HUMAN_SEAT[0]: HUMAN_SEAT[1]}
         self.connections: dict[int, FakeConnection] = {}
+        self.joined: set[int] = set()
         self.ready: set[int] = set()
         self.all_ready = asyncio.Event()
         self.current_phase: Optional[str] = PRE_GAME_PHASE
         self.t0 = asyncio.get_running_loop().time()
+        self.human_joined_at: Optional[float] = None
         self.human_ready_at: Optional[float] = None
         self.gameplay_started_at: Optional[float] = None
         self.game_over_at: Optional[float] = None
@@ -148,17 +173,21 @@ class FakeIbexServer:
             "gameOver": False,
         }
 
-    async def authenticate(self, connection: FakeConnection) -> None:
-        self.connections[connection.player_number] = connection
+    async def _broadcast_joined(self, player_number: int) -> None:
+        self.joined.add(player_number)
         joined = envelope(
             "player-joined",
-            playerNumber=connection.player_number,
-            role=self.seats[connection.player_number],
-            joinedPlayers=len(self.connections),
+            playerNumber=player_number,
+            role=self.seats[player_number],
+            joinedPlayers=len(self.joined),
             totalPlayers=len(self.seats),
         )
         for other in list(self.connections.values()):
             await other.push(joined)
+
+    async def authenticate(self, connection: FakeConnection) -> None:
+        self.connections[connection.player_number] = connection
+        await self._broadcast_joined(connection.player_number)
         await connection.push(
             envelope("phase-transition", round=1, phase=self.current_phase, transitionedAt=self._millis())
         )
@@ -175,8 +204,9 @@ class FakeIbexServer:
         if self.ready >= set(self.seats):
             self.all_ready.set()
 
-    def _millis(self) -> int:
-        return int(self.now() * 1000)
+    @staticmethod
+    def _millis() -> int:
+        return int(time.time() * 1000)
 
     async def _rejoin_everyone(self, label: str) -> None:
         self.rejoin_times[label] = self.now()
@@ -185,9 +215,13 @@ class FakeIbexServer:
                 await self.authenticate(connection)
 
     async def _human(self) -> None:
+        if self.human_join_after is not None:
+            await asyncio.sleep(self.human_join_after)
+            self.human_joined_at = self.now()
+            await self._broadcast_joined(HUMAN_SEAT[0])
         if self.human_ready_after is None:
             return
-        await asyncio.sleep(self.human_ready_after)
+        await asyncio.sleep(max(0.0, self.human_ready_after - self.now()))
         self.human_ready_at = self.now()
         self._mark_ready(HUMAN_SEAT[0])
 
@@ -210,8 +244,9 @@ class FakeIbexServer:
                 transition = envelope("phase-transition", round=1, phase=phase, transitionedAt=self._millis())
                 for connection in list(self.connections.values()):
                     await connection.push(transition)
-                for connection in list(self.connections.values()):
-                    await connection.push(envelope("snapshot", **self.snapshot_for(connection.player_number)))
+                if self.per_phase_snapshots:
+                    for connection in list(self.connections.values()):
+                        await connection.push(envelope("snapshot", **self.snapshot_for(connection.player_number)))
                 for rejoin_phase, offset in self.rejoins:
                     if rejoin_phase == phase:
                         await asyncio.sleep(max(0.0, phase_started + offset - self.now()))
@@ -231,6 +266,7 @@ class SeatOutcome:
     player_number: int
     acted_phases: list[str]
     snapshot_phases: list[str]
+    transition_phases: list[str]
     stopped_at: Optional[float]
     stopped_in_phase: Optional[str]
     game_over_received: bool
@@ -263,12 +299,13 @@ class GameOutcome:
             if seat.game_over_received
             else f"by the runner while the server was in {seat.stopped_in_phase!r}"
         )
+        joined = "" if server.human_joined_at is None else f"joined at +{server.human_joined_at:.2f}s, "
         if server.human_ready_at is not None:
-            human = f"ready at +{server.human_ready_at:.2f}s"
+            human = f"{joined}ready at +{server.human_ready_at:.2f}s"
         elif server.human_ready_after is not None:
-            human = f"not ready yet (scheduled for +{server.human_ready_after:.2f}s)"
+            human = f"{joined}not ready yet (scheduled for +{server.human_ready_after:.2f}s)"
         else:
-            human = "never ready"
+            human = f"{joined}never ready"
         gameplay = "not yet" if server.gameplay_started_at is None else f"+{server.gameplay_started_at:.2f}s"
         return (
             f"agent {seat.player_number}: {stop} {how}; acted in {seat.acted_phases}; "
@@ -276,7 +313,9 @@ class GameOutcome:
         )
 
 
-def build_agent(server: FakeIbexServer, player_number: int, prompts_dir: Path) -> tuple[Agent, FakeConnection]:
+def build_agent(
+    server: FakeIbexServer, player_number: int, prompts_dir: Path, phase_signal: tuple[str, str]
+) -> tuple[Agent, FakeConnection]:
     connection = server.connection(player_number)
     role = MagicMock(spec=Role)
     role.name = AGENT_SEATS[player_number]
@@ -287,8 +326,8 @@ def build_agent(server: FakeIbexServer, player_number: int, prompts_dir: Path) -
         role=role,
         prompts_dir=prompts_dir,
         transport=connection,
-        phase_transition_event="snapshot",
-        phase_identifier_key="currentPhase",
+        phase_transition_event=phase_signal[0],
+        phase_identifier_key=phase_signal[1],
         phase_engine=PhaseEngine(),
         auth_mechanism_kwargs={"recovery": f"recovery-{player_number}"},
     )
@@ -302,7 +341,9 @@ def build_agent(server: FakeIbexServer, player_number: int, prompts_dir: Path) -
     return agent, connection
 
 
-def runner_config(tmp_path: Path, budget: float, **extra: float) -> HybridGameRunnerConfig:
+def runner_config(
+    tmp_path: Path, budget: float, phase_signal: tuple[str, str], **extra: float
+) -> HybridGameRunnerConfig:
     config = HybridGameRunnerConfig(
         game_id=GAME_ID,
         hostname="localhost",
@@ -310,11 +351,13 @@ def runner_config(tmp_path: Path, budget: float, **extra: float) -> HybridGameRu
         path="",
         logs_dir=tmp_path / "logs",
         prompts_dir=tmp_path,
-        phase_transition_event="snapshot",
-        phase_identifier_key="currentPhase",
+        phase_transition_event=phase_signal[0],
+        phase_identifier_key=phase_signal[1],
         continuous_phases=["market"],
     )
     config.max_game_duration = budget
+    for name, value in GAMEPLAY_CLOCK_OPT_IN.items():
+        setattr(config, name, value)
     for name, value in extra.items():
         if name in type(config).model_fields:
             setattr(config, name, value)
@@ -332,13 +375,23 @@ async def play_game(
     budget: float,
     human_ready_after: Optional[float],
     phase_seconds: dict[str, float],
+    human_join_after: Optional[float] = None,
     rejoins: tuple[tuple[str, float], ...] = (),
+    phase_signal: tuple[str, str] = ("snapshot", "currentPhase"),
+    per_phase_snapshots: bool = True,
     **config_extra: float,
 ) -> GameOutcome:
     caplog.set_level(logging.DEBUG)
-    server = FakeIbexServer(phase_seconds=phase_seconds, human_ready_after=human_ready_after, rejoins=rejoins)
-    built = [build_agent(server, number, tmp_path) for number in AGENT_SEATS]
-    runner = GameRunner(config=runner_config(tmp_path, budget, **config_extra), agents=[agent for agent, _ in built])
+    server = FakeIbexServer(
+        phase_seconds=phase_seconds,
+        human_ready_after=human_ready_after,
+        human_join_after=human_join_after,
+        rejoins=rejoins,
+        per_phase_snapshots=per_phase_snapshots,
+    )
+    built = [build_agent(server, number, tmp_path, phase_signal) for number in AGENT_SEATS]
+    config = runner_config(tmp_path, budget, phase_signal, **config_extra)
+    runner = GameRunner(config=config, agents=[agent for agent, _ in built])
 
     server_task = asyncio.create_task(server.run())
     try:
@@ -357,6 +410,7 @@ async def play_game(
             player_number=connection.player_number,
             acted_phases=acted,
             snapshot_phases=connection.snapshot_phases,
+            transition_phases=connection.transition_phases,
             stopped_at=connection.stopped_at,
             stopped_in_phase=connection.stopped_in_phase,
             game_over_received=connection.game_over_received,
@@ -365,19 +419,26 @@ async def play_game(
 
 
 # --- (a) Behavioural bug checks: fail on main, must pass after the fix -------------------------
+# (assume the gameplay clock is on by default; see GAMEPLAY_CLOCK_OPT_IN)
 
 
 @pytest.mark.asyncio
-async def test_pre_game_wait_does_not_consume_gameplay_budget(tmp_path, caplog):
-    """Game 16, scaled: the human readies after 3x the budget; gameplay itself takes ~0.3 s < budget."""
+@pytest.mark.parametrize(("event", "key", "per_phase_snapshots"), PHASE_SIGNALS)
+async def test_pre_game_wait_does_not_consume_gameplay_budget(tmp_path, caplog, event, key, per_phase_snapshots):
+    """Game 16, scaled: the human joins at +0.2 s (every seat joined) but readies only after 3x the
+    budget; gameplay itself takes ~0.3 s < budget. Neither the run start nor the last join may
+    start the gameplay clock."""
     budget = 0.5
     outcome = await play_game(
         tmp_path,
         caplog,
         budget=budget,
+        human_join_after=0.2,
         human_ready_after=1.5,
         phase_seconds=phase_plan(0.03),
         rejoins=((PRE_GAME_PHASE, 0.25),),
+        phase_signal=(event, key),
+        per_phase_snapshots=per_phase_snapshots,
     )
 
     for seat in outcome.seats.values():
@@ -389,19 +450,30 @@ async def test_pre_game_wait_does_not_consume_gameplay_budget(tmp_path, caplog):
 
 
 @pytest.mark.asyncio
-async def test_duplicate_snapshots_and_rejoin_do_not_restart_gameplay_clock(tmp_path, caplog):
+@pytest.mark.parametrize(("event", "key", "per_phase_snapshots"), PHASE_SIGNALS)
+async def test_duplicate_snapshots_and_rejoin_do_not_restart_gameplay_clock(
+    tmp_path, caplog, event, key, per_phase_snapshots
+):
     """The clock starts once, at presentation; an introduction re-join and a market re-join
     (player-joined + phase-transition replay + get-snapshot reply) must neither start nor restart it.
-    Gameplay (2.1 s) is longer than the budget, so the watchdog must fire budget seconds after
-    presentation began, not budget seconds after the run started or after the last snapshot."""
-    budget = 0.6
+    Gameplay (~2 s) is longer than the budget, so the watchdog must fire budget seconds after
+    presentation began (window [0.8, 1.1] s). Wrong clocks land well outside that window: run start
+    (fires in introduction), last join (+0.15 s, fires in introduction), introduction re-join
+    (~0 s), re-armed per phase at market (+0.55 s -> ~1.45 s) or at the market re-join
+    (+0.60 s -> ~1.5 s)."""
+    budget = 0.9
     outcome = await play_game(
         tmp_path,
         caplog,
         budget=budget,
-        human_ready_after=0.9,
-        phase_seconds=phase_plan(0.1, speculation_first=0.05, transition=0.02, transcription=0.02, market=1.5),
+        human_join_after=0.15,
+        human_ready_after=1.2,
+        phase_seconds=phase_plan(
+            0.2, declaration_first=0.15, speculation_first=0.1, transition=0.05, transcription=0.05, market=1.5
+        ),
         rejoins=((PRE_GAME_PHASE, 0.3), ("market", 0.05)),
+        phase_signal=(event, key),
+        per_phase_snapshots=per_phase_snapshots,
     )
     started = outcome.server.gameplay_started_at
 
@@ -414,17 +486,18 @@ async def test_duplicate_snapshots_and_rejoin_do_not_restart_gameplay_clock(tmp_
             f"{outcome.describe(seat)}"
         )
         fired_after = seat.stopped_at - started
-        assert budget - 0.1 <= fired_after <= budget + 0.25, (
+        assert budget - 0.1 <= fired_after <= budget + 0.2, (
             f"gameplay watchdog fired {fired_after:+.2f}s after gameplay started, expected {budget}s "
             f"(clock must start once at presentation; market re-join at "
             f"+{outcome.server.rejoin_times.get('market', float('nan')):.2f}s must not restart it). "
             f"{outcome.describe(seat)}"
         )
-        assert seat.snapshot_phases.count("market") >= 2, (
-            f"agent {seat.player_number} did not see the duplicate market snapshot: {seat.snapshot_phases}"
+        signals = seat.snapshot_phases if event == "snapshot" else seat.transition_phases
+        assert signals.count("market") >= 2, (
+            f"agent {seat.player_number} did not see a duplicate market {event}: {signals}"
         )
-        assert seat.snapshot_phases.count(PRE_GAME_PHASE) >= 2, (
-            f"agent {seat.player_number} did not see the duplicate introduction snapshot: {seat.snapshot_phases}"
+        assert signals.count(PRE_GAME_PHASE) >= 2, (
+            f"agent {seat.player_number} did not see a duplicate introduction {event}: {signals}"
         )
 
 
@@ -432,7 +505,8 @@ async def test_duplicate_snapshots_and_rejoin_do_not_restart_gameplay_clock(tmp_
 
 
 @pytest.mark.asyncio
-async def test_genuine_gameplay_timeout_still_stops_agents(tmp_path, caplog):
+@pytest.mark.parametrize(("event", "key", "per_phase_snapshots"), PHASE_SIGNALS)
+async def test_genuine_gameplay_timeout_still_stops_agents(tmp_path, caplog, event, key, per_phase_snapshots):
     """No pre-game wait, gameplay (market alone 2 s) longer than the budget: agents are stopped
     about budget seconds into gameplay, never reach the final phases, and a warning names the budget."""
     budget = 0.5
@@ -442,6 +516,8 @@ async def test_genuine_gameplay_timeout_still_stops_agents(tmp_path, caplog):
         budget=budget,
         human_ready_after=0.0,
         phase_seconds=phase_plan(0.05, market=2.0),
+        phase_signal=(event, key),
+        per_phase_snapshots=per_phase_snapshots,
     )
     started = outcome.server.gameplay_started_at
     assert started is not None, "fake server never left introduction"
