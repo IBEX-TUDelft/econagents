@@ -14,6 +14,9 @@ identity is pending Yary, see the issue). When the proposal is absent the tests 
 
 Frames use the shapes futarchy-agents and the server emit on origin/futharcy-agents (``roles._envelope``,
 ``DeclareHandler``: ``declaration-received`` with ``{playerNumber}`` to every player on success).
+
+The interface-proposal tests are strict xfails so the suite stays green until the journal is
+implemented; the reproduction harness runs them with ``--runxfail``. The guard tests run normally.
 """
 
 import asyncio
@@ -31,6 +34,10 @@ PLAYER = 2
 RECOVERY = "rec-abc"
 DECLARATION = "declaration_first"
 MARKET = "market"
+PROPOSAL = pytest.mark.xfail(
+    strict=True,
+    reason="interface proposal (IBEX-game_suite#8): the durable response journal is not implemented yet",
+)
 
 
 def _declaration(value: int) -> dict[str, Any]:
@@ -194,6 +201,7 @@ async def _deliver(agent: Agent, event: Event) -> None:
 # --- interface-proposal checks ------------------------------------------------------------------
 
 
+@PROPOSAL
 @pytest.mark.asyncio
 async def test_response_is_persisted_before_it_is_sent(tmp_path):
     journal_dir = tmp_path / "journal"
@@ -213,6 +221,7 @@ async def test_response_is_persisted_before_it_is_sent(tmp_path):
     )
 
 
+@PROPOSAL
 @pytest.mark.asyncio
 async def test_crash_after_persist_before_transmit_resends_saved_bytes_without_model_call(tmp_path):
     journal_dir = tmp_path / "journal"
@@ -244,6 +253,7 @@ async def test_crash_after_persist_before_transmit_resends_saved_bytes_without_m
     )
 
 
+@PROPOSAL
 @pytest.mark.asyncio
 async def test_hold_response_is_persisted_and_recovered_without_model_call(tmp_path):
     journal_dir = tmp_path / "journal"
@@ -271,6 +281,7 @@ async def test_hold_response_is_persisted_and_recovered_without_model_call(tmp_p
     assert transport.wire == [], f"a recovered hold put {transport.wire} on the wire{note}"
 
 
+@PROPOSAL
 @pytest.mark.asyncio
 async def test_lost_request_is_retransmitted_once_without_new_decision(tmp_path):
     role = ScriptedRole(_declaration(70), _declaration(55))
@@ -292,6 +303,7 @@ async def test_lost_request_is_retransmitted_once_without_new_decision(tmp_path)
     )
 
 
+@PROPOSAL
 @pytest.mark.asyncio
 async def test_lost_request_is_retransmitted_after_restart_without_new_decision(tmp_path):
     """A send that raised is recorded as not transmitted, so a restarted agent still resends it."""
@@ -323,6 +335,7 @@ async def test_lost_request_is_retransmitted_after_restart_without_new_decision(
     )
 
 
+@PROPOSAL
 @pytest.mark.asyncio
 async def test_acked_slot_is_neither_redecided_nor_resent(tmp_path):
     """After the server's own-player ack, a same-phase re-snapshot (each reconnect's player-joined ->
@@ -345,6 +358,7 @@ async def test_acked_slot_is_neither_redecided_nor_resent(tmp_path):
     )
 
 
+@PROPOSAL
 @pytest.mark.asyncio
 async def test_acked_slot_is_not_resent_after_restart(tmp_path):
     journal_dir = tmp_path / "journal"
@@ -375,6 +389,7 @@ async def test_acked_slot_is_not_resent_after_restart(tmp_path):
     assert transport.wire == [], f"after a restart an acknowledged slot was resent: {transport.wire}{note}"
 
 
+@PROPOSAL
 @pytest.mark.asyncio
 async def test_unconfirmed_slot_gets_no_new_decision(tmp_path):
     """Sent but not acknowledged (lost ack, or ack not yet seen): whatever the recovery policy (identical
