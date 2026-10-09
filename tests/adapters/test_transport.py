@@ -287,10 +287,15 @@ class TestWebSocketTransport:
 
     @pytest.mark.asyncio
     async def test_send_message_no_connection(self, transport):
-        """Test sending a message when no WebSocket connection exists."""
+        """Sending without a connection returns without hanging; a failure may be reported by raising or
+        by returning False (IBEX-game_suite#8), but never as a successful send."""
         transport.ws = None
 
-        await transport.send("Test message")
+        try:
+            result = await transport.send("Test message")
+        except Exception:
+            return
+        assert result is None or result is False or getattr(result, "transmitted", None) is False
 
     @pytest.mark.asyncio
     async def test_receive_message(self, transport, ws_server, mock_callback):

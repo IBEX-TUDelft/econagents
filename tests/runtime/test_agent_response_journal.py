@@ -1,16 +1,19 @@
 """Reproduction for IBEX-game_suite#8: durable responses and recovery without a new model decision.
 
-The agent must persist each response (with its response-slot identity) before sending it and, after
-a crash or reconnect, reuse the persisted response for that slot instead of asking the model again.
+The agent must persist each response (with its response-slot identity) before sending it, record
+whether it reached the wire and whether the server acknowledged it, and, after a crash or reconnect,
+reuse the persisted response for that slot instead of asking the model again.
 
-The interface is a proposal, isolated in ``_build_agent``:
-``econagents.runtime.journal.ResponseJournal(directory)`` passed as ``Agent(response_journal=...)``
-together with ``Agent(response_slot=callable(phase, state) -> slot id)``. The slot identity itself is
-the caller's (the authoritative one is pending Yary, see the issue). When the proposed API is absent
-the tests fall back to a plain ``Agent`` so they fail on the behavior (model calls, wire bytes,
-journal contents), not on an import error.
+The proposed interface is named in exactly one place, ``_proposed_agent`` below; a fix that picks other
+names only has to edit that function. The proposal is ``econagents.runtime.journal.ResponseJournal(dir)``
+passed as ``Agent(response_journal=...)``, with two caller-supplied callables:
+``response_slot(phase, state) -> slot id`` and ``response_ack(event, state) -> slot id | None``. Slot and
+ack identity are the caller's because econagents does not know the game (the authoritative slot
+identity is pending Yary, see the issue). When the proposal is absent the tests fall back to a plain
+``Agent``, so they fail on behavior (model calls, wire bytes, journal contents), not on an import error.
 
-Frames use the shapes futarchy-agents emits on origin/futharcy-agents (``roles._envelope``).
+Frames use the shapes futarchy-agents and the server emit on origin/futharcy-agents (``roles._envelope``,
+``DeclareHandler``: ``declaration-received`` with ``{playerNumber}`` to every player on success).
 """
 
 import asyncio
@@ -42,6 +45,10 @@ def _post_order(price: int) -> dict[str, Any]:
         "meta": {"type": "post-order", "component": {"type": "standard:dam", "name": "no_project"}},
         "payload": {"sender": PLAYER, "type": "bid", "price": price, "timestamp": 1791555677396 + price, "now": False},
     }
+
+
+def _declaration_received(player: int) -> Event:
+    return Event(type="declaration-received", data={"playerNumber": player})
 
 
 def _snapshot(phase: str, round_: int = 1) -> Event:
@@ -104,6 +111,30 @@ class Slots:
         return f"g1:r{self.round}:{phase}:p{PLAYER}"
 
 
+class Acks:
+    """The futharcy-agents ack for a sealed declaration: ``declaration-received`` for this player."""
+
+    def __init__(self, slots: Slots):
+        self.slots = slots
+
+    def __call__(self, event, state) -> str | None:
+        if event.type == "declaration-received" and event.data.get("playerNumber") == PLAYER:
+            return self.slots(DECLARATION, state)
+        return None
+
+
+def _proposed_agent(base_kwargs: dict[str, Any], *, journal_dir: Path, slots: Slots) -> tuple[Agent, str]:
+    """The single adapter point for the proposed API: edit only this to match the implemented names."""
+    try:
+        from econagents.runtime.journal import ResponseJournal
+
+        journal = ResponseJournal(journal_dir)
+        return Agent(**base_kwargs, response_journal=journal, response_slot=slots, response_ack=Acks(slots)), ""
+    except (ImportError, TypeError) as exc:
+        note = f" [proposed ResponseJournal/Agent(response_journal=, response_slot=, response_ack=) unavailable: {exc}]"
+        return Agent(**base_kwargs), note
+
+
 def _build_agent(
     *, role, transport, prompts_dir: Path, journal_dir: Path, slots: Slots, continuous: set[str] | None = None
 ) -> tuple[Agent, str]:
@@ -118,13 +149,7 @@ def _build_agent(
         phase_identifier_key="currentPhase",
         phase_engine=PhaseEngine(continuous_phases=continuous or set(), min_action_delay=3600, max_action_delay=3600),
     )
-    try:
-        from econagents.runtime.journal import ResponseJournal
-    except ImportError as exc:
-        return Agent(
-            **kwargs
-        ), f" [proposed ResponseJournal/Agent(response_journal=, response_slot=) unavailable: {exc}]"
-    return Agent(**kwargs, response_journal=ResponseJournal(journal_dir), response_slot=slots), ""
+    return _proposed_agent(kwargs, journal_dir=journal_dir, slots=slots)
 
 
 def _json_values(node: Any):
@@ -267,14 +292,120 @@ async def test_lost_request_is_retransmitted_once_without_new_decision(tmp_path)
     )
 
 
-# --- decision-gated check (Yary: ack/idempotent-retry protocol) ----------------------------------
+@pytest.mark.asyncio
+async def test_lost_request_is_retransmitted_after_restart_without_new_decision(tmp_path):
+    """A send that raised is recorded as not transmitted, so a restarted agent still resends it."""
+    journal_dir = tmp_path / "journal"
+    slots = Slots()
+    first_role = ScriptedRole(_declaration(70))
+    failing = WireTransport(failures=[ConnectionError("socket closed before the frame was written")])
+    first, note = _build_agent(
+        role=first_role, transport=failing, prompts_dir=tmp_path, journal_dir=journal_dir, slots=slots
+    )
+    await _deliver(first, _snapshot(DECLARATION))
+    assert failing.wire == [] and first_role.calls == 1
+    del first
+
+    restarted_role = ScriptedRole(_declaration(55))
+    transport = WireTransport()
+    restarted, _ = _build_agent(
+        role=restarted_role, transport=transport, prompts_dir=tmp_path, journal_dir=journal_dir, slots=slots
+    )
+    await _deliver(restarted, _snapshot(DECLARATION))
+
+    assert restarted_role.calls == 0, (
+        f"after a restart the agent asked the model {restarted_role.calls} time(s) for a slot whose request "
+        f"never reached the wire{note}"
+    )
+    assert transport.wire == [json.dumps(_declaration(70))], (
+        f"after a restart the wire got {transport.wire}: a failed send must stay 'not transmitted' and be "
+        f"resent from the persisted bytes{note}"
+    )
 
 
 @pytest.mark.asyncio
+async def test_acked_slot_is_neither_redecided_nor_resent(tmp_path):
+    """After the server's own-player ack, a same-phase re-snapshot (each reconnect's player-joined ->
+    get-snapshot) must not ask the model or resend: DeclareHandler would answer 'declaration-refused'."""
+    role = ScriptedRole(_declaration(70), _declaration(55))
+    transport = WireTransport()
+    agent, note = _build_agent(
+        role=role, transport=transport, prompts_dir=tmp_path, journal_dir=tmp_path / "journal", slots=Slots()
+    )
+
+    await _deliver(agent, _snapshot(DECLARATION))
+    await _deliver(agent, _declaration_received(5))
+    await _deliver(agent, _declaration_received(PLAYER))
+    await _deliver(agent, _snapshot(DECLARATION))
+
+    original = json.dumps(_declaration(70))
+    assert role.calls == 1, f"an acknowledged slot triggered {role.calls} model decisions{note}"
+    assert transport.wire == [original], (
+        f"after the server acknowledged the declaration the wire got {transport.wire}, not only {[original]}{note}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_acked_slot_is_not_resent_after_restart(tmp_path):
+    journal_dir = tmp_path / "journal"
+    slots = Slots()
+    first_transport = WireTransport()
+    first, note = _build_agent(
+        role=ScriptedRole(_declaration(70)),
+        transport=first_transport,
+        prompts_dir=tmp_path,
+        journal_dir=journal_dir,
+        slots=slots,
+    )
+    await _deliver(first, _snapshot(DECLARATION))
+    await _deliver(first, _declaration_received(PLAYER))
+    assert first_transport.wire == [json.dumps(_declaration(70))]
+    del first
+
+    restarted_role = ScriptedRole(_declaration(55))
+    transport = WireTransport()
+    restarted, _ = _build_agent(
+        role=restarted_role, transport=transport, prompts_dir=tmp_path, journal_dir=journal_dir, slots=slots
+    )
+    await _deliver(restarted, _snapshot(DECLARATION))
+
+    assert restarted_role.calls == 0, (
+        f"after a restart the agent asked the model {restarted_role.calls} time(s) for an acknowledged slot{note}"
+    )
+    assert transport.wire == [], f"after a restart an acknowledged slot was resent: {transport.wire}{note}"
+
+
+@pytest.mark.asyncio
+async def test_unconfirmed_slot_gets_no_new_decision(tmp_path):
+    """Sent but not acknowledged (lost ack, or ack not yet seen): whatever the recovery policy (identical
+    retry or slot-status query, pending Yary), the model is not asked again and nothing but the
+    persisted bytes may reach the wire for that slot."""
+    role = ScriptedRole(_declaration(70), _declaration(55))
+    transport = WireTransport()
+    agent, note = _build_agent(
+        role=role, transport=transport, prompts_dir=tmp_path, journal_dir=tmp_path / "journal", slots=Slots()
+    )
+
+    await _deliver(agent, _snapshot(DECLARATION))
+    await _deliver(agent, _snapshot(DECLARATION))
+
+    original = json.dumps(_declaration(70))
+    assert role.calls == 1, f"an unacknowledged slot triggered {role.calls} model decisions{note}"
+    assert set(transport.wire) == {original}, (
+        f"for one unacknowledged slot the wire got {transport.wire}; only the persisted bytes {original} may be sent{note}"
+    )
+
+
+# --- decision-gated (Yary: identical retry vs slot-status query; server idempotency) -------------
+# Not part of the fx spec until the decision is made; un-skip it if Yary picks identical retry.
+
+
+@pytest.mark.skip(reason="decision-gated on Yary (IBEX-game_suite#8): identical retry vs slot-status query")
+@pytest.mark.asyncio
 async def test_lost_ack_retries_identical_bytes_for_same_slot(tmp_path):
-    """Gated: assumes the server answers an identical retry for the same slot with an idempotent result
-    (master-style DeclareHandler). On origin/futharcy-agents DeclareHandler refuses it
-    ('declaration-refused' already-submitted), and the alternative is a slot-status query."""
+    """Assumes the server answers an identical retry for the same slot with an idempotent result. On
+    origin/futharcy-agents DeclareHandler refuses it ('declaration-refused' already-submitted), and the
+    alternative is a slot-status query."""
     role = ScriptedRole(_declaration(70), _declaration(55))
     transport = WireTransport()
     agent, note = _build_agent(
@@ -327,6 +458,7 @@ async def test_uncertain_market_order_is_not_blindly_resent(tmp_path):
         slots=Slots(),
         continuous={MARKET},
     )
+    tasks_before = asyncio.all_tasks()
     try:
         await _deliver(agent, _snapshot(MARKET))
         await _deliver(agent, _snapshot(MARKET))
@@ -336,11 +468,7 @@ async def test_uncertain_market_order_is_not_blindly_resent(tmp_path):
         assert transport.wire.count(first) == 1, f"the uncertain post-order was resent: {transport.wire}"
     finally:
         await agent.stop()
-        loops = [
-            task
-            for task in asyncio.all_tasks()
-            if not task.done() and getattr(task.get_coro(), "__qualname__", "").endswith("_continuous_phase_loop")
-        ]
-        for task in loops:
+        leftovers = [t for t in asyncio.all_tasks() - tasks_before if t is not asyncio.current_task()]
+        for task in leftovers:
             task.cancel()
-        await asyncio.gather(*loops, return_exceptions=True)
+        await asyncio.gather(*leftovers, return_exceptions=True)

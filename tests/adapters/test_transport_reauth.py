@@ -37,7 +37,7 @@ class FakeIbexServer:
         self.port = 0
 
     async def handler(self, ws):
-        conn = {"ws": ws, "authed": False, "received": [], "dropped": []}
+        conn = {"ws": ws, "authed": False, "received": [], "dropped": [], "closed": False}
         self.conns.append(conn)
         try:
             async for raw in ws:
@@ -54,14 +54,27 @@ class FakeIbexServer:
                     await ws.send(json.dumps(snapshot(self.phase)))
         except websockets.ConnectionClosed:
             pass
+        finally:
+            conn["closed"] = True
 
     async def start(self):
         self.server = await websockets.serve(self.handler, "127.0.0.1", 0)
         self.port = self.server.sockets[0].getsockname()[1]
 
-    def drop_current(self):
-        """Fault injection: abort the newest connection's TCP transport (client sees close code 1006)."""
-        self.conns[-1]["ws"].transport.abort()
+    async def drop_current(self, fault: str):
+        """Fault injection on the newest connection.
+
+        ``abort``: the TCP transport is aborted (client sees 1006, like ws.terminate() in the IBEX server).
+        ``going-away``: a clean close handshake with 1001 (server restart, proxy), which ends the client's
+        receive loop without raising ConnectionClosed."""
+        ws = self.conns[-1]["ws"]
+        if fault == "abort":
+            ws.transport.abort()
+        else:
+            await ws.close(1001, "going away")
+
+    def open_connections(self) -> int:
+        return sum(1 for conn in self.conns if not conn["closed"])
 
     async def stop(self):
         self.server.close()
@@ -78,7 +91,8 @@ async def wait_for(pred, timeout=5.0):
 
 
 @pytest.mark.asyncio
-async def test_transport_reauthenticates_after_unexpected_close():
+@pytest.mark.parametrize("fault", ["abort", "going-away"])
+async def test_transport_reauthenticates_after_unexpected_close(fault):
     srv = FakeIbexServer()
     await srv.start()
     received: list[dict] = []
@@ -95,7 +109,7 @@ async def test_transport_reauthenticates_after_unexpected_close():
     task = asyncio.create_task(transport.start_listening())
     try:
         assert await wait_for(lambda: srv.conns and srv.conns[0]["authed"])
-        srv.drop_current()
+        await srv.drop_current(fault)
         assert await wait_for(lambda: len(srv.conns) >= 2), "client did not reconnect"
         second = srv.conns[1]
         await wait_for(lambda: bool(second["received"]), timeout=1.0)
@@ -109,6 +123,14 @@ async def test_transport_reauthenticates_after_unexpected_close():
             lambda: sum(1 for m in received if m["meta"]["type"] == "snapshot") > snapshots_before, timeout=2.0
         )
         assert got_snapshot, "get-snapshot after reconnect got no reply"
+        assert await wait_for(lambda: srv.open_connections() == 1, timeout=2.0), (
+            f"{srv.open_connections()} server connections open after one reconnect (expected 1)"
+        )
+        await asyncio.sleep(0.1)
+        replies = sum(1 for m in received if m["meta"]["type"] == "snapshot") - snapshots_before
+        assert replies == 1, (
+            f"one get-snapshot was delivered {replies} times to the callback (one receive loop expected)"
+        )
     finally:
         await transport.stop()
         task.cancel()
