@@ -17,15 +17,66 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   phase is identified by the phase id plus `state.meta.round` when the state
   defines one, so a game that reuses a phase id every round still gets a new
   decision when the round changes. A game whose state has no `meta.round` and
-  that moves to the next round under the same phase id without waiting for the
-  agent's action gets no decision for that round while the old one is in
-  flight; the ignored transition is logged at INFO.
+  that moves to the next round under the same phase id, with no other phase in
+  between, stays in the same occurrence: the transition is logged at INFO and
+  ignored while the old decision or loop is active, and for a turn-based phase
+  also after the decision completed (see the decision gate below).
 - A decision that is still in flight when the phase changes is cancelled, and a
   result decided in a phase the agent has left, or after `Agent.stop()`, is
   dropped instead of sent.
+- `WebSocketTransport` authenticates every new connection: after an unexpected
+  (1006) or clean (1001) close it reconnects and sends the `join` (or other
+  `auth_mechanism`) message again before reading, so the server no longer drops
+  everything the agent sends after a reconnect (IBEX-game_suite#8). A connection
+  lost while authenticating is retried instead of stopping the transport.
+  Reconnects back off: the first one after a connection that stayed open for
+  `stable_connection_seconds` (default 5) is immediate, and connections that
+  close sooner (for example a `join` rejected with `auth-error` after a server
+  restart) are retried with exponential backoff and jitter from
+  `reconnect_delay` (default 0.5 s) up to `max_reconnect_delay` (default 30 s),
+  all three new `WebSocketTransport` arguments.
+- A re-join no longer repeats a turn-based decision: once the decision for a
+  non-continuous phase occurrence (phase id plus `state.meta.round`) has
+  completed, by sending its action or by returning none, a later transition
+  into the same occurrence, such as the snapshot requested after a reconnect,
+  is logged at INFO and ignored (IBEX-game_suite#8). Before, a second
+  declaration was refused by the server and a second speculation replaced the
+  first. A decision that raised, was dropped as stale, or whose send raised
+  `ConnectionError` is decided again on the next transition. Continuous phases
+  are unchanged. This also applies to a game without `meta.round` that reuses a
+  phase id for the next round (see Changed).
+
+### Added
+
+- `Agent(decision_gate=...)` takes an optional `DecisionGate` (`is_decided`,
+  `mark_decided`) that the agent consults before a turn-based decision and
+  updates after each completed one, so a store that outlives the process can
+  stop a restarted agent from deciding again. Without one the gate is in
+  memory, per `Agent` instance. `DecisionGate`, `DecisionOutcome` and
+  `PhaseOccurrence` are exported from `econagents`. An exception from
+  `is_decided` is logged and no decision is made on that transition; one from
+  `mark_decided` is logged.
 
 ### Changed
 
+- **Breaking:** a turn-based (non-continuous) phase occurrence, the phase id
+  plus `state.meta.round`, is decided at most once per `Agent`. A game whose
+  state has no `meta.round` and that starts the next round under the same phase
+  id, with no other phase in between, used to get a new decision once the
+  previous one had completed; it now gets none for that round. Give the state a
+  `meta.round` field (or pass through another phase) so each round is a new
+  occurrence. The bundled examples are not affected.
+- **Breaking:** `WebSocketTransport.send()` raises `TransportSendError` (a
+  `ConnectionError` subclass, exported from `econagents`,
+  `econagents.adapters.transport` and `econagents.ports`) when there is no open
+  connection, or when the connection closes or the socket fails while writing
+  the frame. It used to log and return
+  `None`, so a lost message was invisible to the caller. `TransportPort.send()`
+  documents the same contract. `Agent` catches it and logs the action at ERROR
+  as not transmitted, without retrying; code that calls `agent.transport.send()`
+  directly (for example to request a snapshot) must handle `ConnectionError`.
+- `WebSocketTransport.start_listening()` runs one listen loop per transport; a
+  second call while one is active logs a warning and returns.
 - An exception raised by a continuous-phase action is logged at ERROR level with
   its traceback and the loop continues; previously it ended the loop.
 - `Agent.stop()` also cancels an in-flight phase-entry decision.

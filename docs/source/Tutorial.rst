@@ -135,6 +135,7 @@ event into state and prompts the role to make a decision.
 
 The connection authenticates with the default :class:`~econagents.JoinPayloadAuth`, which
 sends ``{"meta": {"type": "join"}, "payload": {...}}`` built from ``auth_mechanism_kwargs``.
+It sends it again on every reconnect.
 During the ``introduction`` phase the agent declares itself ready by returning
 ``ready_message()``
 (``{"meta": {"type": "ready", "component": {"type": "standard:ready"}}, "payload": {}}``).

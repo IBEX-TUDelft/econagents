@@ -67,9 +67,11 @@ the current phase (for example a second snapshot after a reconnect) does not
 start another decision or another loop while one is active; it is logged at
 INFO. The current phase is identified by its phase id plus ``state.meta.round``
 when the state defines a ``round`` field, so define one if your game reuses the
-same phase id every round. Without it, a server that starts the next round
-under the same phase id before the agent has acted gets no decision for that
-round. When the phase changes, or the agent stops, the pending decision is
+same phase id every round. Without it, a next round that the server starts
+under the same phase id, with no other phase in between, is the same
+occurrence: a continuous phase's loop simply goes on, and a turn-based phase
+gets no decision for that round, neither while the previous one is in flight
+nor after it completed (see the decision gate below). When the phase changes, or the agent stops, the pending decision is
 cancelled, and a result decided in a phase the agent has since left is logged
 and dropped instead of sent. An exception raised by one continuous-phase action
 is logged and the loop continues.
@@ -77,6 +79,85 @@ is logged and the loop continues.
 ``execute_phase_action`` uses the same decision slot. A phase handler may call
 it to run another phase's action inline, but must not await
 ``handle_phase_transition``, which raises ``RuntimeError`` inside a decision.
+
+Connection Loss
+---------------
+
+``WebSocketTransport`` reconnects after the connection closes, whether the
+close was abnormal or clean, and authenticates every new connection again
+(``JoinPayloadAuth`` resends the ``join`` message) before reading from it. If
+the server replays the current phase after the re-join while that phase's
+decision or continuous loop is still active, the rule above ignores it, so the
+reconnect does not start a second decision or loop. A replayed turn-based phase
+whose decision already finished is not decided again (see the decision gate
+below).
+
+The first reconnect after a connection that stayed open for
+``stable_connection_seconds`` (default 5) is immediate. Connections that close
+sooner, for example because the server answers the ``join`` with an
+``auth-error`` and closes the socket after a server restart, are retried with
+an exponential backoff with jitter that starts at ``reconnect_delay`` (default
+0.5 s) and is capped at ``max_reconnect_delay`` (default 30 s). All three are
+``WebSocketTransport`` constructor arguments, and ``stop()`` interrupts a
+pending backoff.
+
+``transport.send()`` raises ``TransportSendError`` (``from econagents import
+TransportSendError``), a ``ConnectionError``, when the message was not
+transmitted. The agent logs such an action at ERROR as not
+transmitted and does not retry it; a continuous phase goes on with its next
+decision. Event handlers that call ``agent.transport.send()`` themselves should
+catch ``ConnectionError``.
+
+Decision Gate
+-------------
+
+An agent decides each occurrence of a turn-based (non-continuous) phase at
+most once. Once that decision has completed, a later transition into the same
+occurrence, for example the snapshot a server sends after a re-join, is
+logged at INFO and ignored instead of asking the role again. An occurrence is
+the phase id plus ``state.meta.round``, as above. A decision counts as
+completed when:
+
+* its action was sent; or
+* the phase handler or role returned no action. The agent cannot tell a
+  deliberate hold from a result the role dropped, so a role that wants a
+  failed decision retried on the next transition should raise instead.
+
+It does not count when the handler or role raised, when the decision was
+cancelled or dropped because the agent left the phase, or when sending raised
+``ConnectionError``: such an action never reached the server, so the next
+transition into the occurrence decides again. Continuous phases are not gated.
+
+This memory belongs to the ``Agent`` instance and resets when the agent moves
+to another occurrence, so returning to a phase with the same id and round
+later in the game still gets a decision, and a restarted process decides
+again. To keep decisions across restarts, pass a ``DecisionGate`` backed by
+durable storage. The agent consults it, in addition to its own memory, before
+a turn-based decision, and records every completed decision in it:
+
+.. code-block:: python
+
+   from econagents import DecisionOutcome, PhaseOccurrence
+
+   class JournalGate:
+       def is_decided(self, occurrence: PhaseOccurrence) -> bool:
+           return journal.has(occurrence.phase, occurrence.round)
+
+       def mark_decided(self, occurrence: PhaseOccurrence, outcome: DecisionOutcome) -> None:
+           journal.add(occurrence.phase, occurrence.round, outcome)  # "sent" or "hold"
+
+   agent = Agent(..., decision_gate=JournalGate())
+
+The in-memory record forgets an occurrence as soon as the agent moves to
+another one, but a store keyed on ``(phase, round)`` like the one above also
+answers "decided" when the game comes back to the same phase id within one
+round. That is fine for games whose phase ids are unique within a round (the
+futarchy game is one); otherwise include something in the key that tells the
+visits apart. If ``is_decided`` raises, the agent logs the error and makes no
+decision on that transition, so a broken store cannot cause a second
+submission; the next transition into the occurrence asks again. If
+``mark_decided`` raises, the error is logged and the in-memory record still
+holds.
 
 Phase Handlers
 --------------

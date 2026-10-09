@@ -6,7 +6,7 @@ from econagents.ports.parsing import ResponseParserPort
 from econagents.ports.prompts import PromptRendererPort
 from econagents.ports.state import StateProjectorPort
 from econagents.ports.tools import Tool, ToolCall, ToolContext, ToolExecutor, ToolSpec
-from econagents.ports.transport import TransportPort
+from econagents.ports.transport import TransportPort, TransportSendError
 
 __all__ = [
     "MessageCodec",
@@ -21,4 +21,5 @@ __all__ = [
     "ToolExecutor",
     "ToolSpec",
     "TransportPort",
+    "TransportSendError",
 ]

@@ -12,6 +12,7 @@ from econagents.adapters.state import EventFieldStateProjector
 from econagents.adapters.transport import AuthenticationMechanism, JoinPayloadAuth, WebSocketTransport
 from econagents.domain.role import Role
 from econagents.domain.logging import LoggerMixin
+from econagents.runtime.decision_gate import DecisionGate, DecisionOutcome, PhaseOccurrence
 from econagents.runtime.phase_engine import PhaseEngine
 from econagents.domain.messages import Event, PhaseId
 from econagents.domain.state.game import GameState
@@ -24,7 +25,16 @@ EventHandler = Callable[[Event], Any]
 
 
 class Agent(LoggerMixin):
-    """Run one agent against a game server."""
+    """Run one agent against a game server.
+
+    A non-continuous phase occurrence is decided at most once per ``Agent`` instance: once its decision
+    has completed (the action was sent, or the handler or role returned no action), a later transition
+    into the same occurrence, such as the snapshot replayed after a reconnect, is logged at INFO and
+    ignored. A decision that raised, was cancelled, was dropped as stale, or whose send raised
+    ``ConnectionError`` does not count, so the next transition into the occurrence decides again. Pass
+    ``decision_gate`` to also consult and update a store that outlives the process; without one, a
+    restarted agent decides again.
+    """
 
     def __init__(
         self,
@@ -43,6 +53,7 @@ class Agent(LoggerMixin):
         end_game_event: str = "game-over",
         logger: logging.Logger | None = None,
         transport: TransportPort | None = None,
+        decision_gate: DecisionGate | None = None,
     ) -> None:
         if logger:
             self.logger = logger
@@ -63,6 +74,7 @@ class Agent(LoggerMixin):
         self.auth_mechanism = auth_mechanism or JoinPayloadAuth()
         self.auth_mechanism_kwargs = auth_mechanism_kwargs or {}
         self.end_game_event = end_game_event
+        self.decision_gate = decision_gate
         self.transport = transport or WebSocketTransport(
             url=self.url,
             logger=self.logger,
@@ -76,7 +88,8 @@ class Agent(LoggerMixin):
         self._continuous_task: asyncio.Task | None = None
         self._entry_task: asyncio.Task | None = None
         self._phase_epoch = 0
-        self._phase_occurrence: tuple[PhaseId | None, Any] | None = None
+        self._phase_occurrence: PhaseOccurrence | None = None
+        self._decided_occurrence: PhaseOccurrence | None = None
         self._decision_lock = asyncio.Lock()
         self._decision_owner: asyncio.Task | None = None
         self._event_handlers: dict[str, list[EventHandler]] = {}
@@ -144,13 +157,15 @@ class Agent(LoggerMixin):
 
         A phase occurrence is identified by the phase id and, when the state has one, ``state.meta.round``.
         A transition into the current occurrence does not start a new decision while one is in flight or
-        while that phase's continuous loop is running. A transition into a different occurrence cancels
-        the previous one's pending decision and loop. Must not be awaited from inside a phase decision.
+        while that phase's continuous loop is running. For a non-continuous phase it also does not start
+        one once the occurrence's decision has completed (see ``decision_gate``). A transition into a
+        different occurrence cancels the previous one's pending decision and loop. Must not be awaited
+        from inside a phase decision.
         """
         if self._decision_owner is not None and self._decision_owner is asyncio.current_task():
             raise RuntimeError("handle_phase_transition cannot be awaited from inside a phase decision")
 
-        occurrence = (phase, self._current_round())
+        occurrence = PhaseOccurrence(phase, self._current_round())
         if occurrence == self._phase_occurrence:
             if self._phase_busy():
                 self.logger.info(
@@ -161,11 +176,25 @@ class Agent(LoggerMixin):
         else:
             self._phase_epoch += 1
             self._cancel_phase_tasks()
+            self._decided_occurrence = None
 
         self.current_phase = phase
         self._phase_occurrence = occurrence
         if phase is None:
             return
+        if not self.phase_engine.is_continuous(phase):
+            try:
+                decided = self._occurrence_decided(occurrence)
+            except Exception:
+                self.logger.exception(
+                    f"Decision gate failed for phase {phase} (round {occurrence.round}); not deciding on this transition"
+                )
+                return
+            if decided:
+                self.logger.info(
+                    f"Ignoring transition into phase {phase} (round {occurrence.round}): its decision already completed"
+                )
+                return
 
         epoch = self._phase_epoch
         entry = asyncio.create_task(self._execute_phase_action(phase, epoch))
@@ -188,7 +217,9 @@ class Agent(LoggerMixin):
         Decisions are single-flight per agent: this waits until no other decision is in flight, except
         when called from inside a phase handler or role decision, where it runs inline. The result is
         dropped instead of sent if the agent moves to another phase occurrence, or stops, while it is
-        being decided.
+        being decided. If the transport raises ``ConnectionError`` while sending, the action is logged at
+        ERROR as not transmitted and is not retried. A completed decision for the current non-continuous
+        phase occurrence is recorded in the decision gate.
         """
         await self._execute_phase_action(phase, self._phase_epoch)
 
@@ -208,20 +239,29 @@ class Agent(LoggerMixin):
         if epoch != self._phase_epoch:
             self.logger.debug(f"Skipping decision for phase {phase}: the phase ended before it started")
             return
+        occurrence = self._gated_occurrence(phase)
 
         if phase in self._phase_handlers:
             payload = await self._phase_handlers[phase](phase, self.state)
         else:
             payload = await self.role.handle_phase(phase, self.state, self.prompts_dir)
 
-        if not payload:
-            return
         if epoch != self._phase_epoch:
-            self.logger.warning(
-                f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
-            )
+            if payload:
+                self.logger.warning(
+                    f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
+                )
             return
-        await self.transport.send(self.message_codec.encode_action(payload))
+        if not payload:
+            self._record_decided(occurrence, epoch, "hold")
+            return
+        frame = self.message_codec.encode_action(payload)
+        try:
+            await self.transport.send(frame)
+        except ConnectionError as exc:
+            self.logger.error(f"Action decided in phase {phase} was not transmitted ({exc}): {frame}")
+            return
+        self._record_decided(occurrence, epoch, "sent")
 
     async def _continuous_phase_loop(self, phase: PhaseId, epoch: int, entry: asyncio.Task | None = None) -> None:
         """Run repeated actions, after the phase-entry action, while the phase remains active."""
@@ -241,6 +281,32 @@ class Agent(LoggerMixin):
 
     def _current_round(self) -> Any:
         return getattr(getattr(self.state, "meta", None), "round", None)
+
+    def _gated_occurrence(self, phase: PhaseId) -> PhaseOccurrence | None:
+        occurrence = self._phase_occurrence
+        if occurrence is None or occurrence.phase != phase or self.phase_engine.is_continuous(phase):
+            return None
+        return occurrence
+
+    def _occurrence_decided(self, occurrence: PhaseOccurrence) -> bool:
+        if occurrence == self._decided_occurrence:
+            return True
+        return self.decision_gate is not None and self.decision_gate.is_decided(occurrence)
+
+    def _record_decided(self, occurrence: PhaseOccurrence | None, epoch: int, outcome: DecisionOutcome) -> None:
+        if occurrence is None:
+            return
+        if epoch == self._phase_epoch:
+            self._decided_occurrence = occurrence
+        if self.decision_gate is None:
+            return
+        try:
+            self.decision_gate.mark_decided(occurrence, outcome)
+        except Exception:
+            self.logger.exception(
+                f"Decision gate failed to record the {outcome!r} decision for phase {occurrence.phase} "
+                f"(round {occurrence.round})"
+            )
 
     def _continuous_phase_active(self, epoch: int) -> bool:
         return self.in_continuous_phase and epoch == self._phase_epoch
