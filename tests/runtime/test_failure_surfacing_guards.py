@@ -17,7 +17,7 @@ from econagents.domain.role import Role
 from econagents.domain.state.game import GameState
 from econagents.runtime import Agent, PhaseEngine
 
-from tests.adapters.llm.test_openai_truncation import _body, _call
+from tests.adapters.llm.test_openai_truncation import _body, _call, tracked_metadata
 from tests.runtime.test_agent_loop_failures import BOUND_S, ENVELOPE, FakeTransport
 
 
@@ -81,3 +81,4 @@ async def test_reasoning_only_incomplete_response_is_logged(caplog):
     logged = "\n".join(r.getMessage() for r in caplog.records if r.name == name)
     assert "max_output_tokens" in logged
     assert observability.track_llm_call.call_count == 1
+    assert all(tracked_metadata(observability).values())
