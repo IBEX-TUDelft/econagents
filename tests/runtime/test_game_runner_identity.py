@@ -5,8 +5,9 @@ seat, run_game leaves that seat out of the agent list, so ``agent_1.log`` holds 
 and nothing in the file says so. Tests are grouped by kind:
 
 - behavioral: each agent log records the authenticated player number and role.
-- interface proposal: a replacement agent instance for the same seat keeps the actor and is recorded
-  as a separate instance.
+- interface proposal: a replacement agent instance for the same seat (a second runner after a crash,
+  same logs_dir) keeps the actor, does not erase the first instance's records, and is recorded with
+  its own instance identifier.
 - decision-gated (log naming): no file name or ``[AGENT n]`` tag points at another seat's number.
 - guard: agents without a player identity keep the launch-index ``agent_<i>.log`` files.
 """
@@ -117,6 +118,30 @@ def identity_record(path: Path) -> Optional[dict[str, Any]]:
     return None
 
 
+def identity_governing(path: Path, marker: str) -> Optional[dict[str, Any]]:
+    """The latest identity record written before ``marker`` in ``path`` (one file per instance, or appended)."""
+    current = None
+    for line in path.read_text(errors="replace").splitlines():
+        if marker in line:
+            return current
+        start = line.find("{")
+        if start < 0:
+            continue
+        try:
+            record = json.loads(line[start:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict):
+            record = record["identity"] if isinstance(record.get("identity"), dict) else record
+            if "player_number" in record:
+                current = record
+    return None
+
+
+def instance_ids(record: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in record.items() if "instance" in k.lower() and v is not None}
+
+
 def file_holding(config: GameRunnerConfig, marker: str) -> list[Path]:
     return [p for p in agent_logs(config) if marker in p.read_text(errors="replace")]
 
@@ -154,21 +179,32 @@ async def test_agent_logs_record_authenticated_player_identity(config, tmp_path)
 
 @pytest.mark.asyncio
 async def test_replacement_instance_keeps_actor_and_is_recorded_separately(config, tmp_path):
-    """interface proposal: a second Agent instance for seat 7 keeps player 7 and gets its own instance identity."""
-    first = make_agent(7, "speculator", marker_for(7, "a"), tmp_path)
-    replacement = make_agent(7, "speculator", marker_for(7, "b"), tmp_path)
-    other = make_agent(8, "speculator", marker_for(8, "a"), tmp_path)
-    await GameRunner(config=config, agents=[first, other, replacement]).run_game()
+    """interface proposal: a replacement runner for seat 7 keeps player 7, keeps instance a's records, and
+    records its own instance identifier (any identity field whose name contains 'instance')."""
+    await GameRunner(
+        config=config,
+        agents=[
+            make_agent(7, "speculator", marker_for(7, "a"), tmp_path),
+            make_agent(8, "speculator", marker_for(8), tmp_path),
+        ],
+    ).run_game()
+    await GameRunner(config=config, agents=[make_agent(7, "speculator", marker_for(7, "b"), tmp_path)]).run_game()
 
-    records = []
+    records = {}
     for instance in ("a", "b"):
         holders = file_holding(config, marker_for(7, instance))
-        assert len(holders) == 1, f"instance {instance} of player 7 is in {[p.name for p in holders]}"
-        record = identity_record(holders[0])
+        assert len(holders) == 1, (
+            f"instance {instance} of player 7 is in {[p.name for p in holders]} after the replacement runner "
+            f"started (files: {[p.name for p in agent_logs(config)]}); the replacement erased its records"
+        )
+        record = identity_governing(holders[0], marker_for(7, instance))
         assert record is not None, f"{holders[0].name} (player 7, instance {instance}) has no identity record"
         assert record.get("player_number") == 7, f"instance {instance} recorded as player {record.get('player_number')}"
-        records.append(record)
-    assert records[0] != records[1], "both instances of player 7 carry identical identity records (no instance id)"
+        assert record.get("role") == "speculator", f"instance {instance} recorded as role {record.get('role')!r}"
+        records[instance] = record
+    ids = {instance: instance_ids(record) for instance, record in records.items()}
+    assert ids["a"] and ids["b"], f"identity records carry no instance identifier field: {ids}"
+    assert ids["a"] != ids["b"], f"both instances of player 7 carry the same instance identifier: {ids}"
 
 
 @pytest.mark.asyncio

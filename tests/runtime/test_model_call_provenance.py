@@ -4,9 +4,11 @@ At the default INFO level a game run leaves no record of the prompts actually se
 raw model output, or the provider's response id, finish reason and token usage: Role logs prompts at
 DEBUG and ChatOpenAI only DEBUG-logs the provider response. Replay tooling therefore re-renders
 today's templates instead of recovering what was sent. These checks are black-box: they search
-everything the runner persisted under ``logs_dir`` (any file, plain text or JSON).
+everything the runner persisted under ``logs_dir`` (any file, plain text, JSON, or a JSON object inside
+an ordinary log line). The behavioral checks call the real ChatOpenAI with a mocked OpenAI client, so
+recording in Role or in the LLM adapter both satisfy them.
 
-- behavioral: rendered prompts and raw output are recoverable after an INFO-level run.
+- behavioral: rendered prompts and the provider's raw output text are recoverable after an INFO run.
 - behavioral: provider response id, finish reason and token usage are recoverable.
 - guard: recording does not change what goes on the wire or the number of model calls.
 """
@@ -32,7 +34,7 @@ from econagents.runtime.game_runner import GameRunner, GameRunnerConfig
 
 GAME_ID = 21
 PLAYER = 7
-RAW_OUTPUT = '{"message": "scripted-output-gs10", "price": 4321}'
+RAW_OUTPUT = '{"price":4321,  "message":"scripted-output-gs10"}'
 
 
 class ScriptedLLM(BaseLLM):
@@ -119,38 +121,79 @@ def _strings(value: Any) -> Iterator[str]:
             yield from _strings(item)
 
 
+def json_objects(content: str) -> Iterator[Any]:
+    """JSON documents in a file: the whole file, each line, or an object starting at a line's first '{'."""
+    decoder = json.JSONDecoder()
+    for chunk in [content, *content.splitlines()]:
+        try:
+            yield json.loads(chunk)
+            continue
+        except ValueError:
+            pass
+        start = chunk.find("{")
+        if start >= 0:
+            try:
+                yield decoder.raw_decode(chunk[start:])[0]
+            except ValueError:
+                continue
+
+
 def persisted_text(config: GameRunnerConfig) -> tuple[str, set[str]]:
-    """Everything under logs_dir as text, plus every string value of any JSON / JSONL record found there."""
+    """Everything under logs_dir as text, plus every string value of any JSON record found there."""
     text, values = [], set()
     for path in sorted(config.logs_dir.rglob("*")):
         if not path.is_file():
             continue
         content = path.read_text(errors="replace")
         text.append(content)
-        for chunk in [content, *content.splitlines()]:
-            try:
-                values.update(_strings(json.loads(chunk)))
-            except ValueError:
-                continue
+        for document in json_objects(content):
+            values.update(_strings(document))
     return "\n".join(text), values
 
 
 def is_persisted(needle: str, config: GameRunnerConfig) -> bool:
     text, values = persisted_text(config)
-    return needle in text or needle in values
+    return needle in text or needle in values or json.dumps(needle)[1:-1] in text
+
+
+def openai_response(**changes: Any) -> SimpleNamespace:
+    fields: dict[str, Any] = dict(
+        id="resp_gs10_provenance",
+        model="gpt-5.4-mini-2026-03-17",
+        status="completed",
+        incomplete_details=None,
+        usage=SimpleNamespace(input_tokens=48213, output_tokens=7919, total_tokens=56132),
+        output=[],
+        output_text=RAW_OUTPUT,
+        output_parsed=None,
+    )
+    fields.update(changes)
+    return SimpleNamespace(**fields)
+
+
+async def run_with_openai(config: GameRunnerConfig, response: SimpleNamespace) -> tuple[MagicMock, PhaseTransport]:
+    """One decision through the real ChatOpenAI adapter with a mocked AsyncOpenAI client."""
+    client = MagicMock()
+    client.responses.create = AsyncMock(return_value=response)
+    with patch("importlib.util.find_spec", return_value=True), patch("openai.AsyncOpenAI", return_value=client):
+        llm = ChatOpenAI(model_name="gpt-5.4-mini", api_key="sk-test-not-used", reasoning_effort="medium")
+        llm.observability = get_observability_provider("noop")
+        _, transport = await run_one_decision(config, llm)
+    assert client.responses.create.await_count == 1
+    assert transport.sent, "the scripted decision did not reach the transport"
+    return client, transport
 
 
 @pytest.mark.asyncio
 async def test_rendered_prompts_and_raw_output_are_recoverable_after_an_info_run(config):
-    """behavioral: the exact messages sent to the model and its raw output survive an INFO-level run."""
-    llm = ScriptedLLM([RAW_OUTPUT])
-    await run_one_decision(config, llm)
-    assert len(llm.calls) == 1
+    """behavioral: the exact messages sent to the model and its raw output text survive an INFO-level run."""
+    client, _ = await run_with_openai(config, openai_response())
+    sent = client.responses.create.await_args.kwargs["input"]
 
-    missing = [m["role"] for m in llm.calls[0] if not is_persisted(m["content"], config)]
+    missing = [m["role"] for m in sent if not is_persisted(m["content"], config)]
     assert missing == [], (
         f"the {missing} prompt(s) actually sent to the model are not recoverable from {config.logs_dir} "
-        f"(rendered prompts are only logged at DEBUG); sent: {llm.calls[0]!r}"
+        f"(rendered prompts are only logged at DEBUG); sent: {sent!r}"
     )
     assert is_persisted(RAW_OUTPUT, config), (
         f"raw model output {RAW_OUTPUT!r} is not recoverable from {config.logs_dir}"
@@ -160,9 +203,7 @@ async def test_rendered_prompts_and_raw_output_are_recoverable_after_an_info_run
 @pytest.mark.asyncio
 async def test_provider_response_metadata_is_recoverable_after_an_info_run(config):
     """behavioral: response id, finish reason and token usage of the provider call are recorded."""
-    response = SimpleNamespace(
-        id="resp_gs10_provenance",
-        model="gpt-5.4-mini-2026-03-17",
+    response = openai_response(
         status="incomplete",
         incomplete_details=SimpleNamespace(reason="max_output_tokens"),
         usage=SimpleNamespace(
@@ -171,18 +212,8 @@ async def test_provider_response_metadata_is_recoverable_after_an_info_run(confi
             total_tokens=56132,
             output_tokens_details=SimpleNamespace(reasoning_tokens=6011),
         ),
-        output=[],
-        output_text=RAW_OUTPUT,
-        output_parsed=None,
     )
-    client = MagicMock()
-    client.responses.create = AsyncMock(return_value=response)
-    with patch("importlib.util.find_spec", return_value=True), patch("openai.AsyncOpenAI", return_value=client):
-        llm = ChatOpenAI(model_name="gpt-5.4-mini", api_key="sk-test-not-used", reasoning_effort="medium")
-        llm.observability = get_observability_provider("noop")
-        _, transport = await run_one_decision(config, llm)
-    assert client.responses.create.await_count == 1
-    assert transport.sent, "the scripted decision did not reach the transport"
+    await run_with_openai(config, response)
 
     text, values = persisted_text(config)
     corpus = text + "\n" + "\n".join(values)
