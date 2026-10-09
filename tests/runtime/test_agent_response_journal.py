@@ -16,7 +16,10 @@ Frames use the shapes futarchy-agents and the server emit on origin/futharcy-age
 ``DeclareHandler``: ``declaration-received`` with ``{playerNumber}`` to every player on success).
 
 The interface-proposal tests are strict xfails so the suite stays green until the journal is
-implemented; the reproduction harness runs them with ``--runxfail``. The guard tests run normally.
+implemented; the reproduction harness runs them with ``--runxfail``. The in-process checks (an acked or
+unconfirmed slot gets no new decision within one agent) are met by the agent's decision gate and run
+normally, as do the guard tests. The agent's state carries the round from ``currentRound``, as the
+futarchy state does, so the agent can tell two rounds of the same phase apart.
 """
 
 import asyncio
@@ -26,8 +29,11 @@ from typing import Any
 
 import pytest
 
+from pydantic import Field
+
 from econagents.domain import Event
-from econagents.domain.state.game import GameState
+from econagents.domain.state.fields import EventField
+from econagents.domain.state.game import GameState, MetaInformation
 from econagents.runtime import Agent, PhaseEngine
 
 PLAYER = 2
@@ -61,6 +67,14 @@ def _declaration_received(player: int) -> Event:
 def _snapshot(phase: str, round_: int = 1) -> Event:
     players = [{"playerNumber": PLAYER, "role": "developer", "recovery": RECOVERY}]
     return Event(type="snapshot", data={"currentRound": round_, "currentPhase": phase, "players": players})
+
+
+class RoundMeta(MetaInformation):
+    round: int = EventField(default=0, event_key="currentRound")
+
+
+class RoundGameState(GameState):
+    meta: RoundMeta = Field(default_factory=RoundMeta)
 
 
 class ProcessCrash(BaseException):
@@ -147,7 +161,7 @@ def _build_agent(
 ) -> tuple[Agent, str]:
     kwargs: dict[str, Any] = dict(
         url="ws://127.0.0.1:1",
-        state=GameState(),
+        state=RoundGameState(),
         role=role,
         prompts_dir=prompts_dir,
         transport=transport,
@@ -337,29 +351,6 @@ async def test_lost_request_is_retransmitted_after_restart_without_new_decision(
 
 @PROPOSAL
 @pytest.mark.asyncio
-async def test_acked_slot_is_neither_redecided_nor_resent(tmp_path):
-    """After the server's own-player ack, a same-phase re-snapshot (each reconnect's player-joined ->
-    get-snapshot) must not ask the model or resend: DeclareHandler would answer 'declaration-refused'."""
-    role = ScriptedRole(_declaration(70), _declaration(55))
-    transport = WireTransport()
-    agent, note = _build_agent(
-        role=role, transport=transport, prompts_dir=tmp_path, journal_dir=tmp_path / "journal", slots=Slots()
-    )
-
-    await _deliver(agent, _snapshot(DECLARATION))
-    await _deliver(agent, _declaration_received(5))
-    await _deliver(agent, _declaration_received(PLAYER))
-    await _deliver(agent, _snapshot(DECLARATION))
-
-    original = json.dumps(_declaration(70))
-    assert role.calls == 1, f"an acknowledged slot triggered {role.calls} model decisions{note}"
-    assert transport.wire == [original], (
-        f"after the server acknowledged the declaration the wire got {transport.wire}, not only {[original]}{note}"
-    )
-
-
-@PROPOSAL
-@pytest.mark.asyncio
 async def test_acked_slot_is_not_resent_after_restart(tmp_path):
     journal_dir = tmp_path / "journal"
     slots = Slots()
@@ -389,7 +380,31 @@ async def test_acked_slot_is_not_resent_after_restart(tmp_path):
     assert transport.wire == [], f"after a restart an acknowledged slot was resent: {transport.wire}{note}"
 
 
-@PROPOSAL
+# --- in-process (met by the agent's decision gate; the restart variants above stay proposals) ----
+
+
+@pytest.mark.asyncio
+async def test_acked_slot_is_neither_redecided_nor_resent(tmp_path):
+    """After the server's own-player ack, a same-phase re-snapshot (each reconnect's player-joined ->
+    get-snapshot) must not ask the model or resend: DeclareHandler would answer 'declaration-refused'."""
+    role = ScriptedRole(_declaration(70), _declaration(55))
+    transport = WireTransport()
+    agent, note = _build_agent(
+        role=role, transport=transport, prompts_dir=tmp_path, journal_dir=tmp_path / "journal", slots=Slots()
+    )
+
+    await _deliver(agent, _snapshot(DECLARATION))
+    await _deliver(agent, _declaration_received(5))
+    await _deliver(agent, _declaration_received(PLAYER))
+    await _deliver(agent, _snapshot(DECLARATION))
+
+    original = json.dumps(_declaration(70))
+    assert role.calls == 1, f"an acknowledged slot triggered {role.calls} model decisions{note}"
+    assert transport.wire == [original], (
+        f"after the server acknowledged the declaration the wire got {transport.wire}, not only {[original]}{note}"
+    )
+
+
 @pytest.mark.asyncio
 async def test_unconfirmed_slot_gets_no_new_decision(tmp_path):
     """Sent but not acknowledged (lost ack, or ack not yet seen): whatever the recovery policy (identical

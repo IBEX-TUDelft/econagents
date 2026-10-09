@@ -17,9 +17,12 @@ from econagents.domain.state.fields import EventField
 from econagents.domain.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
 from econagents.runtime import (
     Agent,
+    DecisionGate,
+    DecisionOutcome,
     GameRunner,
     HybridGameRunnerConfig,
     PhaseEngine,
+    PhaseOccurrence,
     TurnBasedGameRunnerConfig,
     create_game_state,
 )
@@ -34,6 +37,8 @@ __all__: list[str] = [
     "Action",
     "Role",
     "AgentContext",
+    "DecisionGate",
+    "DecisionOutcome",
     "YamlExperimentLoader",
     "Event",
     "EventField",
@@ -46,6 +51,7 @@ __all__: list[str] = [
     "MetaInformation",
     "PhaseEngine",
     "PhaseId",
+    "PhaseOccurrence",
     "PlayerId",
     "PrivateInformation",
     "PublicInformation",

@@ -34,6 +34,24 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   restart) are retried with exponential backoff and jitter from
   `reconnect_delay` (default 0.5 s) up to `max_reconnect_delay` (default 30 s),
   all three new `WebSocketTransport` arguments.
+- A re-join no longer repeats a turn-based decision: once the decision for a
+  non-continuous phase occurrence (phase id plus `state.meta.round`) has
+  completed, by sending its action or by returning none, a later transition
+  into the same occurrence, such as the snapshot requested after a reconnect,
+  is logged at INFO and ignored (IBEX-game_suite#8). Before, a second
+  declaration was refused by the server and a second speculation replaced the
+  first. A decision that raised, was dropped as stale, or whose send raised
+  `ConnectionError` is decided again on the next transition. Continuous phases
+  are unchanged.
+
+### Added
+
+- `Agent(decision_gate=...)` takes an optional `DecisionGate` (`is_decided`,
+  `mark_decided`) that the agent consults before a turn-based decision and
+  updates after each completed one, so a store that outlives the process can
+  stop a restarted agent from deciding again. Without one the gate is in
+  memory, per `Agent` instance. `DecisionGate`, `DecisionOutcome` and
+  `PhaseOccurrence` are exported from `econagents`.
 
 ### Changed
 
