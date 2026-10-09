@@ -23,9 +23,24 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A decision that is still in flight when the phase changes is cancelled, and a
   result decided in a phase the agent has left, or after `Agent.stop()`, is
   dropped instead of sent.
+- `WebSocketTransport` authenticates every new connection: after an unexpected
+  (1006) or clean (1001) close it reconnects and sends the `join` (or other
+  `auth_mechanism`) message again before reading, so the server no longer drops
+  everything the agent sends after a reconnect (IBEX-game_suite#8). A connection
+  lost while authenticating is retried instead of stopping the transport.
 
 ### Changed
 
+- **Breaking:** `WebSocketTransport.send()` raises `TransportSendError` (a
+  `ConnectionError` subclass, exported from `econagents.adapters.transport` and
+  `econagents.ports`) when there is no open connection, or when the connection
+  closes or the socket fails while writing the frame. It used to log and return
+  `None`, so a lost message was invisible to the caller. `TransportPort.send()`
+  documents the same contract. `Agent` catches it and logs the action at ERROR
+  as not transmitted, without retrying; code that calls `agent.transport.send()`
+  directly (for example to request a snapshot) must handle `ConnectionError`.
+- `WebSocketTransport.start_listening()` runs one listen loop per transport; a
+  second call while one is active logs a warning and returns.
 - An exception raised by a continuous-phase action is logged at ERROR level with
   its traceback and the loop continues; previously it ended the loop.
 - `Agent.stop()` also cancels an in-flight phase-entry decision.

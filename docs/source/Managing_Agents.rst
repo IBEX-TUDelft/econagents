@@ -78,6 +78,23 @@ is logged and the loop continues.
 it to run another phase's action inline, but must not await
 ``handle_phase_transition``, which raises ``RuntimeError`` inside a decision.
 
+Connection Loss
+---------------
+
+``WebSocketTransport`` reconnects after the connection closes, whether the
+close was abnormal or clean, and authenticates every new connection again
+(``JoinPayloadAuth`` resends the ``join`` message) before reading from it. If
+the server replays the current phase after the re-join while that phase's
+decision or continuous loop is still active, the rule above ignores it, so the
+reconnect does not start a second decision or loop. A replayed turn-based phase
+whose decision already finished is decided again.
+
+``transport.send()`` raises ``TransportSendError``, a ``ConnectionError``, when
+the message was not transmitted. The agent logs such an action at ERROR as not
+transmitted and does not retry it; a continuous phase goes on with its next
+decision. Event handlers that call ``agent.transport.send()`` themselves should
+catch ``ConnectionError``.
+
 Phase Handlers
 --------------
 

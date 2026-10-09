@@ -188,7 +188,8 @@ class Agent(LoggerMixin):
         Decisions are single-flight per agent: this waits until no other decision is in flight, except
         when called from inside a phase handler or role decision, where it runs inline. The result is
         dropped instead of sent if the agent moves to another phase occurrence, or stops, while it is
-        being decided.
+        being decided. If the transport raises ``ConnectionError`` while sending, the action is logged at
+        ERROR as not transmitted and is not retried.
         """
         await self._execute_phase_action(phase, self._phase_epoch)
 
@@ -221,7 +222,11 @@ class Agent(LoggerMixin):
                 f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
             )
             return
-        await self.transport.send(self.message_codec.encode_action(payload))
+        frame = self.message_codec.encode_action(payload)
+        try:
+            await self.transport.send(frame)
+        except ConnectionError as exc:
+            self.logger.error(f"Action decided in phase {phase} was not transmitted ({exc}): {frame}")
 
     async def _continuous_phase_loop(self, phase: PhaseId, epoch: int, entry: asyncio.Task | None = None) -> None:
         """Run repeated actions, after the phase-entry action, while the phase remains active."""

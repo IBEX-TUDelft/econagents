@@ -290,3 +290,37 @@ async def test_phase_transition_from_inside_a_decision_raises(role, tmp_path: Pa
     agent.register_phase_handler("outer", jump)
     with pytest.raises(RuntimeError, match="inside a phase decision"):
         await asyncio.wait_for(agent.handle_phase_transition("outer"), timeout=1)
+
+
+class FailingTransport(FakeTransport):
+    def __init__(self, error: BaseException):
+        super().__init__()
+        self.error = error
+
+    async def send(self, message: str) -> None:
+        self.sent.append(message)
+        raise self.error
+
+
+@pytest.mark.asyncio
+async def test_untransmitted_action_is_logged_at_error_and_not_raised(role, tmp_path: Path, caplog):
+    transport = FailingTransport(ConnectionError("no open connection"))
+    agent = Agent(url="ws://localhost:8765", state=GameState(), role=role, prompts_dir=tmp_path, transport=transport)
+
+    with caplog.at_level(logging.ERROR):
+        await agent.handle_phase_transition("decision")
+
+    assert len(transport.sent) == 1
+    errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert len(errors) == 1
+    assert "not transmitted" in errors[0].message and "no open connection" in errors[0].message
+    assert transport.sent[0] in errors[0].message
+
+
+@pytest.mark.asyncio
+async def test_non_connection_send_error_still_propagates(role, tmp_path: Path):
+    transport = FailingTransport(ValueError("codec bug"))
+    agent = Agent(url="ws://localhost:8765", state=GameState(), role=role, prompts_dir=tmp_path, transport=transport)
+
+    with pytest.raises(ValueError, match="codec bug"):
+        await agent.handle_phase_transition("decision")
