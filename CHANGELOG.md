@@ -4,6 +4,37 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `Agent` makes one decision at a time: the phase-entry action and the
+  continuous-phase loop no longer run two role decisions concurrently, and the
+  loop starts its first delay after the phase-entry action finishes
+  (IBEX-game_suite#6).
+- A repeated phase-transition event for the current phase no longer starts a
+  second continuous loop or a second decision while one is active. The current
+  phase is identified by the phase id plus `state.meta.round` when the state
+  defines one, so a game that reuses a phase id every round still gets a new
+  decision when the round changes. A game whose state has no `meta.round` and
+  that moves to the next round under the same phase id without waiting for the
+  agent's action gets no decision for that round while the old one is in
+  flight; the ignored transition is logged at INFO.
+- A decision that is still in flight when the phase changes is cancelled, and a
+  result decided in a phase the agent has left, or after `Agent.stop()`, is
+  dropped instead of sent.
+
+### Changed
+
+- An exception raised by a continuous-phase action is logged at ERROR level with
+  its traceback and the loop continues; previously it ended the loop.
+- `Agent.stop()` also cancels an in-flight phase-entry decision.
+- `Agent.execute_phase_action()` waits for the agent's single decision slot, and
+  its result is dropped if the phase changes while it is being decided. Called
+  from inside a phase handler or role decision, it runs inline.
+  `Agent.handle_phase_transition()` raises `RuntimeError` when awaited from
+  inside a phase decision instead of deadlocking.
+
 ## [0.2.12] - 2026-09-07
 
 ### Added
