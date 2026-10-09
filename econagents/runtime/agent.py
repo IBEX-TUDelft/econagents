@@ -74,6 +74,9 @@ class Agent(LoggerMixin):
         self.current_phase: PhaseId | None = None
         self.in_continuous_phase = False
         self._continuous_task: asyncio.Task | None = None
+        self._entry_task: asyncio.Task | None = None
+        self._phase_epoch = 0
+        self._decision_lock = asyncio.Lock()
         self._event_handlers: dict[str, list[EventHandler]] = {}
         self._phase_handlers: dict[PhaseId, PhaseHandler] = {
             INTRODUCTION_PHASE: self._handle_introduction,
@@ -103,10 +106,7 @@ class Agent(LoggerMixin):
     async def stop(self) -> None:
         """Stop the agent and transport."""
         self.running = False
-        self.in_continuous_phase = False
-        if self._continuous_task is not None:
-            self._continuous_task.cancel()
-            self._continuous_task = None
+        self._cancel_phase_tasks()
         await self.transport.stop()
 
     async def _raw_message_received(self, raw_message: str) -> None:
@@ -137,43 +137,99 @@ class Agent(LoggerMixin):
             await self.handle_phase_transition(event.data.get(self.phase_identifier_key))
 
     async def handle_phase_transition(self, phase: PhaseId | None) -> None:
-        """Move to a new phase and execute the appropriate action behavior."""
-        if self.in_continuous_phase and phase != self.current_phase:
-            self.in_continuous_phase = False
-            if self._continuous_task is not None:
-                self._continuous_task.cancel()
-                self._continuous_task = None
+        """Move to a new phase and execute the appropriate action behavior.
+
+        A transition into the phase the agent is already in does not start a new decision while
+        one is in flight or while that phase's continuous loop is running. A transition into a
+        different phase cancels the previous phase's pending decision and loop.
+        """
+        if phase == self.current_phase:
+            if self._phase_busy():
+                self.logger.debug(f"Phase {phase} re-entered while its decision or loop is active; ignoring")
+                return
+        else:
+            self._phase_epoch += 1
+            self._cancel_phase_tasks()
 
         self.current_phase = phase
         if phase is None:
             return
 
+        epoch = self._phase_epoch
+        entry = asyncio.create_task(self._execute_phase_action(phase, epoch))
+        self._entry_task = entry
         if self.phase_engine.is_continuous(phase):
             self.in_continuous_phase = True
-            self._continuous_task = asyncio.create_task(self._continuous_phase_loop(phase))
+            self._continuous_task = asyncio.create_task(self._continuous_phase_loop(phase, epoch, entry))
 
-        await self.execute_phase_action(phase)
+        try:
+            await asyncio.wait({entry})
+        except asyncio.CancelledError:
+            entry.cancel()
+            raise
+        if not entry.cancelled():
+            entry.result()
 
     async def execute_phase_action(self, phase: PhaseId) -> None:
-        """Execute one action for a phase."""
-        if phase in self._phase_handlers:
-            payload = await self._phase_handlers[phase](phase, self.state)
-        else:
-            payload = await self.role.handle_phase(phase, self.state, self.prompts_dir)
+        """Execute one action for a phase.
 
-        if payload:
+        Decisions are single-flight per agent: this waits until no other decision is in flight.
+        A result is not sent if the agent has moved to another phase while it was being decided.
+        """
+        await self._execute_phase_action(phase, self._phase_epoch)
+
+    async def _execute_phase_action(self, phase: PhaseId, epoch: int) -> None:
+        async with self._decision_lock:
+            if epoch != self._phase_epoch:
+                self.logger.debug(f"Skipping decision for phase {phase}: the phase ended before it started")
+                return
+
+            if phase in self._phase_handlers:
+                payload = await self._phase_handlers[phase](phase, self.state)
+            else:
+                payload = await self.role.handle_phase(phase, self.state, self.prompts_dir)
+
+            if not payload:
+                return
+            if epoch != self._phase_epoch:
+                self.logger.warning(
+                    f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
+                )
+                return
             await self.transport.send(self.message_codec.encode_action(payload))
 
-    async def _continuous_phase_loop(self, phase: PhaseId) -> None:
-        """Run repeated actions while the current phase remains active."""
+    async def _continuous_phase_loop(self, phase: PhaseId, epoch: int, entry: asyncio.Task | None = None) -> None:
+        """Run repeated actions, after the phase-entry action, while the phase remains active."""
         try:
-            while self.in_continuous_phase:
+            if entry is not None:
+                await asyncio.wait({entry})
+            while self._continuous_phase_active(epoch):
                 await asyncio.sleep(self.phase_engine.next_action_delay())
-                if not self.in_continuous_phase or self.current_phase != phase:
+                if not self._continuous_phase_active(epoch):
                     break
-                await self.execute_phase_action(phase)
+                try:
+                    await self._execute_phase_action(phase, epoch)
+                except Exception:
+                    self.logger.exception(f"Action in continuous phase {phase} failed; continuing")
         except asyncio.CancelledError:
             self.logger.debug(f"Continuous phase {phase} cancelled")
+
+    def _continuous_phase_active(self, epoch: int) -> bool:
+        return self.in_continuous_phase and epoch == self._phase_epoch
+
+    def _phase_busy(self) -> bool:
+        entry_running = self._entry_task is not None and not self._entry_task.done()
+        loop_running = self._continuous_task is not None and not self._continuous_task.done()
+        return entry_running or loop_running or self._decision_lock.locked()
+
+    def _cancel_phase_tasks(self) -> None:
+        self.in_continuous_phase = False
+        current = asyncio.current_task()
+        for task in (self._continuous_task, self._entry_task):
+            if task is not None and task is not current:
+                task.cancel()
+        self._continuous_task = None
+        self._entry_task = None
 
     async def _handle_introduction(self, phase: PhaseId, state: GameState) -> dict[str, Any]:
         """Return the ready message for the standard introduction phase."""

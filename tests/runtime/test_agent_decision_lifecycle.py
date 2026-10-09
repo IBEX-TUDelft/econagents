@@ -251,6 +251,30 @@ async def test_stale_market_result_is_not_submitted_after_phase_change(tmp_path)
         await shutdown(agent, entry)
 
 
+@pytest.mark.asyncio
+async def test_stale_market_result_is_not_submitted_when_market_returns(tmp_path):
+    """market -> next phase -> market: the first market's result is stale even though the phase id matches."""
+    role = GatedRole(gated=True)
+    agent, transport = make_agent(role, tmp_path, delay=3600)
+    entry = asyncio.create_task(agent.on_event(snapshot(MARKET)))
+    await spin()
+    first_gate = role.gate
+    await agent.on_event(snapshot(NEXT_PHASE))
+    role.gate = asyncio.Event()
+    reentry = asyncio.create_task(agent.on_event(snapshot(MARKET)))
+    await spin()
+    first_gate.set()
+    await spin()
+    try:
+        assert transport.post_orders() == [], f"first market epoch's result submitted after re-entry: {transport.sent}"
+        role.gate.set()
+        await spin()
+        assert len(transport.post_orders()) == 1, f"new market epoch's decision not submitted: {transport.sent}"
+    finally:
+        role.gate.set()
+        await shutdown(agent, entry, reentry)
+
+
 # ---------------------------------------------------------------------------
 # Interface-proposal checks (disposition hook, trace, timeout)
 # ---------------------------------------------------------------------------

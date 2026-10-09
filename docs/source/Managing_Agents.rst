@@ -60,6 +60,15 @@ active:
        ),
    )
 
+An agent makes one decision at a time. The phase-entry action and the
+continuous loop share a single decision slot, and the loop waits for the
+phase-entry action to finish before its first delay. A repeated transition into
+the current phase (for example a second snapshot after a reconnect) does not
+start another decision or another loop while one is active. When the phase
+changes, the pending decision is cancelled, and a result decided in a phase the
+agent has since left is logged and dropped instead of sent. An exception raised
+by one continuous-phase action is logged and the loop continues.
+
 Phase Handlers
 --------------
 

@@ -4,6 +4,25 @@ All notable changes to econagents are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `Agent` makes one decision at a time: the phase-entry action and the
+  continuous-phase loop no longer run two role decisions concurrently, and the
+  loop starts its first delay after the phase-entry action finishes
+  (IBEX-game_suite#6).
+- A repeated phase-transition event for the current phase no longer starts a
+  second continuous loop or a second decision while one is active.
+- A decision that is still in flight when the phase changes is cancelled, and a
+  result decided in a phase the agent has left is dropped instead of sent.
+
+### Changed
+
+- An exception raised by a continuous-phase action is logged at ERROR level with
+  its traceback and the loop continues; previously it ended the loop.
+- `Agent.stop()` also cancels an in-flight phase-entry decision.
+
 ## [0.2.12] - 2026-09-07
 
 ### Added
