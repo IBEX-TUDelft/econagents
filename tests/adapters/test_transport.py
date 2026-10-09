@@ -10,7 +10,12 @@ from contextlib import closing
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from econagents.adapters.transport import WebSocketTransport, AuthenticationMechanism, SimpleLoginPayloadAuth
+from econagents.adapters.transport import (
+    AuthenticationMechanism,
+    SimpleLoginPayloadAuth,
+    TransportSendError,
+    WebSocketTransport,
+)
 
 
 def find_free_port():
@@ -287,15 +292,11 @@ class TestWebSocketTransport:
 
     @pytest.mark.asyncio
     async def test_send_message_no_connection(self, transport):
-        """Sending without a connection returns without hanging; a failure may be reported by raising or
-        by returning False (IBEX-game_suite#8), but never as a successful send."""
+        """Sending without a connection raises TransportSendError instead of passing as sent (IBEX-game_suite#8)."""
         transport.ws = None
 
-        try:
-            result = await transport.send("Test message")
-        except Exception:
-            return
-        assert result is None or result is False or getattr(result, "transmitted", None) is False
+        with pytest.raises(TransportSendError):
+            await transport.send("Test message")
 
     @pytest.mark.asyncio
     async def test_receive_message(self, transport, ws_server, mock_callback):

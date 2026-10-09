@@ -5,7 +5,12 @@ econagents: A Python library that lets you use LLM agents in economic experiment
 from econagents.adapters.config import YamlExperimentLoader
 from econagents.adapters.protocol import IbexMessageCodec
 from econagents.adapters.protocol import INTRODUCTION_PHASE, build_message, join_message, ready_message
-from econagents.adapters.transport import JoinPayloadAuth, SimpleLoginPayloadAuth, WebSocketTransport
+from econagents.adapters.transport import (
+    JoinPayloadAuth,
+    SimpleLoginPayloadAuth,
+    TransportSendError,
+    WebSocketTransport,
+)
 from econagents.domain import Action, AgentContext, Event, PhaseId, PlayerId
 from econagents.domain.role import Role
 from econagents.domain.state.fields import EventField
@@ -45,6 +50,7 @@ __all__: list[str] = [
     "PrivateInformation",
     "PublicInformation",
     "SimpleLoginPayloadAuth",
+    "TransportSendError",
     "TurnBasedGameRunnerConfig",
     "WebSocketTransport",
     "build_message",
