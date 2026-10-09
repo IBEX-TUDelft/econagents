@@ -5,11 +5,14 @@ pydantic ``ValidationError`` (json_invalid, EOF) inside the SDK. ``ChatOpenAI.ge
 never reaches ``observability.track_llm_call`` or ``_log_response``, so the finish reason
 (``incomplete_details.reason``) and token usage of the failed call are lost, although the
 ``logger`` contract promises "each full provider response (including reasoning and usage)".
+Counting the call is not enough: the tracked call must carry the finish reason and the usage
+(output/reasoning tokens), in the ``response`` or in the metadata.
 
 The Responses API is served by ``httpx.MockTransport`` behind the real OpenAI SDK; no network.
 """
 
 import logging
+from typing import Any, Iterator
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -75,6 +78,32 @@ def _fake_api(body: dict):
     return patch("openai.AsyncOpenAI", side_effect=factory)
 
 
+def _pairs(obj: Any) -> Iterator[tuple[Any, Any]]:
+    """Every (key, value) pair nested in ``obj``, dumping SDK/pydantic models first."""
+    if hasattr(obj, "model_dump"):
+        try:
+            obj = obj.model_dump()
+        except Exception:  # noqa: BLE001
+            return
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            yield key, value
+            yield from _pairs(value)
+    elif isinstance(obj, (list, tuple)):
+        for value in obj:
+            yield from _pairs(value)
+
+
+def tracked_metadata(observability: MagicMock) -> dict[str, bool]:
+    """Whether the tracked calls carry the truncated response's finish reason and usage (anywhere in args)."""
+    pairs = [pair for call in observability.track_llm_call.call_args_list for pair in _pairs([call.args, call.kwargs])]
+    return {
+        "finish reason max_output_tokens": any(value == "max_output_tokens" for _, value in pairs),
+        "output_tokens=4000": ("output_tokens", 4000) in pairs,
+        "reasoning_tokens=3990": ("reasoning_tokens", 3990) in pairs,
+    }
+
+
 async def _call(body: dict, logger: logging.Logger):
     llm = ChatOpenAI(response_kwargs={"max_output_tokens": 4000})
     llm.observability = MagicMock()
@@ -94,7 +123,7 @@ async def test_truncated_structured_response_still_reaches_the_logger(caplog):
     with caplog.at_level(logging.DEBUG, logger=name):
         await _call(_body(TRUNCATED), logging.getLogger(name))
     logged = "\n".join(r.getMessage() for r in caplog.records if r.name == name)
-    assert "max_output_tokens" in logged and "4000" in logged, (
+    assert "max_output_tokens" in logged and "4000" in logged and "3990" in logged, (
         "the truncated response's finish reason and usage were never logged (SDK raised before _log_response); "
         f"logger got: {logged!r}"
     )
@@ -107,3 +136,5 @@ async def test_truncated_structured_response_still_reaches_observability():
         "observability.track_llm_call was skipped for the truncated call "
         f"(calls={observability.track_llm_call.call_count}): its usage is lost"
     )
+    carried = tracked_metadata(observability)
+    assert all(carried.values()), f"the tracked call lost the truncated response's metadata: {carried}"
