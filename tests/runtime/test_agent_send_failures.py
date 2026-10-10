@@ -8,7 +8,9 @@ production ``WebSocketTransport`` it builds itself.
 Logging is not a criterion: the Agent hands its own logger to the transport, so the failed send is
 already logged at ERROR on the agent logger today ("Error sending message."), and the issue requires
 infrastructure errors to be "surfaced to the caller or recorded ... never only logged". The caller
-must see the failure: ``execute_phase_action`` raises, or returns an explicit ``False``.
+must see the failure: ``execute_phase_action`` raises, returns an explicit ``False``, or returns a
+result whose ``transmitted`` attribute is ``False`` (the vocabulary of
+``tests/adapters/test_transport_send_failures.py``).
 """
 
 import logging
@@ -46,7 +48,9 @@ async def _outcome(agent: Agent) -> str:
         result = await agent.execute_phase_action("market")
     except Exception as exc:  # noqa: BLE001
         return f"raised {type(exc).__name__}"
-    return "returned False" if result is False else f"returned {result!r}"
+    if result is False or getattr(result, "transmitted", None) is False:
+        return "returned False"
+    return f"returned {result!r}"
 
 
 @pytest.mark.asyncio
