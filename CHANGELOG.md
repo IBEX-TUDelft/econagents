@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-10
+
 ### Changed
 
 - `max_game_duration` now bounds gameplay only: the `GameRunner` watchdog
@@ -260,6 +262,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.4.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.12...v0.3.0
 [0.2.12]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.10...v0.2.11
