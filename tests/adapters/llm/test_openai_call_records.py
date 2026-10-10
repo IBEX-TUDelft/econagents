@@ -1,4 +1,4 @@
-"""``ChatOpenAI`` reports each provider response to ``capture_llm_calls``, including unparseable ones.
+"""``ChatOpenAI`` reports each provider response to ``capture_llm_calls``, including unparsable ones.
 
 The Responses API is served by ``httpx.MockTransport`` behind the real OpenAI SDK; no network.
 The record API is imported inside each test so that, against an econagents without it, the tests fail
@@ -103,7 +103,7 @@ async def test_completed_structured_response_is_recorded():
 
 
 @pytest.mark.asyncio
-async def test_unparseable_structured_response_is_recorded_and_the_error_reraised():
+async def test_unparsable_structured_response_is_recorded_and_the_error_reraised():
     text = '{"reasoning": "cut off'
     with _fake_api(_body("incomplete", text, "max_output_tokens")), _api().capture_llm_calls() as calls:
         with pytest.raises(ValidationError):
