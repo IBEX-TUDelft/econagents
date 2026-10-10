@@ -191,4 +191,21 @@ Runner Supervision
 ``GameRunner`` supervises agents. It assigns per-agent loggers, starts all
 agents concurrently, enforces ``max_game_duration``, and stops running
 agents during cleanup. Agent construction belongs in code or YAML assembly;
-the runner does not build or mutate agents.
+the runner does not build agents. It only registers one event handler per
+agent on the agent's phase event, to follow the phase for its timeout clock.
+
+``max_game_duration`` bounds gameplay, not waiting for players. Time spent
+in ``pre_game_phases`` (default ``{"introduction"}``) does not count, so a
+human who joins or readies late does not use up the agents' budget. The clock
+starts at the first phase outside that set that any agent reports, logs
+``Gameplay started (phase=...)`` once, and pauses in a later round's pre-game
+phase without resetting. Phases are tracked per round (``state.meta.round``,
+or the event's ``round``), so a replayed phase after a join or reconnect
+changes nothing. If no agent reports a phase, the budget counts from the start
+of the run, as before.
+
+The wait before gameplay is unbounded by default. Set
+``max_pre_game_duration`` to stop the run when the pre-game wait, summed over
+the run, exceeds it; that timeout is logged as ``pre-game wait timeout``.
+After a run, ``runner.timeout_reason`` is ``"gameplay"``, ``"pre_game"`` or
+``None``.
