@@ -263,3 +263,35 @@ The wait before gameplay is unbounded by default. Set
 the run, exceeds it; that timeout is logged as ``pre-game wait timeout``.
 After a run, ``runner.timeout_reason`` is ``"gameplay"``, ``"pre_game"`` or
 ``None``.
+
+Agent Logs and Identity
+-----------------------
+
+With ``logs_dir`` set, the runner writes ``game_<id>/agent_<n>.log`` per agent,
+tags its records ``[AGENT n]`` in ``all.log``, and names both by the agent's
+player number when ``state.meta.player_number`` is set at launch. An agent
+without one uses its launch index (offset past the largest player number if it
+would collide with a seat's file). ``agent_log_naming="launch-index"`` keeps
+launch-index names for every agent.
+
+The first line of every agent log is a JSON identity header
+(``"record": "agent-identity"``) with ``trace_schema_version``, ``run_id``
+(``GameRunnerConfig.run_id``), ``game_id``, ``player_number``, ``role``,
+``seat_kind``, ``agent_instance_id``, ``launch_index`` and ``log_naming``. The
+log is appended to, not truncated: a replacement agent for the same seat (a
+second runner with the same ``logs_dir``) adds its own header with a new
+``agent_instance_id`` and keeps the earlier instance's records.
+
+The header holds the configured seat. Once the server confirms it, the agent
+logs an ``Identity bound`` record and exposes ``agent.bound_identity`` (also
+``transport.bound_identity`` on ``WebSocketTransport``). The agent takes it
+from the snapshot's own ``playerNumber`` and ``role``, else from the first
+``player-joined`` received after each join, else from the roster entry with
+its recovery token. An agent launched without a player number gets it this
+way. If the server binds a configured agent to another seat or role, the agent
+logs ``identity-mismatch``, sets ``agent.identity_error`` and stops.
+
+Each model call made by the default ``Role`` LLM path is written as one JSON
+line to ``agent_<n>.model_calls.jsonl``: the messages as sent and, for every
+provider response the adapter reports, its id, model, finish reason, usage and
+raw text (see ``capture_llm_calls``).

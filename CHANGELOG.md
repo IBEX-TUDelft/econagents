@@ -6,6 +6,42 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Every agent log starts with a JSON identity header (`trace_schema_version`,
+  `run_id`, `game_id`, `player_number`, `role`, `seat_kind`,
+  `agent_instance_id`, `launch_index`, `log_naming`). `GameRunnerConfig.run_id`
+  is recorded in it, and `Agent.instance_id` identifies each agent instance
+  (IBEX-game_suite#10).
+- `Agent.bound_identity` (a `PlayerIdentity`) is the seat the server bound the
+  agent to, taken from the snapshot's own `playerNumber`/`role`, else the first
+  `player-joined` after each join, else the recovery-token roster match; the
+  agent logs it as an `identity-bound` record. `WebSocketTransport` exposes
+  `bound_identity` and `connection_epoch`. A configured agent the server binds
+  to another seat or role logs `identity-mismatch`, sets
+  `Agent.identity_error` and stops (IBEX-game_suite#10).
+- The default `Role` LLM path writes one JSON `model-call` record per call to
+  `agent_<n>.model_calls.jsonl` (messages as sent, response id, model, finish
+  reason, usage, raw output) at INFO; previously prompts were logged only at
+  DEBUG and the provider metadata was lost (IBEX-game_suite#10).
+- `LLMCallRecord.response_id` and `LLMCallRecord.messages` (the request input
+  as sent).
+
+### Changed
+
+- Agent logs are named `agent_<player_number>.log` and tagged
+  `[AGENT <player_number>]` when the agent's state has a player number at
+  launch; previously the launch index was used, so a human seat shifted every
+  later agent's file. Agents without a player number keep the launch index.
+  `GameRunnerConfig.agent_log_naming="launch-index"` restores the old names
+  (IBEX-game_suite#10).
+- Agent logs are appended to instead of truncated, so a replacement instance
+  for the same seat keeps the earlier instance's records.
+- `capture_llm_calls` blocks nest: a record is added to every enclosing block,
+  not only the innermost.
+- `GameRunner.run_game` raises `ValueError` when two agents are configured for
+  the same player number.
+
 ## [0.5.1] - 2026-10-10
 
 ### Changed

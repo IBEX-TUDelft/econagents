@@ -99,7 +99,18 @@ async def test_completed_structured_response_is_recorded():
         result = await _llm().get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision)
 
     assert result == _Decision(reasoning="r", price=10)
-    assert calls == [api.LLMCallRecord("openai", "gpt-5.4-mini", "completed", USAGE, text, None)]
+    assert calls == [
+        api.LLMCallRecord(
+            "openai",
+            "gpt-5.4-mini",
+            "completed",
+            USAGE,
+            text,
+            None,
+            response_id="resp_1",
+            messages=[{"role": "user", "content": "x"}],
+        )
+    ]
 
 
 @pytest.mark.asyncio
@@ -177,3 +188,14 @@ async def test_calls_inside_wait_for_are_collected_and_nothing_leaks_outside():
 def test_report_without_capture_is_a_no_op():
     api = _api()
     api.report_llm_call(api.LLMCallRecord("openai", None, None, None, None))
+
+
+def test_nested_captures_each_receive_the_record():
+    api = _api()
+    record = api.LLMCallRecord("openai", None, None, None, None)
+    with api.capture_llm_calls() as outer:
+        with api.capture_llm_calls() as inner:
+            api.report_llm_call(record)
+        api.report_llm_call(record)
+    assert inner == [record]
+    assert outer == [record, record]

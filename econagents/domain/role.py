@@ -1,11 +1,15 @@
+import json
 import logging
 import re
 from abc import ABC
+from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Generic, Optional, Pattern, Protocol, Type, TypeVar, Union
 
 from pydantic import BaseModel
 
+from econagents.adapters.llm.call_records import capture_llm_calls
 from econagents.domain.logging import LoggerMixin
 from econagents.domain.messages import PhaseId
 from econagents.domain.state.game import GameStateProtocol
@@ -472,20 +476,75 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
 
         tool_kwargs = self._build_tool_kwargs(phase, state)
 
+        response: Any = None
+        error: Optional[Exception] = None
+        with capture_llm_calls() as calls:
+            try:
+                response = await self.llm.get_response(
+                    messages=messages,
+                    tracing_extra={
+                        "state": state.model_dump(),
+                    },
+                    response_schema=self.get_response_schema(phase),
+                    logger=self.logger,
+                    **tool_kwargs,
+                )
+            except Exception as e:
+                error = e
+        self._record_model_call(phase, state, messages, calls, response, error)
+        if error is not None:
+            self.logger.error(f"Error getting LLM response: {error}")
+            return {"error": str(error), "phase": phase}
         try:
-            response = await self.llm.get_response(
-                messages=messages,
-                tracing_extra={
-                    "state": state.model_dump(),
-                },
-                response_schema=self.get_response_schema(phase),
-                logger=self.logger,
-                **tool_kwargs,
-            )
             return self.parse_phase_llm_response(response, state)
         except Exception as e:
             self.logger.error(f"Error getting LLM response: {e}")
             return {"error": str(e), "phase": phase}
+
+    @property
+    def model_call_logger(self) -> logging.Logger:
+        """Logger for model-call records: a ``model_calls`` child of the role's logger.
+
+        ``GameRunner`` writes it to ``agent_<id>.model_calls.jsonl`` next to the agent log.
+        """
+        return logging.getLogger(f"{self.logger.name}.model_calls")
+
+    def _record_model_call(
+        self,
+        phase: PhaseId,
+        state: StateT_contra,
+        messages: list[Any],
+        calls: list[Any],
+        response: Any,
+        error: Optional[Exception],
+    ) -> None:
+        """Log what was sent to the model and what it returned, as one JSON line at INFO.
+
+        Holds the messages as sent and, per provider response the adapter reported, its id, model,
+        finish reason, usage and raw text. An adapter that reports nothing leaves ``calls`` empty, and
+        a text response is kept as ``raw_output``.
+        """
+        record = {
+            "record": "model-call",
+            "trace_schema_version": 1,
+            "recorded_at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+            "game_id": getattr(state.meta, "game_id", None),
+            "player_number": getattr(state.meta, "player_number", None),
+            "role": self.name,
+            "phase": phase,
+            "messages": messages,
+            "calls": [
+                {k: v for k, v in asdict(call).items() if not (k == "messages" and v == messages)} for call in calls
+            ],
+            "raw_output": response if isinstance(response, str) else None,
+            "error": f"{type(error).__name__}: {error}" if error is not None else None,
+        }
+        try:
+            line = json.dumps(record, default=str)
+        except (TypeError, ValueError) as exc:
+            self.logger.warning(f"Model call not recorded: {exc}")
+            return
+        self.model_call_logger.info(line)
 
     def _build_tool_kwargs(self, phase: PhaseId, state: StateT_contra) -> dict[str, Any]:
         """Build the ``tools``/``tool_executor`` kwargs for the LLM call.
