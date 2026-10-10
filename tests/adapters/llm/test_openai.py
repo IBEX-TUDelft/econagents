@@ -92,7 +92,9 @@ class TestChatOpenAI:
         mock_response.output_parsed = parsed
 
         mock_client = MagicMock()
-        mock_client.responses.parse = AsyncMock(return_value=mock_response)
+        raw_response = MagicMock()
+        raw_response.parse.return_value = mock_response
+        mock_client.responses.with_raw_response.parse = AsyncMock(return_value=raw_response)
 
         with (
             patch("importlib.util.find_spec", return_value=True),
@@ -109,8 +111,8 @@ class TestChatOpenAI:
             )
 
             assert response is parsed
-            mock_client.responses.parse.assert_called_once()
-            call_kwargs = mock_client.responses.parse.call_args.kwargs
+            mock_client.responses.with_raw_response.parse.assert_called_once()
+            call_kwargs = mock_client.responses.with_raw_response.parse.call_args.kwargs
             assert call_kwargs["text_format"] is _SampleSchema
             assert call_kwargs["model"] == "gpt-4.1-mini"
             assert call_kwargs["input"] == messages
