@@ -26,6 +26,26 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   DEBUG and the provider metadata was lost (IBEX-game_suite#10).
 - `LLMCallRecord.response_id` and `LLMCallRecord.messages` (the request input
   as sent).
+- `Agent(disposition_tracker=...)`: a `DispositionTracker` announces which
+  submissions await a server disposition and maps events to dispositions; the
+  agent's next decision, in any phase, waits until the previous submission has
+  one (IBEX-game_suite#22). A hold needs none, and each decision has its own
+  `decision_id`, so a later decision may send an identical payload.
+  `disposition_timeout` records a missing answer as `"unknown"`;
+  `on_unknown="block"` (default) holds decisions until the next phase
+  transition event reconciles, calling `reconcile_request` a bounded number of
+  times (`reconcile_retry_interval`, `reconcile_retry_limit`), while
+  `"continue"` only records it.
+- `Agent(decision_trace=...)` receives one record per settled decision: id,
+  phase, round, phase epoch, input and send revisions, whether the input
+  changed during the call, the submitted frame, status and disposition
+  (`"stale-phase"` for a result dropped at a phase change, also when the
+  decision was cancelled by it).
+- `Agent(decision_input="guard-discard" | "guard-rerun")` drops, or decides
+  once more, when the state's revision (`input_revision`, default
+  `state_revision`) changed during the decision; the dropped action's outcome
+  status is `"superseded"`. `ActionOutcome` gains `decision_id` and
+  `disposition`.
 
 ### Changed
 
@@ -41,6 +61,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   not only the innermost.
 - `GameRunner.run_game` raises `ValueError` when two agents are configured for
   the same player number.
+- Roles and phase handlers decide on a deep copy of the state taken when the
+  decision starts (`decision_input="frozen"`, the default), so events that
+  arrive during a model call no longer change its input
+  (IBEX-game_suite#22). Behaviour change: a role or handler that mutated the
+  state it was given no longer changes the agent's state; mutate
+  `agent.state` instead.
 
 ## [0.5.1] - 2026-10-10
 

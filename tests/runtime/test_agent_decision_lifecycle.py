@@ -7,16 +7,16 @@ continuous phase.
 
 Test groups:
 
-* behavioral: bugs observable through the current public API.
-* interface proposal: generic disposition hooks that do not exist yet. The proposed shape is
-  ``Agent(disposition_tracker=..., disposition_timeout=..., decision_trace=...)`` where the tracker
+* behavioral: bugs observable through the public API (fixed in 0.3.0, IBEX-game_suite#6).
+* interface proposal: the disposition hooks
+  ``Agent(disposition_tracker=..., disposition_timeout=..., decision_trace=...)``, where the tracker
   has ``submitted(decision_id, message, state) -> bool`` (True: wait for a disposition) and
-  ``observe(event, state) -> list[(decision_id, disposition)]``.
-* decision-gated: behavior that depends on an open researcher/server decision.
+  ``observe(event, state) -> list[(decision_id, disposition)]`` (IBEX-game_suite#22).
+* decision-gated: behavior that depended on an open researcher decision, encoded as the assumed
+  answers (IBEX-game_suite#22, pending Rutger/Sander): an ``unknown`` disposition blocks until a
+  snapshot reconciles (R4, ``on_unknown="block"``), and the decision input is a frozen copy (R5,
+  ``decision_input="frozen"``). Invert or rewrite them if the decision differs.
 * guard: behavior that already works and that a fix must keep.
-
-Proposal and decision-gated tests are strict xfails so the suite stays green until they are
-implemented; the reproduction harness runs them with ``--runxfail``.
 """
 
 import asyncio
@@ -37,14 +37,6 @@ BID = {
     "payload": {"sender": 2, "type": "bid", "price": 6421.5, "timestamp": 0, "now": False},
 }
 TICKS = 50
-PROPOSAL = pytest.mark.xfail(
-    strict=True,
-    reason="interface proposal (IBEX-game_suite#6): the Agent disposition hooks are not implemented yet",
-)
-GATED = pytest.mark.xfail(
-    strict=True,
-    reason="decision-gated (IBEX-game_suite#6): waits on an open researcher/server decision",
-)
 
 
 class FakeTransport:
@@ -291,7 +283,6 @@ async def test_stale_market_result_is_not_submitted_when_market_returns(tmp_path
 # ---------------------------------------------------------------------------
 
 
-@PROPOSAL
 @pytest.mark.asyncio
 async def test_proposal_next_decision_waits_for_disposition(tmp_path):
     """No second decision/submission until the previous submission has a disposition; then exactly one more."""
@@ -318,7 +309,6 @@ async def test_proposal_next_decision_waits_for_disposition(tmp_path):
         await shutdown(agent, entry)
 
 
-@PROPOSAL
 @pytest.mark.asyncio
 async def test_proposal_trace_links_decision_to_input_submission_and_disposition(tmp_path):
     """One trace record per decision: id, phase, epoch, input revision, submission bytes, disposition."""
@@ -345,7 +335,6 @@ async def test_proposal_trace_links_decision_to_input_submission_and_disposition
         await shutdown(agent, entry)
 
 
-@PROPOSAL
 @pytest.mark.asyncio
 async def test_proposal_stale_phase_result_is_recorded_not_sent(tmp_path):
     """The discarded stale result is kept in the trace with disposition 'stale-phase'."""
@@ -368,7 +357,6 @@ async def test_proposal_stale_phase_result_is_recorded_not_sent(tmp_path):
         await shutdown(agent, entry)
 
 
-@PROPOSAL
 @pytest.mark.asyncio
 async def test_proposal_missing_disposition_times_out_as_unknown(tmp_path):
     """A silent server drop ends in the configured timeout as 'unknown', never as accepted."""
@@ -397,7 +385,6 @@ async def test_proposal_missing_disposition_times_out_as_unknown(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-@GATED
 @pytest.mark.asyncio
 async def test_gated_unknown_disposition_blocks_until_snapshot_reconciles(tmp_path):
     """Option under discussion: after an 'unknown' disposition, wait for a reconciling snapshot."""
@@ -422,7 +409,6 @@ async def test_gated_unknown_disposition_blocks_until_snapshot_reconciles(tmp_pa
         await shutdown(agent, entry)
 
 
-@GATED
 @pytest.mark.asyncio
 async def test_gated_decision_input_is_frozen_while_in_flight(tmp_path):
     """Option under discussion: the role sees a frozen input copy, not live state mutated mid-decision."""
