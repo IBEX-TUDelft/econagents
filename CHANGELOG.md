@@ -6,6 +6,28 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `Agent.execute_phase_action` returns an `ActionOutcome` (`sent`,
+  `not-transmitted`, `stale`, `no-action` or `skipped`, with the payload,
+  frame and send error), and `Agent.register_action_listener` receives the
+  outcome of every decision, including those started by phase transitions and
+  the continuous loop. A failed send is therefore visible to the caller and to
+  listeners, not only logged (IBEX-game_suite#7).
+- `LLMCallRecord` and `econagents.adapters.llm.capture_llm_calls`: `ChatOpenAI`
+  reports the finish reason (`completed` or the incomplete reason, such as
+  `max_output_tokens`), token usage and raw text of every provider response
+  (IBEX-game_suite#7).
+
+### Fixed
+
+- `ChatOpenAI` now tracks and logs a response whose structured output fails to
+  parse (for example JSON truncated at `max_output_tokens`) before re-raising
+  the SDK's `ValidationError`; previously the call never reached
+  observability or the logger, so its finish reason and usage were lost. The
+  forced final answer after `max_tool_iterations` is now tracked too.
+  Structured requests go through `client.responses.with_raw_response.parse`.
+
 ## [0.4.0] - 2026-10-10
 
 ### Changed
