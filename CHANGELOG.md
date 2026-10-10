@@ -6,6 +6,11 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Spelled "unparsable" in the `ChatOpenAI` call record tests so the codespell
+  pre-commit hook passes. No library code changed.
+
 ## [0.5.1] - 2026-10-10
 
 ### Changed
