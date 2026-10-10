@@ -1,6 +1,8 @@
 """``ChatOpenAI`` reports each provider response to ``capture_llm_calls``, including unparseable ones.
 
 The Responses API is served by ``httpx.MockTransport`` behind the real OpenAI SDK; no network.
+The record API is imported inside each test so that, against an econagents without it, the tests fail
+instead of erroring at collection (IBEX-game_suite#7).
 """
 
 import asyncio
@@ -12,7 +14,6 @@ import openai
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from econagents.adapters.llm import LLMCallRecord, capture_llm_calls, report_llm_call
 from econagents.adapters.llm.openai import ChatOpenAI
 
 
@@ -69,6 +70,13 @@ def _fake_api(body: dict):
     return patch("openai.AsyncOpenAI", side_effect=factory)
 
 
+def _api():
+    from econagents.adapters import llm
+
+    assert hasattr(llm, "capture_llm_calls"), "econagents.adapters.llm has no capture_llm_calls"
+    return llm
+
+
 def _llm() -> ChatOpenAI:
     llm = ChatOpenAI()
     llm.observability = MagicMock()
@@ -80,18 +88,19 @@ USAGE = {"input_tokens": 10, "output_tokens": 20, "reasoning_tokens": 5}
 
 @pytest.mark.asyncio
 async def test_completed_structured_response_is_recorded():
+    api = _api()
     text = '{"reasoning": "r", "price": 10}'
-    with _fake_api(_body("completed", text)), capture_llm_calls() as calls:
+    with _fake_api(_body("completed", text)), _api().capture_llm_calls() as calls:
         result = await _llm().get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision)
 
     assert result == _Decision(reasoning="r", price=10)
-    assert calls == [LLMCallRecord("openai", "gpt-5.4-mini", "completed", USAGE, text, None)]
+    assert calls == [api.LLMCallRecord("openai", "gpt-5.4-mini", "completed", USAGE, text, None)]
 
 
 @pytest.mark.asyncio
 async def test_unparseable_structured_response_is_recorded_and_the_error_reraised():
     text = '{"reasoning": "cut off'
-    with _fake_api(_body("incomplete", text, "max_output_tokens")), capture_llm_calls() as calls:
+    with _fake_api(_body("incomplete", text, "max_output_tokens")), _api().capture_llm_calls() as calls:
         with pytest.raises(ValidationError):
             await _llm().get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision)
 
@@ -102,7 +111,7 @@ async def test_unparseable_structured_response_is_recorded_and_the_error_reraise
 
 @pytest.mark.asyncio
 async def test_reasoning_only_response_is_recorded_without_output():
-    with _fake_api(_body("incomplete", None, "max_output_tokens")), capture_llm_calls() as calls:
+    with _fake_api(_body("incomplete", None, "max_output_tokens")), _api().capture_llm_calls() as calls:
         result = await _llm().get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision)
 
     assert result is None
@@ -111,7 +120,7 @@ async def test_reasoning_only_response_is_recorded_without_output():
 
 @pytest.mark.asyncio
 async def test_plain_text_response_is_recorded():
-    with _fake_api(_body("completed", "hello")), capture_llm_calls() as calls:
+    with _fake_api(_body("completed", "hello")), _api().capture_llm_calls() as calls:
         result = await _llm().get_response([{"role": "user", "content": "x"}], {})
 
     assert result == "hello"
@@ -122,7 +131,7 @@ async def test_plain_text_response_is_recorded():
 async def test_calls_inside_wait_for_are_collected_and_nothing_leaks_outside():
     text = '{"reasoning": "r", "price": 1}'
     with _fake_api(_body("completed", text)):
-        with capture_llm_calls() as calls:
+        with _api().capture_llm_calls() as calls:
             await asyncio.wait_for(
                 _llm().get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision), 5
             )
@@ -132,4 +141,5 @@ async def test_calls_inside_wait_for_are_collected_and_nothing_leaks_outside():
 
 
 def test_report_without_capture_is_a_no_op():
-    report_llm_call(LLMCallRecord("openai", None, None, None, None))
+    api = _api()
+    api.report_llm_call(api.LLMCallRecord("openai", None, None, None, None))
