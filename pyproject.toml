@@ -30,10 +30,10 @@ econagents = "econagents.cli:run_cli"
 ollama = ["ollama>=0.5.1"]
 langsmith = ["langsmith>=0.4.1"]
 langfuse = ["langfuse>=3.0.3"]
-monty = ["pydantic-monty>=0.0.18"]
+monty = ["pydantic-monty>=1.0.0,<2"]
 standard = ["langsmith>=0.4.1"]
 examples = ["python-dotenv>=1.2.1,<2"]
-all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3", "pydantic-monty>=0.0.18", "python-dotenv>=1.2.1,<2"]
+all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3", "pydantic-monty>=1.0.0,<2", "python-dotenv>=1.2.1,<2"]
 
 [dependency-groups]
 docs = [
@@ -53,11 +53,11 @@ dev = [
     "python-dotenv>=1.2.1,<2",
     "jupyter>=1.1.1,<2",
     "nest-asyncio>=1.6.0,<2",
-    "ruff>=0.14.3,<0.15",
+    "ruff>=0.16.2,<0.17",
     "types-requests>=2.32.4.20250913,<3",
     "pytest-asyncio>=1.2.0,<2",
     "types-pyyaml>=6.0.12.20250915,<7",
-    "pydantic-monty>=0.0.18",
+    "pydantic-monty>=1.0.0,<2",
 ]
 debug = [
     "ipdb>=0.13.9",
@@ -143,6 +143,7 @@ exclude = [
 line-length = 120
 
 [tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 ignore = [
     "B905",  # zip strict=True; remove once python <3.10 support is dropped.
     "D100",

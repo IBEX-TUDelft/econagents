@@ -6,6 +6,17 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The `monty` extra now requires `pydantic-monty>=1.0.0,<2`.
+  `PythonExecutionTool` runs each call in a fresh session checked out of a
+  single-worker `AsyncMonty` pool, because 1.0 executes code in subprocess
+  workers and dropped the one-shot `Monty(code).run_async()` API.
+- Bumped ruff to 0.16 (dev group and pre-commit hook) and pinned the lint
+  selection to the previous default rule set (`E4`, `E7`, `E9`, `F`), since
+  0.16 enables a broader default set. Refreshed pydantic, pytest-asyncio and
+  websockets in the lockfile.
+
 ## [0.5.0] - 2026-10-10
 
 ### Added

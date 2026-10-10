@@ -61,8 +61,9 @@ class PythonExecutionTool(BaseTool):
 
         stdout = pydantic_monty.CollectString()
         try:
-            runner = pydantic_monty.Monty(arguments.code, type_check=self._type_check)
-            result = await runner.run_async(print_callback=stdout)
+            async with pydantic_monty.AsyncMonty(max_processes=1) as pool:
+                async with pool.checkout(type_check=self._type_check) as session:
+                    result = await session.feed_run(arguments.code, print_callback=stdout)
             return {"result": repr(result), "stdout": stdout.output}
         except Exception as exc:  # noqa: BLE001 - returned to the model, not raised
             if ctx.logger is not None:
