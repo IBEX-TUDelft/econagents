@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-10
+
 ### Changed
 
 - The `monty` extra now requires `pydantic-monty>=1.0.0,<2`.
@@ -300,6 +302,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.5.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.2.12...v0.3.0
