@@ -108,6 +108,60 @@ transmitted and does not retry it; a continuous phase goes on with its next
 decision. Event handlers that call ``agent.transport.send()`` themselves should
 catch ``ConnectionError``.
 
+Action Outcomes
+---------------
+
+``agent.execute_phase_action(phase)`` returns an ``ActionOutcome`` (``from
+econagents import ActionOutcome``) saying what became of the decision. Its
+``status`` is ``"sent"``, ``"not-transmitted"`` (the transport raised
+``ConnectionError``, kept in ``error``), ``"stale"`` (the decision finished
+after the agent left the phase occurrence, so nothing was sent),
+``"no-action"`` or ``"skipped"``; ``transmitted`` is ``True`` only for
+``"sent"``. To record outcomes of every decision, including the ones started
+by phase transitions and the continuous loop, register a listener:
+
+.. code-block:: python
+
+   def on_action(outcome):
+       if not outcome.transmitted and outcome.payload:
+           journal.add(outcome.phase, outcome.status, outcome.payload)
+
+   agent.register_action_listener(on_action)
+
+Listeners may be async. They run after the send attempt, inside the
+agent's single-flight decision; an exception in a listener is logged and
+ignored.
+
+Model Call Metadata
+-------------------
+
+``ChatOpenAI`` reports the finish reason, token usage and raw text of every
+provider response it receives as an ``LLMCallRecord``, also when a structured
+output fails to parse (for example JSON cut off at ``max_output_tokens``, where
+the SDK raises a pydantic ``ValidationError`` that ``get_response`` re-raises).
+That response is also tracked by the observability provider and logged to the
+``logger`` passed to ``get_response``. Collect the records with
+``capture_llm_calls``:
+
+.. code-block:: python
+
+   from econagents.adapters.llm import capture_llm_calls
+
+   with capture_llm_calls() as calls:
+       response = await llm.get_response(messages, tracing_extra={}, response_schema=Decision)
+   calls[-1].finish_reason  # "completed", "max_output_tokens", ...
+   calls[-1].usage          # {"input_tokens": ..., "output_tokens": ..., "reasoning_tokens": ...}
+
+When the HTTP body is not a Responses API payload at all (for example an HTML
+page from a proxy, served with status 200), no model output was received: the
+record has ``response_error`` set instead of ``parse_error``, and the original
+decoding error is re-raised. ``parse_error`` therefore means the model answered
+and its output did not fit the schema; ``response_error`` means the call itself
+failed.
+
+Adapters other than ``ChatOpenAI`` do not report records yet, so the list stays
+empty for them.
+
 Decision Gate
 -------------
 

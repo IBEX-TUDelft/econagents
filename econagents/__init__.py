@@ -16,6 +16,7 @@ from econagents.domain.role import Role
 from econagents.domain.state.fields import EventField
 from econagents.domain.state.game import GameState, MetaInformation, PrivateInformation, PublicInformation
 from econagents.runtime import (
+    ActionOutcome,
     Agent,
     DecisionGate,
     DecisionOutcome,
@@ -33,6 +34,7 @@ except ImportError:
     __version__ = "0.0.0+unknown"
 
 __all__: list[str] = [
+    "ActionOutcome",
     "Agent",
     "Action",
     "Role",

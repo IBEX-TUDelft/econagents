@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal, Optional
 
 from econagents.adapters.protocol import INTRODUCTION_PHASE, IbexMessageCodec, ready_message
 from econagents.adapters.parsing import JsonResponseParser
@@ -22,6 +23,33 @@ from econagents.ports.transport import TransportPort
 
 PhaseHandler = Callable[[PhaseId, GameState], Any]
 EventHandler = Callable[[Event], Any]
+
+ActionStatus = Literal["sent", "not-transmitted", "stale", "no-action", "skipped"]
+
+
+@dataclass(frozen=True)
+class ActionOutcome:
+    """What became of one phase decision.
+
+    ``status`` is ``"sent"`` when the transport accepted the frame, ``"not-transmitted"`` when it raised
+    ``ConnectionError`` (``error`` holds it), ``"stale"`` when the decision finished after the agent had
+    moved to another phase occurrence or stopped (nothing is sent), ``"no-action"`` when the handler or
+    role returned no action, and ``"skipped"`` when the phase ended before the decision started.
+    """
+
+    phase: PhaseId
+    status: ActionStatus
+    payload: Optional[dict[str, Any]] = None
+    frame: Optional[str] = None
+    error: Optional[BaseException] = None
+
+    @property
+    def transmitted(self) -> bool:
+        """Whether the action's frame was handed to the transport without error."""
+        return self.status == "sent"
+
+
+ActionListener = Callable[[ActionOutcome], Any]
 
 
 class Agent(LoggerMixin):
@@ -93,6 +121,7 @@ class Agent(LoggerMixin):
         self._decision_lock = asyncio.Lock()
         self._decision_owner: asyncio.Task | None = None
         self._event_handlers: dict[str, list[EventHandler]] = {}
+        self._action_listeners: list[ActionListener] = []
         self._phase_handlers: dict[PhaseId, PhaseHandler] = {
             INTRODUCTION_PHASE: self._handle_introduction,
         }
@@ -105,6 +134,15 @@ class Agent(LoggerMixin):
     def register_event_handler(self, event_type: str, handler: EventHandler) -> "Agent":
         """Register a handler that runs after state projection."""
         self._event_handlers.setdefault(event_type, []).append(handler)
+        return self
+
+    def register_action_listener(self, listener: ActionListener) -> "Agent":
+        """Register a callback that receives the ``ActionOutcome`` of every phase decision.
+
+        It runs after the send attempt, for decisions started by a phase transition, by the continuous
+        loop or by ``execute_phase_action``. Exceptions it raises are logged and ignored.
+        """
+        self._action_listeners.append(listener)
         return self
 
     def register_phase_handler(self, phase: PhaseId, handler: PhaseHandler) -> "Agent":
@@ -211,34 +249,34 @@ class Agent(LoggerMixin):
         if not entry.cancelled():
             entry.result()
 
-    async def execute_phase_action(self, phase: PhaseId) -> None:
-        """Execute one action for a phase.
+    async def execute_phase_action(self, phase: PhaseId) -> ActionOutcome:
+        """Execute one action for a phase and return what became of it.
 
         Decisions are single-flight per agent: this waits until no other decision is in flight, except
         when called from inside a phase handler or role decision, where it runs inline. The result is
         dropped instead of sent if the agent moves to another phase occurrence, or stops, while it is
-        being decided. If the transport raises ``ConnectionError`` while sending, the action is logged at
-        ERROR as not transmitted and is not retried. A completed decision for the current non-continuous
-        phase occurrence is recorded in the decision gate.
+        being decided (status ``"stale"``). If the transport raises ``ConnectionError`` while sending,
+        the action is logged at ERROR as not transmitted, is not retried, and the outcome has status
+        ``"not-transmitted"`` (``transmitted`` is ``False``). A completed decision for the current
+        non-continuous phase occurrence is recorded in the decision gate.
         """
-        await self._execute_phase_action(phase, self._phase_epoch)
+        return await self._execute_phase_action(phase, self._phase_epoch)
 
-    async def _execute_phase_action(self, phase: PhaseId, epoch: int) -> None:
+    async def _execute_phase_action(self, phase: PhaseId, epoch: int) -> ActionOutcome:
         current = asyncio.current_task()
         if self._decision_owner is not None and self._decision_owner is current:
-            await self._decide_and_send(phase, epoch)
-            return
+            return await self._decide_and_send(phase, epoch)
         async with self._decision_lock:
             self._decision_owner = current
             try:
-                await self._decide_and_send(phase, epoch)
+                return await self._decide_and_send(phase, epoch)
             finally:
                 self._decision_owner = None
 
-    async def _decide_and_send(self, phase: PhaseId, epoch: int) -> None:
+    async def _decide_and_send(self, phase: PhaseId, epoch: int) -> ActionOutcome:
         if epoch != self._phase_epoch:
             self.logger.debug(f"Skipping decision for phase {phase}: the phase ended before it started")
-            return
+            return ActionOutcome(phase, "skipped")
         occurrence = self._gated_occurrence(phase)
 
         if phase in self._phase_handlers:
@@ -251,17 +289,30 @@ class Agent(LoggerMixin):
                 self.logger.warning(
                     f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
                 )
-            return
+            return await self._notify(ActionOutcome(phase, "stale" if payload else "no-action", payload or None))
         if not payload:
             self._record_decided(occurrence, epoch, "hold")
-            return
+            return await self._notify(ActionOutcome(phase, "no-action"))
         frame = self.message_codec.encode_action(payload)
         try:
             await self.transport.send(frame)
         except ConnectionError as exc:
             self.logger.error(f"Action decided in phase {phase} was not transmitted ({exc}): {frame}")
-            return
+            return await self._notify(ActionOutcome(phase, "not-transmitted", payload, frame, exc))
         self._record_decided(occurrence, epoch, "sent")
+        return await self._notify(ActionOutcome(phase, "sent", payload, frame))
+
+    async def _notify(self, outcome: ActionOutcome) -> ActionOutcome:
+        for listener in self._action_listeners:
+            try:
+                result = listener(outcome)
+                if hasattr(result, "__await__"):
+                    await result
+            except Exception:
+                self.logger.exception(
+                    f"Action listener failed for the {outcome.status!r} action in phase {outcome.phase}"
+                )
+        return outcome
 
     async def _continuous_phase_loop(self, phase: PhaseId, epoch: int, entry: asyncio.Task | None = None) -> None:
         """Run repeated actions, after the phase-entry action, while the phase remains active."""
