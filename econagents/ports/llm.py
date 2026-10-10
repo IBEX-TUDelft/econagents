@@ -21,6 +21,9 @@ class LLMCallRecord:
     ``input_tokens``, ``output_tokens`` and ``reasoning_tokens`` when supplied. ``raw_output`` is the
     model's text output (``None`` when it produced none). ``parse_error`` is set when a structured
     output could not be parsed into the requested schema; the adapter then re-raises that error.
+    ``response_error`` is set instead when the provider's HTTP response was not a model response at
+    all (for example a non-JSON page from a proxy); no model output was received and the adapter
+    re-raises the decoding error.
     """
 
     provider: str
@@ -29,6 +32,7 @@ class LLMCallRecord:
     usage: Optional[dict[str, Optional[int]]]
     raw_output: Optional[str]
     parse_error: Optional[str] = None
+    response_error: Optional[str] = None
 
 
 @runtime_checkable

@@ -17,7 +17,10 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `LLMCallRecord` and `econagents.adapters.llm.capture_llm_calls`: `ChatOpenAI`
   reports the finish reason (`completed` or the incomplete reason, such as
   `max_output_tokens`), token usage and raw text of every provider response
-  (IBEX-game_suite#7).
+  (IBEX-game_suite#7). `parse_error` marks a model response whose structured
+  output failed to parse; `response_error` marks an HTTP body that was not a
+  model response at all (for example a proxy page served with status 200), so
+  callers can tell model output failures from infrastructure failures.
 
 ### Fixed
 

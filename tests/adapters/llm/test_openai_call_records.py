@@ -6,6 +6,7 @@ instead of erroring at collection (IBEX-game_suite#7).
 """
 
 import asyncio
+import json
 from typing import Optional
 from unittest.mock import MagicMock, patch
 
@@ -56,10 +57,14 @@ def _body(status: str, text: Optional[str], reason: Optional[str] = None) -> dic
 
 
 def _fake_api(body: dict):
+    return _fake_http(lambda request: httpx.Response(200, json=body))
+
+
+def _fake_http(handler):
     real = openai.AsyncOpenAI
 
     def factory(*_args, **_kwargs):
-        transport = httpx.MockTransport(lambda request: httpx.Response(200, json=body))
+        transport = httpx.MockTransport(handler)
         return real(
             api_key="sk-test",
             base_url="http://127.0.0.1:9/v1",
@@ -107,6 +112,35 @@ async def test_unparseable_structured_response_is_recorded_and_the_error_reraise
     [record] = calls
     assert (record.finish_reason, record.usage, record.raw_output) == ("max_output_tokens", USAGE, text)
     assert record.parse_error
+    assert record.response_error is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content_type", ["application/json", "text/html"])
+async def test_a_non_response_body_is_reported_as_a_response_error_and_the_original_error_reraised(content_type):
+    """A proxy page served with status 200 is no model output: no parse_error, the decoding error re-raised."""
+    page = b"<html>502 Bad Gateway</html>"
+    llm = _llm()
+    with _fake_http(lambda request: httpx.Response(200, content=page, headers={"content-type": content_type})):
+        with _api().capture_llm_calls() as calls:
+            with pytest.raises(Exception) as raised:
+                await llm.get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision)
+
+    [record] = calls
+    assert (record.parse_error, record.raw_output, record.finish_reason) == (None, None, None)
+    assert record.response_error == str(raised.value)
+    if content_type == "application/json":
+        assert isinstance(raised.value, json.JSONDecodeError)
+    llm.observability.track_llm_call.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_a_json_body_that_is_no_model_response_is_a_response_error():
+    with _fake_api({"error": {"message": "overloaded"}}), _api().capture_llm_calls() as calls:
+        with pytest.raises(Exception):
+            await _llm().get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision)
+
+    assert [(c.parse_error, c.response_error is not None) for c in calls] == [(None, True)]
 
 
 @pytest.mark.asyncio

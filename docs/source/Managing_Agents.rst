@@ -152,6 +152,13 @@ That response is also tracked by the observability provider and logged to the
    calls[-1].finish_reason  # "completed", "max_output_tokens", ...
    calls[-1].usage          # {"input_tokens": ..., "output_tokens": ..., "reasoning_tokens": ...}
 
+When the HTTP body is not a Responses API payload at all (for example an HTML
+page from a proxy, served with status 200), no model output was received: the
+record has ``response_error`` set instead of ``parse_error``, and the original
+decoding error is re-raised. ``parse_error`` therefore means the model answered
+and its output did not fit the schema; ``response_error`` means the call itself
+failed.
+
 Adapters other than ``ChatOpenAI`` do not report records yet, so the list stays
 empty for them.
 

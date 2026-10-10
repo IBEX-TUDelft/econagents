@@ -104,17 +104,33 @@ class ChatOpenAI(BaseLLM):
             response = raw.parse()
         except Exception as exc:
             unparsed = self._unparsed_response(raw)
-            self._observe(unparsed, kwargs["input"], {**tracing_extra, "parse_error": str(exc)}, logger, exc)
+            if unparsed is None:
+                self._observe(
+                    None, kwargs["input"], {**tracing_extra, "response_error": str(exc)}, logger, response_error=exc
+                )
+            else:
+                self._observe(
+                    unparsed, kwargs["input"], {**tracing_extra, "parse_error": str(exc)}, logger, parse_error=exc
+                )
             raise
         self._observe(response, kwargs["input"], tracing_extra, logger)
         return response
 
     @staticmethod
     def _unparsed_response(raw: Any) -> Any:
-        """The response body of a request whose structured output failed to parse."""
+        """The model response of a request whose structured output failed to parse.
+
+        ``None`` when the HTTP body is not a Responses API payload at all (for example an HTML page
+        from a proxy served with status 200): then no model output was received.
+        """
         from openai.types.responses import Response
 
-        body = raw.http_response.json()
+        try:
+            body = raw.http_response.json()
+        except Exception:  # noqa: BLE001
+            return None
+        if not isinstance(body, dict) or body.get("object") != "response":
+            return None
         try:
             return Response.model_validate(body)
         except Exception:  # noqa: BLE001
@@ -127,6 +143,7 @@ class ChatOpenAI(BaseLLM):
         metadata: dict[str, Any],
         logger: Optional[logging.Logger],
         parse_error: Optional[BaseException] = None,
+        response_error: Optional[BaseException] = None,
     ) -> None:
         self.observability.track_llm_call(
             name="openai_responses",
@@ -144,6 +161,7 @@ class ChatOpenAI(BaseLLM):
                 usage=_usage(response),
                 raw_output=_output_text(response),
                 parse_error=str(parse_error) if parse_error is not None else None,
+                response_error=str(response_error) if response_error is not None else None,
             )
         )
 
@@ -180,7 +198,9 @@ class ChatOpenAI(BaseLLM):
 
         Every provider response is tracked, logged and reported to ``capture_llm_calls`` with its finish
         reason and usage, including one whose structured output fails to parse (for example JSON cut off
-        at ``max_output_tokens``); that parse error is then re-raised.
+        at ``max_output_tokens``); that parse error is then re-raised. A body that is not a Responses API
+        payload (for example a proxy's HTML page) is reported with ``response_error`` instead of
+        ``parse_error``, and its decoding error is re-raised.
 
         Raises:
             ImportError: If OpenAI is not installed.
