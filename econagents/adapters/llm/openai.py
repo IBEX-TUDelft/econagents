@@ -162,6 +162,8 @@ class ChatOpenAI(BaseLLM):
                 raw_output=_output_text(response),
                 parse_error=str(parse_error) if parse_error is not None else None,
                 response_error=str(response_error) if response_error is not None else None,
+                response_id=_response_id(response),
+                messages=list(messages),
             )
         )
 
@@ -280,6 +282,11 @@ def _finish_reason(response: Any) -> Optional[str]:
     return status if isinstance(status, str) else None
 
 
+def _response_id(response: Any) -> Optional[str]:
+    response_id = getattr(response, "id", None)
+    return response_id if isinstance(response_id, str) else None
+
+
 def _usage(response: Any) -> Optional[dict[str, Optional[int]]]:
     usage = getattr(response, "usage", None)
     if usage is None:
@@ -301,4 +308,7 @@ def _output_text(response: Any) -> Optional[str]:
         if getattr(part, "type", None) == "output_text"
     ]
     texts = [text for text in texts if isinstance(text, str)]
-    return "".join(texts) if texts else None
+    if texts:
+        return "".join(texts)
+    text = getattr(response, "output_text", None)
+    return text if isinstance(text, str) and text else None

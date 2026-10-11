@@ -2,6 +2,7 @@ import asyncio
 import logging
 import queue
 from contextvars import ContextVar
+from datetime import datetime, timezone
 from logging.handlers import QueueHandler, QueueListener
 from pathlib import Path
 from typing import Any, Literal, Optional, List
@@ -14,6 +15,9 @@ from econagents.adapters.transport import AuthenticationMechanism, JoinPayloadAu
 from econagents.domain.messages import Event, PhaseId
 from econagents.runtime.agent import Agent
 from econagents.runtime.game_clock import GameClock, TimeoutReason
+from econagents.runtime.identity import TRACE_SCHEMA_VERSION, json_record
+
+AgentLogNaming = Literal["player-number", "launch-index"]
 
 ctx_agent_id: ContextVar[str] = ContextVar("agent_id", default="N/A")
 
@@ -85,6 +89,18 @@ class GameRunnerConfig(BaseModel):
     end_game_event: str = "game-over"
     """Event type that signals the end of the game and should stop the agent."""
 
+    # Agent logs and identity
+    agent_log_naming: AgentLogNaming = Field(
+        default="player-number",
+        description=(
+            "How agent logs and [AGENT n] tags are named: 'player-number' uses agent_<player_number>.log when the "
+            "agent's state has a player number at launch and its launch index otherwise; 'launch-index' always uses "
+            "the launch index. Either way the first line of each log is a JSON identity header."
+        ),
+    )
+    run_id: Optional[str] = None
+    """Identifier of the run, recorded in every agent log's identity header."""
+
     def server_url(self) -> str:
         """Build the WebSocket URL for agents."""
         base = f"{self.protocol}://{self.hostname}:{self.port}"
@@ -129,6 +145,7 @@ class GameRunner:
         self.timeout_reason: Optional[TimeoutReason] = None
         """Which budget stopped the last run: ``"gameplay"``, ``"pre_game"``, or None if none did."""
         self._clock: Optional[GameClock] = None
+        self._log_ids: dict[int, tuple[int, int, AgentLogNaming]] = {}
 
         # Create log directories if it doesn't exist
         if self.config.logs_dir:
@@ -247,9 +264,8 @@ class GameRunner:
         for handler in agent_logger.handlers[:]:
             agent_logger.removeHandler(handler)
 
-        # Create or clear the agent log file; concurrent agent processes may
-        # share this path, so tolerate another process removing it first.
-        agent_log_file.unlink(missing_ok=True)
+        # Append: a replacement instance for the same seat keeps the earlier instance's records and starts
+        # its own segment with a new identity header.
         Path(agent_log_file).touch()
 
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] [AGENT %(agent_id)s] %(message)s")
@@ -276,7 +292,20 @@ class GameRunner:
         agent_logger.addHandler(console_handler)
         agent_logger.addHandler(queue_handler)  # Use queue handler instead of direct file handler
 
+        self._setup_model_call_logger(agent_logger, game_dir / f"agent_{agent_id}.model_calls.jsonl")
         return agent_logger
+
+    def _setup_model_call_logger(self, agent_logger: logging.Logger, path: Path) -> None:
+        """Write the role's model-call records (one JSON object per line) to ``path`` only."""
+        call_logger = logging.getLogger(f"{agent_logger.name}.model_calls")
+        call_logger.setLevel(logging.INFO)
+        call_logger.propagate = False
+        for handler in call_logger.handlers[:]:
+            call_logger.removeHandler(handler)
+            handler.close()
+        handler = logging.FileHandler(path)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        call_logger.addHandler(handler)
 
     def get_game_logger(self, game_id: int) -> logging.Logger:
         """
@@ -339,17 +368,78 @@ class GameRunner:
 
     def _inject_agent_logger(self, agent: Agent, agent_id: int) -> None:
         """
-        Assign a logger to an agent.
+        Assign a logger to an agent and record its identity header.
 
         Args:
             agent: Agent to assign a logger to
-            agent_id (int): Agent identifier
+            agent_id (int): Agent identifier (its player number, or its launch index)
         """
         agent_logger = self.get_agent_logger(agent_id, self.config.game_id)
         agent.logger = agent_logger
         transport = getattr(agent, "transport", None)
         if transport is not None and hasattr(transport, "logger"):
             transport.logger = agent_logger
+        self._write_identity_header(agent, agent_id)
+
+    def identity_header(self, agent: Agent, agent_id: int) -> dict[str, Any]:
+        """The identity header of ``agent``'s log: the seat it was launched for and this instance.
+
+        ``player_number`` and ``role`` are the configured seat (the state's player number before the agent
+        connects); the agent logs an ``identity-bound`` record once the server confirms it.
+        """
+        _, launch_index, naming = self._log_ids.get(id(agent), (agent_id, agent_id, "launch-index"))
+        meta = getattr(getattr(agent, "state", None), "meta", None)
+        role = getattr(agent, "role", None)
+        player_number = getattr(meta, "player_number", None)
+        return {
+            "record": "agent-identity",
+            "trace_schema_version": TRACE_SCHEMA_VERSION,
+            "run_id": self.config.run_id,
+            "game_id": self.config.game_id,
+            "player_number": player_number,
+            "player_number_source": "configured" if player_number is not None else None,
+            "role": getattr(meta, "role", None) or getattr(role, "name", None),
+            "seat_kind": "agent",
+            "agent_instance_id": getattr(agent, "instance_id", None),
+            "launch_index": launch_index,
+            "log_naming": naming,
+            "started_at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        }
+
+    def _write_identity_header(self, agent: Agent, agent_id: int) -> None:
+        line = json_record(self.identity_header(agent, agent_id))
+        if not self.config.logs_dir:
+            agent.logger.info(f"Agent identity: {line}")
+            return
+        path = self.config.logs_dir / f"game_{self.config.game_id}" / f"agent_{agent_id}.log"
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+        agent.logger.info(f"Agent identity header written to {path.name}")
+
+    def _assign_log_ids(self) -> list[int]:
+        """Each agent's log id: its configured player number, or its launch index when it has none.
+
+        A launch index that equals another agent's player number would share that agent's file, so it is
+        offset past the largest player number.
+        """
+        numbers = []
+        for agent in self.agents:
+            meta = getattr(getattr(agent, "state", None), "meta", None)
+            number = getattr(meta, "player_number", None)
+            numbers.append(number if self.config.agent_log_naming == "player-number" else None)
+        taken = [n for n in numbers if n is not None]
+        duplicates = sorted({n for n in taken if taken.count(n) > 1})
+        if duplicates:
+            raise ValueError(f"Several agents are configured for player number(s) {duplicates}")
+        offset = max(taken, default=0) if any(i in taken for i, n in enumerate(numbers, start=1) if n is None) else 0
+        log_ids = []
+        self._log_ids.clear()
+        for index, (agent, number) in enumerate(zip(self.agents, numbers), start=1):
+            log_id = number if number is not None else index + offset
+            naming: AgentLogNaming = "player-number" if number is not None else "launch-index"
+            self._log_ids[id(agent)] = (log_id, index, naming)
+            log_ids.append(log_id)
+        return log_ids
 
     async def spawn_agent(self, agent: Agent, agent_id: int) -> None:
         """
@@ -446,8 +536,10 @@ class GameRunner:
 
         try:
             game_logger.info("Configuring and starting agents...")
-            for i, agent in enumerate(self.agents, start=1):
-                task = asyncio.create_task(self.spawn_agent(agent, i), name=f"AgentTask-{self.config.game_id}-{i}")
+            for agent, log_id in zip(self.agents, self._assign_log_ids()):
+                task = asyncio.create_task(
+                    self.spawn_agent(agent, log_id), name=f"AgentTask-{self.config.game_id}-{log_id}"
+                )
                 agent_tasks.append(task)
 
             if clock.enabled:

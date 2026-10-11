@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
@@ -14,6 +15,13 @@ from econagents.adapters.transport import AuthenticationMechanism, JoinPayloadAu
 from econagents.domain.role import Role
 from econagents.domain.logging import LoggerMixin
 from econagents.runtime.decision_gate import DecisionGate, DecisionOutcome, PhaseOccurrence
+from econagents.runtime.identity import (
+    PLAYER_JOINED_EVENT,
+    SNAPSHOT_EVENT,
+    IdentityMismatchError,
+    PlayerIdentity,
+    json_record,
+)
 from econagents.runtime.phase_engine import PhaseEngine
 from econagents.domain.messages import Event, PhaseId
 from econagents.domain.state.game import GameState
@@ -62,6 +70,13 @@ class Agent(LoggerMixin):
     ``ConnectionError`` does not count, so the next transition into the occurrence decides again. Pass
     ``decision_gate`` to also consult and update a store that outlives the process; without one, a
     restarted agent decides again.
+
+    The agent binds the seat the server authenticated it as (``bound_identity``) from, in order of
+    preference, the snapshot's own ``playerNumber`` and ``role``, the first ``player-joined`` received
+    after each join, and the roster entry carrying its recovery token. It fills in
+    ``state.meta.player_number`` when that is unset; when it was set before ``start()`` (the configured
+    seat) and the server binds another seat or role, the agent logs ``identity_error`` and stops.
+    ``instance_id`` identifies this agent instance; a replacement instance for the same seat gets a new one.
     """
 
     def __init__(
@@ -103,6 +118,13 @@ class Agent(LoggerMixin):
         self.auth_mechanism_kwargs = auth_mechanism_kwargs or {}
         self.end_game_event = end_game_event
         self.decision_gate = decision_gate
+        self.instance_id = uuid.uuid4().hex
+        self.bound_identity: PlayerIdentity | None = None
+        self.identity_error: IdentityMismatchError | None = None
+        self._configured_player_number: Any = None
+        self._configured_role: Any = None
+        self._joined_connection: Any = None
+        self._player_joined_seen = False
         self.transport = transport or WebSocketTransport(
             url=self.url,
             logger=self.logger,
@@ -153,6 +175,9 @@ class Agent(LoggerMixin):
     async def start(self) -> None:
         """Connect to the game server and process events until stopped."""
         self.role.logger = self.logger
+        meta = getattr(self.state, "meta", None)
+        self._configured_player_number = getattr(meta, "player_number", None)
+        self._configured_role = getattr(meta, "role", None)
         self.running = True
         await self.transport.start_listening()
 
@@ -176,7 +201,9 @@ class Agent(LoggerMixin):
         """Project an event into state and run the relevant behavior."""
         self.logger.debug(f"<-- Agent received event: {event}")
         self.state_projector.apply(self.state, event)
-        self._resolve_player_number(event)
+        if not self._resolve_player_number(event):
+            await self.stop()
+            return
 
         for handler in self._event_handlers.get(event.type, []):
             result = handler(event)
@@ -380,18 +407,69 @@ class Agent(LoggerMixin):
         """Return the ready message for the standard introduction phase."""
         return ready_message()
 
-    def _resolve_player_number(self, event: Event) -> None:
-        meta = getattr(self.state, "meta", None)
-        if meta is None or not hasattr(meta, "player_number") or meta.player_number:
-            return
+    def _connection_epoch(self) -> Any:
+        return getattr(self.transport, "connection_epoch", None)
 
+    def _identity_from(self, event: Event) -> PlayerIdentity | None:
+        """The identity ``event`` proves for this agent's connection, if any."""
+        data = event.data or {}
+        epoch = self._connection_epoch()
+        if event.type == SNAPSHOT_EVENT and isinstance(data.get("playerNumber"), int):
+            return PlayerIdentity(data["playerNumber"], data.get("role"), "snapshot", epoch)
+        if event.type == PLAYER_JOINED_EVENT:
+            first_on_connection = not self._player_joined_seen or (
+                epoch is not None and epoch != self._joined_connection
+            )
+            self._player_joined_seen = True
+            self._joined_connection = epoch
+            if first_on_connection and isinstance(data.get("playerNumber"), int):
+                return PlayerIdentity(data["playerNumber"], data.get("role") or None, "player-joined", epoch)
+            return None
+        if self.bound_identity is not None:
+            return None
         recovery = self.auth_mechanism_kwargs.get("recovery") or (self.auth_mechanism_kwargs.get("payload") or {}).get(
             "recovery"
         )
         if not recovery:
-            return
+            return None
+        for player in data.get("players", []) or []:
+            if isinstance(player, dict) and player.get("recovery") == recovery and player.get("playerNumber"):
+                return PlayerIdentity(player["playerNumber"], player.get("role"), "recovery", epoch)
+        return None
 
-        for player in event.data.get("players", []) or []:
-            if player.get("recovery") == recovery:
-                meta.player_number = player.get("playerNumber")
-                break
+    def _resolve_player_number(self, event: Event) -> bool:
+        """Record the identity ``event`` proves; False when it contradicts the configured seat."""
+        identity = self._identity_from(event)
+        if identity is None:
+            return True
+        previous = self.bound_identity
+        self.bound_identity = identity
+        if hasattr(self.transport, "bound_identity"):
+            self.transport.bound_identity = identity
+        if previous != identity:
+            self.logger.info(f"Identity bound: {json_record(identity.as_record())}")
+
+        meta = getattr(self.state, "meta", None)
+        if meta is not None and hasattr(meta, "player_number") and not meta.player_number:
+            meta.player_number = identity.player_number
+        configured = self._configured_player_number
+        role = self._configured_role
+        if configured is not None and configured != identity.player_number:
+            problem = f"player {identity.player_number}, configured as player {configured}"
+        elif role is not None and identity.role and role != identity.role:
+            problem = f"role {identity.role!r}, configured as {role!r}"
+        else:
+            return True
+        self.identity_error = IdentityMismatchError(f"the server bound this agent to {problem} ({identity.source})")
+        self.logger.error(
+            "Identity mismatch: "
+            + json_record(
+                {
+                    **identity.as_record(),
+                    "record": "identity-mismatch",
+                    "configured_player_number": configured,
+                    "configured_role": role,
+                }
+            )
+        )
+        return False

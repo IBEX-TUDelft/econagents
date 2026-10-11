@@ -7,7 +7,7 @@ from typing import Optional
 
 from econagents.ports.llm import LLMCallRecord
 
-_captured: ContextVar[Optional[list[LLMCallRecord]]] = ContextVar("econagents_llm_calls", default=None)
+_captured: ContextVar[tuple[list[LLMCallRecord], ...]] = ContextVar("econagents_llm_calls", default=())
 
 
 @contextmanager
@@ -15,10 +15,11 @@ def capture_llm_calls() -> Iterator[list[LLMCallRecord]]:
     """Collect an ``LLMCallRecord`` for every provider response received inside the ``with`` block.
 
     The list is shared with tasks started inside the block, so a call wrapped in ``asyncio.wait_for``
-    is collected too. Adapters that do not report records leave the list empty.
+    is collected too. Blocks nest: a record is added to every enclosing block. Adapters that do not
+    report records leave the list empty.
     """
     calls: list[LLMCallRecord] = []
-    token = _captured.set(calls)
+    token = _captured.set((*_captured.get(), calls))
     try:
         yield calls
     finally:
@@ -26,7 +27,6 @@ def capture_llm_calls() -> Iterator[list[LLMCallRecord]]:
 
 
 def report_llm_call(record: LLMCallRecord) -> None:
-    """Add ``record`` to the innermost active ``capture_llm_calls`` block, if any."""
-    calls = _captured.get()
-    if calls is not None:
+    """Add ``record`` to every active ``capture_llm_calls`` block, if any."""
+    for calls in _captured.get():
         calls.append(record)

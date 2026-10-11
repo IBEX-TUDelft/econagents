@@ -9,6 +9,7 @@ from econagents.runtime.game_runner import (
     HybridGameRunnerConfig,
     TurnBasedGameRunnerConfig,
 )
+from econagents.runtime.identity import IdentityMismatchError, PlayerIdentity
 from econagents.runtime.phase_engine import PhaseEngine
 
 __all__ = [
@@ -19,8 +20,10 @@ __all__ = [
     "GameRunner",
     "GameRunnerConfig",
     "HybridGameRunnerConfig",
+    "IdentityMismatchError",
     "PhaseEngine",
     "PhaseOccurrence",
+    "PlayerIdentity",
     "TurnBasedGameRunnerConfig",
     "create_game_state",
 ]

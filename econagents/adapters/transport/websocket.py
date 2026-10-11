@@ -106,6 +106,10 @@ class WebSocketTransport(LoggerMixin):
         self._authenticated = False
         self._reconnect_attempts = 0
         self._stop_requested: Optional[asyncio.Event] = None
+        self.connection_epoch = 0
+        """Number of connections authenticated so far; it increases before a connection's first message."""
+        self.bound_identity: Optional[Any] = None
+        """The seat the current connection is bound to, as reported by the agent (None until it knows)."""
 
     def _next_reconnect_delay(self, connection_was_stable: bool) -> float:
         """Delay before the next reconnect: none after a stable connection, then a capped, jittered backoff."""
@@ -180,6 +184,8 @@ class WebSocketTransport(LoggerMixin):
                         self.logger.error("Authentication failed. Stopping transport.")
                         break
                     authenticated_at = loop.time()
+                    self.connection_epoch += 1
+                    self.bound_identity = None
 
                     async for message in websocket:
                         if not self._running:
