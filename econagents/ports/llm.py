@@ -23,7 +23,8 @@ class LLMCallRecord:
     output could not be parsed into the requested schema; the adapter then re-raises that error.
     ``response_error`` is set instead when the provider's HTTP response was not a model response at
     all (for example a non-JSON page from a proxy); no model output was received and the adapter
-    re-raises the decoding error.
+    re-raises the decoding error. ``response_id`` is the provider's id for the response, and ``messages``
+    the request input exactly as sent (for a tool-calling loop, the conversation of that request).
     """
 
     provider: str
@@ -33,6 +34,8 @@ class LLMCallRecord:
     raw_output: Optional[str]
     parse_error: Optional[str] = None
     response_error: Optional[str] = None
+    response_id: Optional[str] = None
+    messages: Optional[list[Any]] = None
 
 
 @runtime_checkable

@@ -2,7 +2,8 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
@@ -14,6 +15,22 @@ from econagents.adapters.transport import AuthenticationMechanism, JoinPayloadAu
 from econagents.domain.role import Role
 from econagents.domain.logging import LoggerMixin
 from econagents.runtime.decision_gate import DecisionGate, DecisionOutcome, PhaseOccurrence
+from econagents.runtime.identity import (
+    PLAYER_JOINED_EVENT,
+    SNAPSHOT_EVENT,
+    IdentityMismatchError,
+    PlayerIdentity,
+    json_record,
+)
+from econagents.runtime.dispositions import (
+    DecisionInputMode,
+    DecisionTrace,
+    DispositionTracker,
+    InputRevision,
+    UnknownPolicy,
+    is_unknown,
+    state_revision,
+)
 from econagents.runtime.phase_engine import PhaseEngine
 from econagents.domain.messages import Event, PhaseId
 from econagents.domain.state.game import GameState
@@ -24,7 +41,7 @@ from econagents.ports.transport import TransportPort
 PhaseHandler = Callable[[PhaseId, GameState], Any]
 EventHandler = Callable[[Event], Any]
 
-ActionStatus = Literal["sent", "not-transmitted", "stale", "no-action", "skipped"]
+ActionStatus = Literal["sent", "not-transmitted", "stale", "no-action", "skipped", "superseded"]
 
 
 @dataclass(frozen=True)
@@ -34,7 +51,11 @@ class ActionOutcome:
     ``status`` is ``"sent"`` when the transport accepted the frame, ``"not-transmitted"`` when it raised
     ``ConnectionError`` (``error`` holds it), ``"stale"`` when the decision finished after the agent had
     moved to another phase occurrence or stopped (nothing is sent), ``"no-action"`` when the handler or
-    role returned no action, and ``"skipped"`` when the phase ended before the decision started.
+    role returned no action, ``"skipped"`` when the phase ended before the decision started, and
+    ``"superseded"`` when a revision guard (``Agent(decision_input="guard-...")``) discarded the action
+    because the state changed during the decision. ``decision_id`` identifies the decision in the
+    decision trace. ``disposition`` is set once the decision is settled: always for outcomes other than
+    ``"sent"``, and for ``"sent"`` only when no disposition tracker waits for the server's answer.
     """
 
     phase: PhaseId
@@ -42,6 +63,8 @@ class ActionOutcome:
     payload: Optional[dict[str, Any]] = None
     frame: Optional[str] = None
     error: Optional[BaseException] = None
+    decision_id: Optional[str] = None
+    disposition: Optional[str] = None
 
     @property
     def transmitted(self) -> bool:
@@ -62,6 +85,34 @@ class Agent(LoggerMixin):
     ``ConnectionError`` does not count, so the next transition into the occurrence decides again. Pass
     ``decision_gate`` to also consult and update a store that outlives the process; without one, a
     restarted agent decides again.
+
+    The agent binds the seat the server authenticated it as (``bound_identity``) from, in order of
+    preference, the snapshot's own ``playerNumber`` and ``role``, the first ``player-joined`` received
+    after each join, and the roster entry carrying its recovery token. It fills in
+    ``state.meta.player_number`` when that is unset; when it was set before ``start()`` (the configured
+    seat) and the server binds another seat or role, the agent logs ``identity_error`` and stops.
+    ``instance_id`` identifies this agent instance; a replacement instance for the same seat gets a new one.
+
+    Dispositions: with a ``disposition_tracker`` (see ``DispositionTracker``), an action the tracker
+    announces as awaiting an answer stays unresolved until the tracker reports its disposition, and the
+    agent's next decision, in any phase, does not start before that. ``disposition_timeout`` (seconds,
+    ``None`` waits indefinitely) turns a missing answer into ``"unknown"``. With ``on_unknown="block"``
+    (the default) an ``"unknown"`` disposition also holds every later decision until the next
+    ``phase_transition_event`` reconciles the state; meanwhile ``reconcile_request`` (if given) is called
+    at once and then every ``reconcile_retry_interval`` seconds, at most ``reconcile_retry_limit``
+    times. ``on_unknown="continue"`` only records it.
+
+    Decision input: with ``decision_input="frozen"`` (the default) the role and phase handlers decide on
+    a deep copy of the state taken when the decision starts, so events that arrive during the model call
+    do not change its input. ``"guard-discard"`` drops the action when the state's revision changed
+    during the decision, and ``"guard-rerun"`` decides once more on the new state first. Revisions come
+    from ``input_revision`` (default: sha256 of the state's JSON form).
+
+    ``decision_trace`` receives one record per decision once it is settled: ``decision_id``, ``phase``,
+    ``round``, ``phase_epoch``, ``input_revision``, ``send_revision``, ``input_changed_during_call``,
+    ``submitted`` (the frame, or ``None``), ``status`` (the ``ActionOutcome`` status) and
+    ``disposition`` (the tracker's answer, ``"unknown"``, ``"sent"`` without a tracker, ``"no-action"``,
+    ``"stale-phase"``, ``"not-transmitted"`` or ``"superseded"``).
     """
 
     def __init__(
@@ -82,7 +133,24 @@ class Agent(LoggerMixin):
         logger: logging.Logger | None = None,
         transport: TransportPort | None = None,
         decision_gate: DecisionGate | None = None,
+        disposition_tracker: DispositionTracker | None = None,
+        disposition_timeout: float | None = None,
+        decision_trace: DecisionTrace | None = None,
+        on_unknown: UnknownPolicy = "block",
+        reconcile_request: Callable[[], Any] | None = None,
+        reconcile_retry_interval: float = 2.0,
+        reconcile_retry_limit: int = 3,
+        decision_input: DecisionInputMode = "frozen",
+        input_revision: InputRevision | None = None,
     ) -> None:
+        if on_unknown not in ("block", "continue"):
+            raise ValueError(f"on_unknown must be 'block' or 'continue', not {on_unknown!r}")
+        if decision_input not in ("frozen", "guard-discard", "guard-rerun"):
+            raise ValueError(
+                f"decision_input must be 'frozen', 'guard-discard' or 'guard-rerun', not {decision_input!r}"
+            )
+        if disposition_timeout is not None and disposition_timeout <= 0:
+            raise ValueError(f"disposition_timeout must be positive or None, not {disposition_timeout!r}")
         if logger:
             self.logger = logger
 
@@ -103,6 +171,22 @@ class Agent(LoggerMixin):
         self.auth_mechanism_kwargs = auth_mechanism_kwargs or {}
         self.end_game_event = end_game_event
         self.decision_gate = decision_gate
+        self.instance_id = uuid.uuid4().hex
+        self.bound_identity: PlayerIdentity | None = None
+        self.identity_error: IdentityMismatchError | None = None
+        self._configured_player_number: Any = None
+        self._configured_role: Any = None
+        self._joined_connection: Any = None
+        self._player_joined_seen = False
+        self.disposition_tracker = disposition_tracker
+        self.disposition_timeout = disposition_timeout
+        self.decision_trace = decision_trace
+        self.on_unknown = on_unknown
+        self.reconcile_request = reconcile_request
+        self.reconcile_retry_interval = reconcile_retry_interval
+        self.reconcile_retry_limit = reconcile_retry_limit
+        self.decision_input = decision_input
+        self.input_revision = input_revision or state_revision
         self.transport = transport or WebSocketTransport(
             url=self.url,
             logger=self.logger,
@@ -122,6 +206,11 @@ class Agent(LoggerMixin):
         self._decision_owner: asyncio.Task | None = None
         self._event_handlers: dict[str, list[EventHandler]] = {}
         self._action_listeners: list[ActionListener] = []
+        self._pending: dict[str, dict[str, Any]] = {}
+        self._disposition_timers: dict[str, asyncio.Task] = {}
+        self._settled = asyncio.Event()
+        self._blocked_on_unknown = False
+        self._reconcile_task: asyncio.Task | None = None
         self._phase_handlers: dict[PhaseId, PhaseHandler] = {
             INTRODUCTION_PHASE: self._handle_introduction,
         }
@@ -153,6 +242,9 @@ class Agent(LoggerMixin):
     async def start(self) -> None:
         """Connect to the game server and process events until stopped."""
         self.role.logger = self.logger
+        meta = getattr(self.state, "meta", None)
+        self._configured_player_number = getattr(meta, "player_number", None)
+        self._configured_role = getattr(meta, "role", None)
         self.running = True
         await self.transport.start_listening()
 
@@ -161,6 +253,12 @@ class Agent(LoggerMixin):
         self.running = False
         self._phase_epoch += 1
         self._cancel_phase_tasks()
+        for timer in self._disposition_timers.values():
+            timer.cancel()
+        self._disposition_timers.clear()
+        if self._reconcile_task is not None:
+            self._reconcile_task.cancel()
+            self._reconcile_task = None
         await self.transport.stop()
 
     async def _raw_message_received(self, raw_message: str) -> None:
@@ -176,7 +274,12 @@ class Agent(LoggerMixin):
         """Project an event into state and run the relevant behavior."""
         self.logger.debug(f"<-- Agent received event: {event}")
         self.state_projector.apply(self.state, event)
-        self._resolve_player_number(event)
+        if not self._resolve_player_number(event):
+            await self.stop()
+            return
+        self._observe_dispositions(event)
+        if self._blocked_on_unknown and event.type == self.phase_transition_event:
+            self._unblock()
 
         for handler in self._event_handlers.get(event.type, []):
             result = handler(event)
@@ -277,30 +380,220 @@ class Agent(LoggerMixin):
         if epoch != self._phase_epoch:
             self.logger.debug(f"Skipping decision for phase {phase}: the phase ended before it started")
             return ActionOutcome(phase, "skipped")
-        occurrence = self._gated_occurrence(phase)
-
-        if phase in self._phase_handlers:
-            payload = await self._phase_handlers[phase](phase, self.state)
-        else:
-            payload = await self.role.handle_phase(phase, self.state, self.prompts_dir)
-
+        await self._wait_until_settled()
         if epoch != self._phase_epoch:
-            if payload:
-                self.logger.warning(
-                    f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
+            self.logger.debug(f"Skipping decision for phase {phase}: the phase ended while it waited for a disposition")
+            return ActionOutcome(phase, "skipped")
+        occurrence = self._gated_occurrence(phase)
+        decision_id = uuid.uuid4().hex
+        record = self._new_trace_record(decision_id, phase, epoch)
+        reruns_left = 1 if self.decision_input == "guard-rerun" else 0
+
+        while True:
+            input_revision = self._revision()
+            record["input_revision"] = input_revision
+            try:
+                payload = await self._decide(phase)
+            except asyncio.CancelledError:
+                if epoch != self._phase_epoch:
+                    record.update(status="stale", disposition="stale-phase")
+                    self._emit_trace(record)
+                raise
+            send_revision = self._revision()
+            record.update(
+                send_revision=send_revision,
+                input_changed_during_call=None if input_revision is None else input_revision != send_revision,
+            )
+            if epoch != self._phase_epoch:
+                if payload:
+                    self.logger.warning(
+                        f"Dropping stale action decided in phase {phase}; the agent is now in phase {self.current_phase}"
+                    )
+                    outcome = ActionOutcome(phase, "stale", payload, decision_id=decision_id)
+                    return await self._settle(outcome, record, "stale-phase")
+                return await self._settle(
+                    ActionOutcome(phase, "no-action", decision_id=decision_id), record, "no-action"
                 )
-            return await self._notify(ActionOutcome(phase, "stale" if payload else "no-action", payload or None))
-        if not payload:
-            self._record_decided(occurrence, epoch, "hold")
-            return await self._notify(ActionOutcome(phase, "no-action"))
+            if not payload:
+                self._record_decided(occurrence, epoch, "hold")
+                return await self._settle(
+                    ActionOutcome(phase, "no-action", decision_id=decision_id), record, "no-action"
+                )
+            if self.decision_input == "frozen" or not record["input_changed_during_call"]:
+                break
+            if reruns_left:
+                reruns_left -= 1
+                self.logger.info(f"State changed while deciding in phase {phase}; deciding again on the new state")
+                continue
+            self.logger.warning(
+                f"Discarding the action decided in phase {phase}: the state changed during the decision"
+            )
+            outcome = ActionOutcome(phase, "superseded", payload, decision_id=decision_id)
+            return await self._settle(outcome, record, "superseded")
+
         frame = self.message_codec.encode_action(payload)
+        record["submitted"] = frame
+        awaited = self._announce(decision_id, payload, record)
         try:
             await self.transport.send(frame)
         except ConnectionError as exc:
+            if awaited:
+                self._withdraw(decision_id)
             self.logger.error(f"Action decided in phase {phase} was not transmitted ({exc}): {frame}")
-            return await self._notify(ActionOutcome(phase, "not-transmitted", payload, frame, exc))
+            outcome = ActionOutcome(phase, "not-transmitted", payload, frame, exc, decision_id=decision_id)
+            return await self._settle(outcome, record, "not-transmitted")
         self._record_decided(occurrence, epoch, "sent")
-        return await self._notify(ActionOutcome(phase, "sent", payload, frame))
+        outcome = ActionOutcome(phase, "sent", payload, frame, decision_id=decision_id)
+        if awaited:
+            return await self._notify(outcome)
+        return await self._settle(outcome, record, "sent")
+
+    async def _decide(self, phase: PhaseId) -> Any:
+        state = self.state.model_copy(deep=True) if self.decision_input == "frozen" else self.state
+        if phase in self._phase_handlers:
+            return await self._phase_handlers[phase](phase, state)
+        return await self.role.handle_phase(phase, state, self.prompts_dir)
+
+    def _revision(self) -> str | None:
+        if self.decision_trace is None and self.decision_input == "frozen":
+            return None
+        try:
+            return self.input_revision(self.state)
+        except Exception:
+            self.logger.exception("Could not compute the decision-input revision")
+            return None
+
+    def _new_trace_record(self, decision_id: str, phase: PhaseId, epoch: int) -> dict[str, Any]:
+        return {
+            "decision_id": decision_id,
+            "phase": phase,
+            "round": self._current_round(),
+            "phase_epoch": epoch,
+            "input_revision": None,
+            "send_revision": None,
+            "input_changed_during_call": None,
+            "submitted": None,
+            "status": None,
+            "disposition": None,
+        }
+
+    async def _settle(self, outcome: ActionOutcome, record: dict[str, Any], disposition: str) -> ActionOutcome:
+        record.update(status=outcome.status, disposition=disposition)
+        self._emit_trace(record)
+        return await self._notify(replace(outcome, disposition=disposition))
+
+    def _emit_trace(self, record: dict[str, Any]) -> None:
+        if self.decision_trace is None:
+            return
+        try:
+            result = self.decision_trace(dict(record))
+            if hasattr(result, "__await__"):
+                asyncio.ensure_future(result)
+        except Exception:
+            self.logger.exception(f"Decision trace failed for decision {record.get('decision_id')}")
+
+    def _announce(self, decision_id: str, payload: dict[str, Any], record: dict[str, Any]) -> bool:
+        """Tell the tracker about a submission; return whether its disposition must be awaited."""
+        if self.disposition_tracker is None:
+            return False
+        try:
+            awaited = bool(self.disposition_tracker.submitted(decision_id, payload, self.state))
+        except Exception:
+            self.logger.exception(f"Disposition tracker failed on submission {decision_id}; not waiting for it")
+            return False
+        if not awaited:
+            return False
+        record["status"] = "sent"
+        self._pending[decision_id] = record
+        if self.disposition_timeout is not None:
+            self._disposition_timers[decision_id] = asyncio.create_task(self._expire(decision_id))
+        return True
+
+    def _withdraw(self, decision_id: str) -> None:
+        self._pending.pop(decision_id, None)
+        timer = self._disposition_timers.pop(decision_id, None)
+        if timer is not None:
+            timer.cancel()
+        not_transmitted = getattr(self.disposition_tracker, "not_transmitted", None)
+        if callable(not_transmitted):
+            try:
+                not_transmitted(decision_id)
+            except Exception:
+                self.logger.exception(f"Disposition tracker failed on the untransmitted submission {decision_id}")
+        self._settled.set()
+
+    async def _expire(self, decision_id: str) -> None:
+        await asyncio.sleep(self.disposition_timeout or 0)
+        if decision_id in self._pending:
+            self.logger.warning(
+                f"No disposition for submission {decision_id} within {self.disposition_timeout}s; recording it as unknown"
+            )
+            self._resolve(decision_id, "unknown")
+
+    def _observe_dispositions(self, event: Event) -> None:
+        if self.disposition_tracker is None:
+            return
+        try:
+            resolved = list(self.disposition_tracker.observe(event, self.state) or [])
+        except Exception:
+            self.logger.exception(f"Disposition tracker failed on a {event.type!r} event")
+            return
+        for decision_id, disposition in resolved:
+            self._resolve(decision_id, disposition)
+
+    def _resolve(self, decision_id: str, disposition: str) -> None:
+        record = self._pending.pop(decision_id, None)
+        timer = self._disposition_timers.pop(decision_id, None)
+        if timer is not None and timer is not asyncio.current_task():
+            timer.cancel()
+        if record is None:
+            return
+        record["disposition"] = disposition
+        self._emit_trace(record)
+        if is_unknown(disposition) and self.on_unknown == "block":
+            self._block_on_unknown()
+        self._settled.set()
+
+    def _block_on_unknown(self) -> None:
+        if not self._blocked_on_unknown:
+            self.logger.warning(
+                f"A disposition is unknown; no new decision until a {self.phase_transition_event!r} event reconciles"
+            )
+        self._blocked_on_unknown = True
+        if self.reconcile_request is not None and (self._reconcile_task is None or self._reconcile_task.done()):
+            self._reconcile_task = asyncio.create_task(self._request_reconciliation())
+
+    def _unblock(self) -> None:
+        self._blocked_on_unknown = False
+        if self._reconcile_task is not None:
+            if self._reconcile_task is not asyncio.current_task():
+                self._reconcile_task.cancel()
+            self._reconcile_task = None
+        self.logger.info(f"A {self.phase_transition_event!r} event reconciled the unknown disposition")
+        self._settled.set()
+
+    async def _request_reconciliation(self) -> None:
+        for _ in range(self.reconcile_retry_limit):
+            if not self._blocked_on_unknown:
+                return
+            try:
+                result = self.reconcile_request() if self.reconcile_request is not None else None
+                if hasattr(result, "__await__"):
+                    await result
+            except Exception as exc:
+                self.logger.warning(f"Reconciliation request failed: {exc}")
+            await asyncio.sleep(self.reconcile_retry_interval)
+        if self._blocked_on_unknown:
+            self.logger.warning(
+                f"Still waiting for a {self.phase_transition_event!r} event after {self.reconcile_retry_limit} "
+                "reconciliation requests"
+            )
+
+    async def _wait_until_settled(self) -> None:
+        """Wait until no submission awaits a disposition and no unknown disposition blocks decisions."""
+        while self._pending or self._blocked_on_unknown:
+            self._settled.clear()
+            await self._settled.wait()
 
     async def _notify(self, outcome: ActionOutcome) -> ActionOutcome:
         for listener in self._action_listeners:
@@ -380,18 +673,69 @@ class Agent(LoggerMixin):
         """Return the ready message for the standard introduction phase."""
         return ready_message()
 
-    def _resolve_player_number(self, event: Event) -> None:
-        meta = getattr(self.state, "meta", None)
-        if meta is None or not hasattr(meta, "player_number") or meta.player_number:
-            return
+    def _connection_epoch(self) -> Any:
+        return getattr(self.transport, "connection_epoch", None)
 
+    def _identity_from(self, event: Event) -> PlayerIdentity | None:
+        """The identity ``event`` proves for this agent's connection, if any."""
+        data = event.data or {}
+        epoch = self._connection_epoch()
+        if event.type == SNAPSHOT_EVENT and isinstance(data.get("playerNumber"), int):
+            return PlayerIdentity(data["playerNumber"], data.get("role"), "snapshot", epoch)
+        if event.type == PLAYER_JOINED_EVENT:
+            first_on_connection = not self._player_joined_seen or (
+                epoch is not None and epoch != self._joined_connection
+            )
+            self._player_joined_seen = True
+            self._joined_connection = epoch
+            if first_on_connection and isinstance(data.get("playerNumber"), int):
+                return PlayerIdentity(data["playerNumber"], data.get("role") or None, "player-joined", epoch)
+            return None
+        if self.bound_identity is not None:
+            return None
         recovery = self.auth_mechanism_kwargs.get("recovery") or (self.auth_mechanism_kwargs.get("payload") or {}).get(
             "recovery"
         )
         if not recovery:
-            return
+            return None
+        for player in data.get("players", []) or []:
+            if isinstance(player, dict) and player.get("recovery") == recovery and player.get("playerNumber"):
+                return PlayerIdentity(player["playerNumber"], player.get("role"), "recovery", epoch)
+        return None
 
-        for player in event.data.get("players", []) or []:
-            if player.get("recovery") == recovery:
-                meta.player_number = player.get("playerNumber")
-                break
+    def _resolve_player_number(self, event: Event) -> bool:
+        """Record the identity ``event`` proves; False when it contradicts the configured seat."""
+        identity = self._identity_from(event)
+        if identity is None:
+            return True
+        previous = self.bound_identity
+        self.bound_identity = identity
+        if hasattr(self.transport, "bound_identity"):
+            self.transport.bound_identity = identity
+        if previous != identity:
+            self.logger.info(f"Identity bound: {json_record(identity.as_record())}")
+
+        meta = getattr(self.state, "meta", None)
+        if meta is not None and hasattr(meta, "player_number") and not meta.player_number:
+            meta.player_number = identity.player_number
+        configured = self._configured_player_number
+        role = self._configured_role
+        if configured is not None and configured != identity.player_number:
+            problem = f"player {identity.player_number}, configured as player {configured}"
+        elif role is not None and identity.role and role != identity.role:
+            problem = f"role {identity.role!r}, configured as {role!r}"
+        else:
+            return True
+        self.identity_error = IdentityMismatchError(f"the server bound this agent to {problem} ({identity.source})")
+        self.logger.error(
+            "Identity mismatch: "
+            + json_record(
+                {
+                    **identity.as_record(),
+                    "record": "identity-mismatch",
+                    "configured_player_number": configured,
+                    "configured_role": role,
+                }
+            )
+        )
+        return False

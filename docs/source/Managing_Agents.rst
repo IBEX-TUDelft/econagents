@@ -116,8 +116,10 @@ econagents import ActionOutcome``) saying what became of the decision. Its
 ``status`` is ``"sent"``, ``"not-transmitted"`` (the transport raised
 ``ConnectionError``, kept in ``error``), ``"stale"`` (the decision finished
 after the agent left the phase occurrence, so nothing was sent),
-``"no-action"`` or ``"skipped"``; ``transmitted`` is ``True`` only for
-``"sent"``. To record outcomes of every decision, including the ones started
+``"no-action"``, ``"skipped"`` or ``"superseded"`` (a revision guard discarded
+it, see below); ``transmitted`` is ``True`` only for ``"sent"``. Its
+``decision_id`` names the decision in the decision trace, and its
+``disposition`` is set once the decision is settled. To record outcomes of every decision, including the ones started
 by phase transitions and the continuous loop, register a listener:
 
 .. code-block:: python
@@ -213,6 +215,64 @@ submission; the next transition into the occurrence asks again. If
 ``mark_decided`` raises, the error is logged and the in-memory record still
 holds.
 
+Dispositions and Decision Traces
+--------------------------------
+
+Sending an action does not mean the server accepted it. A
+``DispositionTracker`` maps server events to the dispositions of the agent's
+own submissions, and the agent does not start its next decision, in any
+phase, until the previous submission has one:
+
+.. code-block:: python
+
+   class AckTracker:
+       def __init__(self):
+           self.pending = []
+
+       def submitted(self, decision_id, message, state) -> bool:
+           self.pending.append(decision_id)
+           return True  # wait for this submission's disposition
+
+       def observe(self, event, state):
+           if event.type in ("order-accepted", "order-refused") and self.pending:
+               return [(self.pending.pop(0), "accepted" if event.type == "order-accepted" else "refused")]
+           return []
+
+   agent = Agent(..., disposition_tracker=AckTracker(), decision_trace=records.append)
+
+``submitted`` runs just before the frame is handed to the transport; if the
+send raises, the agent calls the tracker's optional
+``not_transmitted(decision_id)`` and does not wait. ``observe`` sees every
+event in arrival order, after state projection and before event handlers.
+A hold or no-op needs no disposition. Each decision gets its own
+``decision_id``, so a later decision may send a byte-identical payload.
+
+``disposition_timeout`` (seconds; ``None``, the default, waits indefinitely)
+records a missing answer as ``"unknown"``; a tracker may also return a
+disposition starting with ``"unknown"``. With ``on_unknown="block"`` (the
+default) the agent then makes no new decision until the next
+``phase_transition_event`` reconciles the state. While it waits it calls
+``reconcile_request`` (for example a function that asks the server for a
+snapshot) at once and then every ``reconcile_retry_interval`` seconds, at most
+``reconcile_retry_limit`` times. ``on_unknown="continue"`` only records it.
+
+The role decides on a frozen deep copy of the state, taken when the decision
+starts (``decision_input="frozen"``, the default), so events that arrive
+during a model call do not change its input. ``"guard-discard"`` decides on the
+live state and drops the action (status ``"superseded"``) when the state's
+revision changed during the decision; ``"guard-rerun"`` decides once more on
+the new state first. ``input_revision`` computes the revision (default: sha256
+of the state's JSON form).
+
+``decision_trace`` receives one record per decision once it is settled:
+``decision_id``, ``phase``, ``round``, ``phase_epoch``, ``input_revision``,
+``send_revision``, ``input_changed_during_call``, ``submitted`` (the frame or
+``None``), ``status`` and ``disposition``. Without a tracker, a sent action is
+settled with disposition ``"sent"``; other values are ``"no-action"``,
+``"stale-phase"`` (decided in a phase occurrence the agent has left),
+``"not-transmitted"`` and ``"superseded"``. Revisions are only computed when a
+trace or a guard mode needs them.
+
 Phase Handlers
 --------------
 
@@ -263,3 +323,35 @@ The wait before gameplay is unbounded by default. Set
 the run, exceeds it; that timeout is logged as ``pre-game wait timeout``.
 After a run, ``runner.timeout_reason`` is ``"gameplay"``, ``"pre_game"`` or
 ``None``.
+
+Agent Logs and Identity
+-----------------------
+
+With ``logs_dir`` set, the runner writes ``game_<id>/agent_<n>.log`` per agent,
+tags its records ``[AGENT n]`` in ``all.log``, and names both by the agent's
+player number when ``state.meta.player_number`` is set at launch. An agent
+without one uses its launch index (offset past the largest player number if it
+would collide with a seat's file). ``agent_log_naming="launch-index"`` keeps
+launch-index names for every agent.
+
+The first line of every agent log is a JSON identity header
+(``"record": "agent-identity"``) with ``trace_schema_version``, ``run_id``
+(``GameRunnerConfig.run_id``), ``game_id``, ``player_number``, ``role``,
+``seat_kind``, ``agent_instance_id``, ``launch_index`` and ``log_naming``. The
+log is appended to, not truncated: a replacement agent for the same seat (a
+second runner with the same ``logs_dir``) adds its own header with a new
+``agent_instance_id`` and keeps the earlier instance's records.
+
+The header holds the configured seat. Once the server confirms it, the agent
+logs an ``Identity bound`` record and exposes ``agent.bound_identity`` (also
+``transport.bound_identity`` on ``WebSocketTransport``). The agent takes it
+from the snapshot's own ``playerNumber`` and ``role``, else from the first
+``player-joined`` received after each join, else from the roster entry with
+its recovery token. An agent launched without a player number gets it this
+way. If the server binds a configured agent to another seat or role, the agent
+logs ``identity-mismatch``, sets ``agent.identity_error`` and stops.
+
+Each model call made by the default ``Role`` LLM path is written as one JSON
+line to ``agent_<n>.model_calls.jsonl``: the messages as sent and, for every
+provider response the adapter reports, its id, model, finish reason, usage and
+raw text (see ``capture_llm_calls``).
