@@ -2,6 +2,7 @@
 
 from econagents.runtime.agent import ActionOutcome, Agent
 from econagents.runtime.decision_gate import DecisionGate, DecisionOutcome, PhaseOccurrence
+from econagents.runtime.dispositions import DispositionTracker, state_revision
 from econagents.runtime.experiment_factory import create_game_state
 from econagents.runtime.game_runner import (
     GameRunner,
@@ -17,6 +18,7 @@ __all__ = [
     "Agent",
     "DecisionGate",
     "DecisionOutcome",
+    "DispositionTracker",
     "GameRunner",
     "GameRunnerConfig",
     "HybridGameRunnerConfig",
@@ -26,4 +28,5 @@ __all__ = [
     "PlayerIdentity",
     "TurnBasedGameRunnerConfig",
     "create_game_state",
+    "state_revision",
 ]
