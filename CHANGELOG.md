@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-11
+
 ### Added
 
 - Every agent log starts with a JSON identity header (`trace_schema_version`,
@@ -364,6 +366,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.6.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.3.0...v0.4.0
