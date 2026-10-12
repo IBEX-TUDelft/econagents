@@ -521,8 +521,8 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
         """Log what was sent to the model and what it returned, as one JSON line at INFO.
 
         Holds the messages as sent and, per provider response the adapter reported, its id, model,
-        finish reason, usage and raw text. An adapter that reports nothing leaves ``calls`` empty, and
-        a text response is kept as ``raw_output``.
+        finish reason, usage, raw text and any reasoning summaries. An adapter that reports nothing
+        leaves ``calls`` empty, and a text response is kept as ``raw_output``.
         """
         record = {
             "record": "model-call",

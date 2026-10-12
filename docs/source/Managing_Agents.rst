@@ -137,10 +137,11 @@ ignored.
 Model Call Metadata
 -------------------
 
-``ChatOpenAI`` reports the finish reason, token usage and raw text of every
-provider response it receives as an ``LLMCallRecord``, also when a structured
-output fails to parse (for example JSON cut off at ``max_output_tokens``, where
-the SDK raises a pydantic ``ValidationError`` that ``get_response`` re-raises).
+``ChatOpenAI`` reports the finish reason, token usage, raw text and any reasoning
+summaries of every provider response it receives as an ``LLMCallRecord``, also
+when a structured output fails to parse (for example JSON cut off at
+``max_output_tokens``, where the SDK raises a pydantic ``ValidationError`` that
+``get_response`` re-raises).
 That response is also tracked by the observability provider and logged to the
 ``logger`` passed to ``get_response``. Collect the records with
 ``capture_llm_calls``:
@@ -153,6 +154,15 @@ That response is also tracked by the observability provider and logged to the
        response = await llm.get_response(messages, tracing_extra={}, response_schema=Decision)
    calls[-1].finish_reason  # "completed", "max_output_tokens", ...
    calls[-1].usage          # {"input_tokens": ..., "output_tokens": ..., "reasoning_tokens": ...}
+   calls[-1].reasoning_summary  # ["First summary entry", ...], or None
+
+To request native summaries from a supported OpenAI model, configure
+``ChatOpenAI(reasoning_summary="auto")``. The adapter collects text from
+``summary_text`` entries in each response's ``reasoning`` output items, in
+response order. These summaries are separate from the action output and do
+not require changes to prompts or client messages. Missing or empty summaries
+are recorded as ``None``. Summaries are retained for each response in a tool
+loop and when structured-output parsing fails.
 
 When the HTTP body is not a Responses API payload at all (for example an HTML
 page from a proxy, served with status 200), no model output was received: the
@@ -353,5 +363,5 @@ logs ``identity-mismatch``, sets ``agent.identity_error`` and stops.
 
 Each model call made by the default ``Role`` LLM path is written as one JSON
 line to ``agent_<n>.model_calls.jsonl``: the messages as sent and, for every
-provider response the adapter reports, its id, model, finish reason, usage and
-raw text (see ``capture_llm_calls``).
+provider response the adapter reports, its id, model, finish reason, usage,
+raw text and any reasoning summaries (see ``capture_llm_calls``).

@@ -25,6 +25,8 @@ class LLMCallRecord:
     all (for example a non-JSON page from a proxy); no model output was received and the adapter
     re-raises the decoding error. ``response_id`` is the provider's id for the response, and ``messages``
     the request input exactly as sent (for a tool-calling loop, the conversation of that request).
+    ``reasoning_summary`` holds the provider's summary text entries in response order, or ``None``
+    when none were returned. It is separate from the model's action output.
     """
 
     provider: str
@@ -36,6 +38,7 @@ class LLMCallRecord:
     response_error: Optional[str] = None
     response_id: Optional[str] = None
     messages: Optional[list[Any]] = None
+    reasoning_summary: Optional[list[str]] = None
 
 
 @runtime_checkable
