@@ -6,6 +6,15 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-15
+
+### Fixed
+
+- Raised the gameplay timeout guard test's budget from 0.5 to 5 seconds and
+  extended its simulated market phase to 10 seconds, giving slow Windows
+  startup time to report a phase before the provisional timeout. The deadline
+  assertions remain unchanged. No library code changed.
+
 ## [0.7.0] - 2026-10-15
 
 ### Added
@@ -388,6 +397,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.7.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.5.1...v0.6.0
