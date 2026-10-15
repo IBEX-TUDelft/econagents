@@ -231,6 +231,26 @@ async def test_provider_response_metadata_is_recoverable_after_an_info_run(confi
 
 
 @pytest.mark.asyncio
+async def test_native_reasoning_summary_is_persisted_at_info_without_changing_the_action(config):
+    summaries = ["Comparing the available prices.", "Choosing the price with the highest expected payoff."]
+    response = openai_response(
+        output=[
+            SimpleNamespace(
+                type="reasoning",
+                summary=[SimpleNamespace(type="summary_text", text=text) for text in summaries],
+            )
+        ]
+    )
+    _, transport = await run_with_openai(config, response)
+
+    path = config.logs_dir / f"game_{GAME_ID}" / f"agent_{PLAYER}.model_calls.jsonl"
+    [record] = [json.loads(line) for line in path.read_text().splitlines()]
+    assert record["calls"][0]["reasoning_summary"] == summaries
+    assert record["calls"][0]["response_id"] == response.id
+    assert [json.loads(message) for message in transport.sent] == [json.loads(RAW_OUTPUT)]
+
+
+@pytest.mark.asyncio
 async def test_recording_does_not_change_wire_output_or_model_calls(config):
     """guard: one decision means one model call and the parsed output is what reaches the wire."""
     llm = ScriptedLLM([RAW_OUTPUT])

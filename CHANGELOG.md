@@ -6,6 +6,21 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-15
+
+### Added
+
+- `LLMCallRecord.reasoning_summary` captures OpenAI's native reasoning summary
+  text in response order and persists it in `agent_<n>.model_calls.jsonl` at
+  INFO level. Enable summaries with `ChatOpenAI(reasoning_summary="auto")`.
+  Summaries are retained for tool calls, reasoning-only responses and structured
+  output parsing failures; missing summaries remain optional.
+
+### Fixed
+
+- Expressed the trace schema version's documentation as a comment so the
+  `check-docstring-first` pre-commit hook passes across the repository.
+
 ## [0.6.1] - 2026-10-11
 
 ### Fixed
@@ -373,6 +388,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.7.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.5.0...v0.5.1

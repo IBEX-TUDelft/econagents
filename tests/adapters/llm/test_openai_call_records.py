@@ -23,8 +23,16 @@ class _Decision(BaseModel):
     price: float
 
 
-def _body(status: str, text: Optional[str], reason: Optional[str] = None) -> dict:
-    output: list[dict] = [{"type": "reasoning", "id": "rs_1", "summary": []}]
+def _body(
+    status: str, text: Optional[str], reason: Optional[str] = None, *, summaries: Optional[list[str]] = None
+) -> dict:
+    output: list[dict] = [
+        {
+            "type": "reasoning",
+            "id": "rs_1",
+            "summary": [{"type": "summary_text", "text": text} for text in summaries or []],
+        }
+    ]
     if text is not None:
         output.append(
             {
@@ -116,7 +124,8 @@ async def test_completed_structured_response_is_recorded():
 @pytest.mark.asyncio
 async def test_unparsable_structured_response_is_recorded_and_the_error_reraised():
     text = '{"reasoning": "cut off'
-    with _fake_api(_body("incomplete", text, "max_output_tokens")), _api().capture_llm_calls() as calls:
+    body = _body("incomplete", text, "max_output_tokens", summaries=["Choosing a price."])
+    with _fake_api(body), _api().capture_llm_calls() as calls:
         with pytest.raises(ValidationError):
             await _llm().get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision)
 
@@ -124,6 +133,7 @@ async def test_unparsable_structured_response_is_recorded_and_the_error_reraised
     assert (record.finish_reason, record.usage, record.raw_output) == ("max_output_tokens", USAGE, text)
     assert record.parse_error
     assert record.response_error is None
+    assert record.reasoning_summary == ["Choosing a price."]
 
 
 @pytest.mark.asyncio
@@ -140,6 +150,7 @@ async def test_a_non_response_body_is_reported_as_a_response_error_and_the_origi
     [record] = calls
     assert (record.parse_error, record.raw_output, record.finish_reason) == (None, None, None)
     assert record.response_error == str(raised.value)
+    assert record.reasoning_summary is None
     if content_type == "application/json":
         assert isinstance(raised.value, json.JSONDecodeError)
     llm.observability.track_llm_call.assert_called_once()
@@ -156,11 +167,94 @@ async def test_a_json_body_that_is_no_model_response_is_a_response_error():
 
 @pytest.mark.asyncio
 async def test_reasoning_only_response_is_recorded_without_output():
-    with _fake_api(_body("incomplete", None, "max_output_tokens")), _api().capture_llm_calls() as calls:
+    body = _body("incomplete", None, "max_output_tokens", summaries=["Considering the available prices."])
+    with _fake_api(body), _api().capture_llm_calls() as calls:
         result = await _llm().get_response([{"role": "user", "content": "x"}], {}, response_schema=_Decision)
 
     assert result is None
     assert [(c.finish_reason, c.raw_output, c.parse_error) for c in calls] == [("max_output_tokens", None, None)]
+    assert calls[0].reasoning_summary == ["Considering the available prices."]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("structured", [False, True])
+async def test_native_summary_entries_are_recorded_in_response_order(structured):
+    text = '{"reasoning": "action explanation", "price": 10}'
+    body = _body("completed", text, summaries=["Comparing payoffs.", "Considering risk.\nChoosing a price."])
+    body["output"] = [
+        body["output"][1],
+        body["output"][0],
+        {"type": "reasoning", "id": "rs_2", "summary": [{"type": "summary_text", "text": "Decision made."}]},
+    ]
+    requests = []
+
+    def handler(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(200, json=body)
+
+    llm = _llm()
+    llm.reasoning_summary = "auto"
+    with _fake_http(handler), _api().capture_llm_calls() as calls:
+        result = await llm.get_response(
+            [{"role": "user", "content": "x"}], {}, response_schema=_Decision if structured else None
+        )
+
+    assert result == (_Decision(reasoning="action explanation", price=10) if structured else text)
+    assert calls[0].raw_output == text
+    assert calls[0].reasoning_summary == [
+        "Comparing payoffs.",
+        "Considering risk.\nChoosing a price.",
+        "Decision made.",
+    ]
+    assert requests[0]["reasoning"] == {"summary": "auto"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("include_reasoning", [False, True])
+async def test_absent_or_empty_native_summaries_are_optional(include_reasoning):
+    body = _body("completed", "hello")
+    if not include_reasoning:
+        body["output"] = body["output"][1:]
+    with _fake_api(body), _api().capture_llm_calls() as calls:
+        result = await _llm().get_response([{"role": "user", "content": "x"}], {})
+
+    assert result == "hello"
+    assert calls[0].reasoning_summary is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("max_tool_iterations", [0, 1])
+async def test_native_summaries_are_recorded_for_each_tool_loop_response(max_tool_iterations):
+    from econagents.ports.tools import ToolSpec
+
+    first = _body("completed", None, summaries=["I need the current price."])
+    first["output"].append(
+        {"type": "function_call", "id": "fc_1", "call_id": "call_1", "name": "price", "arguments": "{}"}
+    )
+    final = _body("completed", "hello", summaries=["The price supports my decision."])
+    final["id"] = "resp_2"
+    responses = iter([first, final])
+    executed = []
+
+    async def executor(call):
+        executed.append(call)
+        return 10
+
+    with _fake_http(lambda request: httpx.Response(200, json=next(responses))), _api().capture_llm_calls() as calls:
+        result = await _llm().get_response(
+            [{"role": "user", "content": "x"}],
+            {},
+            tools=[ToolSpec(name="price", description="Get the price", parameters={"type": "object"})],
+            tool_executor=executor,
+            max_tool_iterations=max_tool_iterations,
+        )
+
+    assert result == "hello"
+    assert [call.name for call in executed] == ["price"]
+    assert [(call.response_id, call.reasoning_summary) for call in calls] == [
+        ("resp_1", ["I need the current price."]),
+        ("resp_2", ["The price supports my decision."]),
+    ]
 
 
 @pytest.mark.asyncio

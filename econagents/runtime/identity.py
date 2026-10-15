@@ -4,8 +4,8 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any, Literal, Optional
 
+# Version of the identity header, identity-bound and model-call records written to agent logs.
 TRACE_SCHEMA_VERSION = 1
-"""Version of the identity header, identity-bound and model-call records written to agent logs."""
 
 SNAPSHOT_EVENT = "snapshot"
 PLAYER_JOINED_EVENT = "player-joined"

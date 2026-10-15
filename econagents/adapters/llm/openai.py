@@ -164,6 +164,7 @@ class ChatOpenAI(BaseLLM):
                 response_error=str(response_error) if response_error is not None else None,
                 response_id=_response_id(response),
                 messages=list(messages),
+                reasoning_summary=_reasoning_summary(response),
             )
         )
 
@@ -312,3 +313,14 @@ def _output_text(response: Any) -> Optional[str]:
         return "".join(texts)
     text = getattr(response, "output_text", None)
     return text if isinstance(text, str) and text else None
+
+
+def _reasoning_summary(response: Any) -> Optional[list[str]]:
+    texts = [
+        getattr(part, "text", None)
+        for item in getattr(response, "output", None) or []
+        if getattr(item, "type", None) == "reasoning"
+        for part in getattr(item, "summary", None) or []
+        if getattr(part, "type", None) == "summary_text"
+    ]
+    return [text for text in texts if isinstance(text, str)] or None
