@@ -508,15 +508,18 @@ async def test_duplicate_snapshots_and_rejoin_do_not_restart_gameplay_clock(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("event", "key", "per_phase_snapshots"), PHASE_SIGNALS)
 async def test_genuine_gameplay_timeout_still_stops_agents(tmp_path, caplog, event, key, per_phase_snapshots):
-    """No pre-game wait, gameplay (market alone 2 s) longer than the budget: agents are stopped
-    about budget seconds into gameplay, never reach the final phases, and a warning names the budget."""
-    budget = 0.5
+    """Allow slow startup to report a phase before the provisional from-start timeout.
+
+    Gameplay exceeds the budget: agents stop at the deadline during market, never reach the final
+    phases, and a warning names the budget.
+    """
+    budget = 5.0
     outcome = await play_game(
         tmp_path,
         caplog,
         budget=budget,
         human_ready_after=0.0,
-        phase_seconds=phase_plan(0.05, market=2.0),
+        phase_seconds=phase_plan(0.05, market=2 * budget),
         phase_signal=(event, key),
         per_phase_snapshots=per_phase_snapshots,
     )
