@@ -65,13 +65,14 @@ class Role:
 
 
 class Tracker:
-    """``ack`` resolves the oldest submission as accepted; ``drop`` as unknown."""
+    """``ack`` resolves the oldest submission as accepted, ``drop`` as unknown; ``reconcile`` settles a dropped one."""
 
     def __init__(self, wait: bool = True, fail: bool = False) -> None:
         self.wait = wait
         self.fail = fail
         self.pending: list[str] = []
         self.untransmitted: list[str] = []
+        self.dropped: list[str] = []
 
     def submitted(self, decision_id, message, state) -> bool:
         if self.fail:
@@ -80,8 +81,13 @@ class Tracker:
         return self.wait
 
     def observe(self, event, state):
+        if event.type == "reconcile" and self.dropped:
+            return [(self.dropped.pop(0), event.data.get("disposition", "accepted"))]
         if event.type in ("ack", "drop") and self.pending:
-            return [(self.pending.pop(0), "accepted" if event.type == "ack" else "unknown")]
+            decision_id = self.pending.pop(0)
+            if event.type == "drop":
+                self.dropped.append(decision_id)
+            return [(decision_id, "accepted" if event.type == "ack" else "unknown")]
         return []
 
     def not_transmitted(self, decision_id) -> None:
@@ -146,6 +152,85 @@ async def test_continue_policy_records_unknown_without_blocking(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_continue_policy_traces_a_later_reconciliation(tmp_path):
+    records: list[dict] = []
+    role = Role()
+    agent, _ = make_agent(
+        role, tmp_path, delay=3600, disposition_tracker=Tracker(), decision_trace=records.append, on_unknown="continue"
+    )
+    entry = asyncio.create_task(agent.on_event(snapshot()))
+    await spin()
+    try:
+        await agent.on_event(Event(type="drop"))
+        await agent.on_event(Event(type="reconcile", data={"disposition": "filled"}))
+        await agent.on_event(Event(type="reconcile", data={"disposition": "accepted"}))
+        assert [(r["disposition"], r.get("reconciled_from")) for r in records] == [
+            ("unknown", None),
+            ("filled", "unknown"),
+        ]
+    finally:
+        await shutdown(agent, entry)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("via", ["tracker", "timeout"])
+async def test_unknown_reported_after_the_phase_moved_does_not_hold_the_next_phase(tmp_path, via):
+    records: list[dict] = []
+    options: dict[str, Any] = {"disposition_tracker": Tracker(), "decision_trace": records.append}
+    if via == "timeout":
+        options["disposition_timeout"] = 0.2
+    role = Role()
+    agent, transport = make_agent(role, tmp_path, delay=3600, **options)
+    decided: list[str] = []
+
+    async def later(phase, state):
+        decided.append(phase)
+        return None
+
+    agent.register_phase_handler("later", later)
+    entry = asyncio.create_task(agent.on_event(snapshot()))
+    await spin()
+    moved = asyncio.create_task(agent.on_event(snapshot("later")))
+    await spin()
+    try:
+        assert len(transport.orders()) == 1
+        assert decided == [], "the pending disposition must hold the next phase until it is answered"
+        if via == "tracker":
+            await agent.on_event(Event(type="drop"))
+        else:
+            await asyncio.sleep(0.3)
+        await spin()
+        assert decided == ["later"], "an unknown from the closed market occurrence held the next phase"
+        closed = [r for r in records if r.get("unresolved_at_phase_close")]
+        assert [r["disposition"] for r in closed] == ["unknown"]
+        assert agent._unknown == {}
+    finally:
+        await shutdown(agent, entry, moved)
+
+
+@pytest.mark.asyncio
+async def test_continue_policy_forgets_unknowns_when_their_phase_closes(tmp_path):
+    records: list[dict] = []
+    role = Role()
+    agent, _ = make_agent(
+        role, tmp_path, delay=3600, disposition_tracker=Tracker(), decision_trace=records.append, on_unknown="continue"
+    )
+    entry = asyncio.create_task(agent.on_event(snapshot()))
+    await spin()
+    try:
+        await agent.on_event(Event(type="drop"))
+        assert len(agent._unknown) == 1
+        moved = asyncio.create_task(agent.on_event(snapshot("later")))
+        await spin()
+        assert agent._unknown == {}, "unknown decisions outlived their phase occurrence under 'continue'"
+        first = records[0]["decision_id"]
+        assert [r.get("unresolved_at_phase_close") for r in records if r["decision_id"] == first] == [None, True]
+        await shutdown(agent, moved)
+    finally:
+        await shutdown(agent, entry)
+
+
+@pytest.mark.asyncio
 async def test_block_policy_requests_reconciliation_a_bounded_number_of_times(tmp_path):
     requests: list[int] = []
     role = Role()
@@ -164,9 +249,9 @@ async def test_block_policy_requests_reconciliation_a_bounded_number_of_times(tm
         await asyncio.sleep(0.15)
         assert len(requests) == 3, f"{len(requests)} reconciliation requests, want the limit of 3"
         assert role.calls == 1
-        await agent.on_event(snapshot())
+        await agent.on_event(Event(type="reconcile"))
         await spin()
-        assert role.calls == 2, "the reconciling snapshot must release the next decision"
+        assert role.calls == 2, "the reconciliation must release the next decision"
     finally:
         await shutdown(agent, entry)
 

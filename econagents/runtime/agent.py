@@ -96,11 +96,16 @@ class Agent(LoggerMixin):
     Dispositions: with a ``disposition_tracker`` (see ``DispositionTracker``), an action the tracker
     announces as awaiting an answer stays unresolved until the tracker reports its disposition, and the
     agent's next decision, in any phase, does not start before that. ``disposition_timeout`` (seconds,
-    ``None`` waits indefinitely) turns a missing answer into ``"unknown"``. With ``on_unknown="block"``
-    (the default) an ``"unknown"`` disposition also holds every later decision until the next
-    ``phase_transition_event`` reconciles the state; meanwhile ``reconcile_request`` (if given) is called
-    at once and then every ``reconcile_retry_interval`` seconds, at most ``reconcile_retry_limit``
-    times. ``on_unknown="continue"`` only records it.
+    ``None`` waits indefinitely) turns a missing answer into ``"unknown"``. The tracker reconciles an
+    ``"unknown"`` decision by reporting its id again with a disposition that is not unknown; a further
+    ``"unknown"`` for it changes nothing. With ``on_unknown="block"`` (the default) an ``"unknown"``
+    disposition holds every later decision in its phase occurrence until the tracker reconciles it; no
+    event releases it by itself. When the agent moves to a different phase occurrence, the action's
+    phase has closed and the next decision reads that occurrence's state, so an unknown decision from an
+    earlier occurrence stops blocking and keeps its ``"unknown"`` disposition (assumed, pending
+    Rutger/Sander; IBEX-game_suite#37). Meanwhile ``reconcile_request`` (if given) is called at once and
+    then every ``reconcile_retry_interval`` seconds, at most ``reconcile_retry_limit`` times.
+    ``on_unknown="continue"`` only records it.
 
     Decision input: with ``decision_input="frozen"`` (the default) the role and phase handlers decide on
     a deep copy of the state taken when the decision starts, so events that arrive during the model call
@@ -112,7 +117,11 @@ class Agent(LoggerMixin):
     ``round``, ``phase_epoch``, ``input_revision``, ``send_revision``, ``input_changed_during_call``,
     ``submitted`` (the frame, or ``None``), ``status`` (the ``ActionOutcome`` status) and
     ``disposition`` (the tracker's answer, ``"unknown"``, ``"sent"`` without a tracker, ``"no-action"``,
-    ``"stale-phase"``, ``"not-transmitted"`` or ``"superseded"``).
+    ``"stale-phase"``, ``"not-transmitted"`` or ``"superseded"``). A decision whose disposition was unknown
+    gets a second record when the tracker reconciles it, with the reconciled ``disposition`` and
+    ``reconciled_from`` set to the unknown one, or, when its phase occurrence has ended unreconciled
+    (also when the unknown arrives after the agent moved on), with the unknown ``disposition`` and
+    ``unresolved_at_phase_close`` set to ``True``; the agent then stops tracking it.
     """
 
     def __init__(
@@ -209,7 +218,7 @@ class Agent(LoggerMixin):
         self._pending: dict[str, dict[str, Any]] = {}
         self._disposition_timers: dict[str, asyncio.Task] = {}
         self._settled = asyncio.Event()
-        self._blocked_on_unknown = False
+        self._unknown: dict[str, dict[str, Any]] = {}
         self._reconcile_task: asyncio.Task | None = None
         self._phase_handlers: dict[PhaseId, PhaseHandler] = {
             INTRODUCTION_PHASE: self._handle_introduction,
@@ -278,8 +287,6 @@ class Agent(LoggerMixin):
             await self.stop()
             return
         self._observe_dispositions(event)
-        if self._blocked_on_unknown and event.type == self.phase_transition_event:
-            self._unblock()
 
         for handler in self._event_handlers.get(event.type, []):
             result = handler(event)
@@ -318,6 +325,7 @@ class Agent(LoggerMixin):
             self._phase_epoch += 1
             self._cancel_phase_tasks()
             self._decided_occurrence = None
+            self._release_closed_unknowns()
 
         self.current_phase = phase
         self._phase_occurrence = occurrence
@@ -541,35 +549,69 @@ class Agent(LoggerMixin):
         for decision_id, disposition in resolved:
             self._resolve(decision_id, disposition)
 
+    @property
+    def _blocked_on_unknown(self) -> bool:
+        return self.on_unknown == "block" and bool(self._unknown)
+
     def _resolve(self, decision_id: str, disposition: str) -> None:
         record = self._pending.pop(decision_id, None)
         timer = self._disposition_timers.pop(decision_id, None)
         if timer is not None and timer is not asyncio.current_task():
             timer.cancel()
         if record is None:
+            self._reconcile(decision_id, disposition)
             return
         record["disposition"] = disposition
         self._emit_trace(record)
-        if is_unknown(disposition) and self.on_unknown == "block":
-            self._block_on_unknown()
+        if is_unknown(disposition):
+            if record.get("phase_epoch") != self._phase_epoch:
+                self._close_unresolved(decision_id, record)
+            else:
+                self._unknown[decision_id] = record
+                if self.on_unknown == "block":
+                    self._block_on_unknown()
         self._settled.set()
 
+    def _reconcile(self, decision_id: str, disposition: str) -> None:
+        """Settle an unknown decision the tracker reports again; release the block once none is left."""
+        record = self._unknown.get(decision_id)
+        if record is None or is_unknown(disposition):
+            return
+        del self._unknown[decision_id]
+        self._emit_trace({**record, "disposition": disposition, "reconciled_from": record["disposition"]})
+        self.logger.info(f"The disposition tracker reconciled the unknown decision {decision_id}: {disposition}")
+        if self.on_unknown == "block" and not self._unknown:
+            self._unblock()
+
+    def _release_closed_unknowns(self) -> None:
+        """Stop tracking unknown decisions whose phase occurrence has ended; they stay unknown."""
+        closed = [d for d, r in self._unknown.items() if r.get("phase_epoch") != self._phase_epoch]
+        if not closed:
+            return
+        for decision_id in closed:
+            self._close_unresolved(decision_id, self._unknown.pop(decision_id))
+        if self.on_unknown == "block" and not self._unknown:
+            self._unblock()
+
+    def _close_unresolved(self, decision_id: str, record: dict[str, Any]) -> None:
+        self.logger.warning(
+            f"Decision {decision_id} from phase {record.get('phase')} (round {record.get('round')}) is still "
+            f"{record.get('disposition')!r} after its phase closed; it no longer holds decisions"
+        )
+        self._emit_trace({**record, "unresolved_at_phase_close": True})
+
     def _block_on_unknown(self) -> None:
-        if not self._blocked_on_unknown:
-            self.logger.warning(
-                f"A disposition is unknown; no new decision until a {self.phase_transition_event!r} event reconciles"
-            )
-        self._blocked_on_unknown = True
+        if len(self._unknown) == 1:
+            self.logger.warning("A disposition is unknown; no new decision until the disposition tracker reconciles it")
         if self.reconcile_request is not None and (self._reconcile_task is None or self._reconcile_task.done()):
             self._reconcile_task = asyncio.create_task(self._request_reconciliation())
 
     def _unblock(self) -> None:
-        self._blocked_on_unknown = False
         if self._reconcile_task is not None:
             if self._reconcile_task is not asyncio.current_task():
                 self._reconcile_task.cancel()
             self._reconcile_task = None
-        self.logger.info(f"A {self.phase_transition_event!r} event reconciled the unknown disposition")
+        self.logger.info("No unknown disposition holds decisions any more; decisions resume")
         self._settled.set()
 
     async def _request_reconciliation(self) -> None:
@@ -585,7 +627,7 @@ class Agent(LoggerMixin):
             await asyncio.sleep(self.reconcile_retry_interval)
         if self._blocked_on_unknown:
             self.logger.warning(
-                f"Still waiting for a {self.phase_transition_event!r} event after {self.reconcile_retry_limit} "
+                f"Still waiting for the disposition tracker to reconcile after {self.reconcile_retry_limit} "
                 "reconciliation requests"
             )
 
