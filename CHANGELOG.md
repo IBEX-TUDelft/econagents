@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-17
+
 ### Changed
 
 - The disposition hook contract (IBEX-game_suite#37): with `Agent(on_unknown="block")`, an
@@ -421,6 +423,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.8.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.6.0...v0.6.1
