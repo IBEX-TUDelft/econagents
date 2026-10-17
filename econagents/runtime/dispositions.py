@@ -24,7 +24,9 @@ class DispositionTracker(Protocol):
     and returns the ``(decision_id, disposition)`` pairs it resolves. A disposition that starts with
     ``"unknown"`` means the outcome could not be established (see ``Agent(on_unknown=...)``). Once the
     tracker has evidence for such a submission, ``observe`` reports its decision id again with the
-    reconciled disposition; that report, not any particular event, is what releases a block.
+    reconciled disposition; that report, not any particular event, releases a block within the
+    submission's phase occurrence. Moving to another occurrence also releases it, leaving the
+    disposition unknown (``Agent`` docstring).
 
     A tracker may also define ``not_transmitted(decision_id)``; the agent calls it when the transport
     raised while sending a submission it had announced with ``submitted``.

@@ -454,6 +454,45 @@ async def test_gated_unknown_disposition_holds_until_the_tracker_reports_it_reco
 
 
 @pytest.mark.asyncio
+async def test_gated_unknown_disposition_stops_blocking_when_its_phase_closes(tmp_path):
+    """IBEX-game_suite#37 (assumed, pending Rutger/Sander): a later phase occurrence is not held by an
+    unknown from a closed one; the decision stays 'unknown', marked unresolved at phase close."""
+    records: list[dict] = []
+    role = GatedRole(gated=False)
+    agent, _ = make_agent(
+        role,
+        tmp_path,
+        delay=0,
+        disposition_tracker=ReconcilingTracker(),
+        disposition_timeout=0.05,
+        decision_trace=records.append,
+    )
+    entry = asyncio.create_task(agent.on_event(snapshot(MARKET)))
+    try:
+        assert await wait_for(lambda: bool(records)), "no decision record after the disposition timeout"
+        decision_id = records[0]["decision_id"]
+        await agent.on_event(snapshot(MARKET))
+        await asyncio.sleep(0.1)
+        assert role.calls == 1, "a same-phase snapshot released the unknown block"
+        decided: list[str] = []
+
+        async def next_phase(phase, state):
+            decided.append(phase)
+            return None
+
+        agent.register_phase_handler(NEXT_PHASE, next_phase)
+        moved = asyncio.create_task(agent.on_event(snapshot(NEXT_PHASE)))
+        assert await wait_for(lambda: decided == [NEXT_PHASE], timeout=1.0), (
+            "the next phase's decision was held by the unknown"
+        )
+        closed = [r for r in records if r["decision_id"] == decision_id and r.get("unresolved_at_phase_close")]
+        assert [r["disposition"] for r in closed] == ["unknown"]
+        assert all(r["disposition"] == "unknown" for r in records if r["decision_id"] == decision_id)
+    finally:
+        await shutdown(agent, entry, *([moved] if "moved" in locals() else []))
+
+
+@pytest.mark.asyncio
 async def test_gated_decision_input_is_frozen_while_in_flight(tmp_path):
     """Option under discussion: the role sees a frozen input copy, not live state mutated mid-decision."""
     role = GatedRole(gated=True)

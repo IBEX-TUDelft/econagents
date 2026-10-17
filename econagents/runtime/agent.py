@@ -99,9 +99,12 @@ class Agent(LoggerMixin):
     ``None`` waits indefinitely) turns a missing answer into ``"unknown"``. The tracker reconciles an
     ``"unknown"`` decision by reporting its id again with a disposition that is not unknown; a further
     ``"unknown"`` for it changes nothing. With ``on_unknown="block"`` (the default) an ``"unknown"``
-    disposition holds every later decision until the tracker has reconciled every such decision; no
-    event releases it by itself. Meanwhile ``reconcile_request`` (if given) is called at once and then
-    every ``reconcile_retry_interval`` seconds, at most ``reconcile_retry_limit`` times.
+    disposition holds every later decision in its phase occurrence until the tracker reconciles it; no
+    event releases it by itself. When the agent moves to a different phase occurrence, the action's
+    phase has closed and the next decision reads that occurrence's state, so an unknown decision from an
+    earlier occurrence stops blocking and keeps its ``"unknown"`` disposition (assumed, pending
+    Rutger/Sander; IBEX-game_suite#37). Meanwhile ``reconcile_request`` (if given) is called at once and
+    then every ``reconcile_retry_interval`` seconds, at most ``reconcile_retry_limit`` times.
     ``on_unknown="continue"`` only records it.
 
     Decision input: with ``decision_input="frozen"`` (the default) the role and phase handlers decide on
@@ -116,7 +119,9 @@ class Agent(LoggerMixin):
     ``disposition`` (the tracker's answer, ``"unknown"``, ``"sent"`` without a tracker, ``"no-action"``,
     ``"stale-phase"``, ``"not-transmitted"`` or ``"superseded"``). A decision whose disposition was unknown
     gets a second record when the tracker reconciles it, with the reconciled ``disposition`` and
-    ``reconciled_from`` set to the unknown one.
+    ``reconciled_from`` set to the unknown one, or, under ``on_unknown="block"``, when its phase
+    occurrence ends unreconciled, with the unknown ``disposition`` and ``unresolved_at_phase_close``
+    set to ``True``.
     """
 
     def __init__(
@@ -320,6 +325,7 @@ class Agent(LoggerMixin):
             self._phase_epoch += 1
             self._cancel_phase_tasks()
             self._decided_occurrence = None
+            self._release_closed_unknowns()
 
         self.current_phase = phase
         self._phase_occurrence = occurrence
@@ -574,6 +580,23 @@ class Agent(LoggerMixin):
         if self.on_unknown == "block" and not self._unknown:
             self._unblock()
 
+    def _release_closed_unknowns(self) -> None:
+        """Stop blocking on unknown decisions whose phase occurrence has ended; they stay unknown."""
+        if self.on_unknown != "block":
+            return
+        closed = [d for d, r in self._unknown.items() if r.get("phase_epoch") != self._phase_epoch]
+        if not closed:
+            return
+        for decision_id in closed:
+            record = self._unknown.pop(decision_id)
+            self.logger.warning(
+                f"Decision {decision_id} from phase {record.get('phase')} (round {record.get('round')}) is still "
+                f"{record.get('disposition')!r} after its phase closed; it no longer holds decisions"
+            )
+            self._emit_trace({**record, "unresolved_at_phase_close": True})
+        if not self._unknown:
+            self._unblock()
+
     def _block_on_unknown(self) -> None:
         if len(self._unknown) == 1:
             self.logger.warning("A disposition is unknown; no new decision until the disposition tracker reconciles it")
@@ -585,7 +608,7 @@ class Agent(LoggerMixin):
             if self._reconcile_task is not asyncio.current_task():
                 self._reconcile_task.cancel()
             self._reconcile_task = None
-        self.logger.info("Every unknown disposition is reconciled; decisions resume")
+        self.logger.info("No unknown disposition holds decisions any more; decisions resume")
         self._settled.set()
 
     async def _request_reconciliation(self) -> None:
