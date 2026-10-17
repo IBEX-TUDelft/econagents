@@ -119,9 +119,9 @@ class Agent(LoggerMixin):
     ``disposition`` (the tracker's answer, ``"unknown"``, ``"sent"`` without a tracker, ``"no-action"``,
     ``"stale-phase"``, ``"not-transmitted"`` or ``"superseded"``). A decision whose disposition was unknown
     gets a second record when the tracker reconciles it, with the reconciled ``disposition`` and
-    ``reconciled_from`` set to the unknown one, or, under ``on_unknown="block"``, when its phase
-    occurrence ends unreconciled, with the unknown ``disposition`` and ``unresolved_at_phase_close``
-    set to ``True``.
+    ``reconciled_from`` set to the unknown one, or, when its phase occurrence has ended unreconciled
+    (also when the unknown arrives after the agent moved on), with the unknown ``disposition`` and
+    ``unresolved_at_phase_close`` set to ``True``; the agent then stops tracking it.
     """
 
     def __init__(
@@ -564,9 +564,12 @@ class Agent(LoggerMixin):
         record["disposition"] = disposition
         self._emit_trace(record)
         if is_unknown(disposition):
-            self._unknown[decision_id] = record
-            if self.on_unknown == "block":
-                self._block_on_unknown()
+            if record.get("phase_epoch") != self._phase_epoch:
+                self._close_unresolved(decision_id, record)
+            else:
+                self._unknown[decision_id] = record
+                if self.on_unknown == "block":
+                    self._block_on_unknown()
         self._settled.set()
 
     def _reconcile(self, decision_id: str, disposition: str) -> None:
@@ -581,21 +584,21 @@ class Agent(LoggerMixin):
             self._unblock()
 
     def _release_closed_unknowns(self) -> None:
-        """Stop blocking on unknown decisions whose phase occurrence has ended; they stay unknown."""
-        if self.on_unknown != "block":
-            return
+        """Stop tracking unknown decisions whose phase occurrence has ended; they stay unknown."""
         closed = [d for d, r in self._unknown.items() if r.get("phase_epoch") != self._phase_epoch]
         if not closed:
             return
         for decision_id in closed:
-            record = self._unknown.pop(decision_id)
-            self.logger.warning(
-                f"Decision {decision_id} from phase {record.get('phase')} (round {record.get('round')}) is still "
-                f"{record.get('disposition')!r} after its phase closed; it no longer holds decisions"
-            )
-            self._emit_trace({**record, "unresolved_at_phase_close": True})
-        if not self._unknown:
+            self._close_unresolved(decision_id, self._unknown.pop(decision_id))
+        if self.on_unknown == "block" and not self._unknown:
             self._unblock()
+
+    def _close_unresolved(self, decision_id: str, record: dict[str, Any]) -> None:
+        self.logger.warning(
+            f"Decision {decision_id} from phase {record.get('phase')} (round {record.get('round')}) is still "
+            f"{record.get('disposition')!r} after its phase closed; it no longer holds decisions"
+        )
+        self._emit_trace({**record, "unresolved_at_phase_close": True})
 
     def _block_on_unknown(self) -> None:
         if len(self._unknown) == 1:

@@ -259,9 +259,15 @@ A hold or no-op needs no disposition. Each decision gets its own
 
 ``disposition_timeout`` (seconds; ``None``, the default, waits indefinitely)
 records a missing answer as ``"unknown"``; a tracker may also return a
-disposition starting with ``"unknown"``. With ``on_unknown="block"`` (the
-default) the agent then makes no new decision until the next
-``phase_transition_event`` reconciles the state. While it waits it calls
+disposition starting with ``"unknown"``. The tracker reconciles such a
+decision by returning its ``decision_id`` from ``observe`` again with a
+disposition that is not unknown, once it has evidence (for example a snapshot
+newer than the submission). With ``on_unknown="block"`` (the default) the
+agent makes no new decision in that phase occurrence until the tracker
+reconciles it; no event releases the block by itself. When the agent moves to
+a different phase occurrence, the action's phase has closed and the next
+decision reads the new occurrence's state: the decision stops blocking and
+keeps its ``"unknown"`` disposition. While it waits the agent calls
 ``reconcile_request`` (for example a function that asks the server for a
 snapshot) at once and then every ``reconcile_retry_interval`` seconds, at most
 ``reconcile_retry_limit`` times. ``on_unknown="continue"`` only records it.
@@ -280,8 +286,12 @@ of the state's JSON form).
 ``None``), ``status`` and ``disposition``. Without a tracker, a sent action is
 settled with disposition ``"sent"``; other values are ``"no-action"``,
 ``"stale-phase"`` (decided in a phase occurrence the agent has left),
-``"not-transmitted"`` and ``"superseded"``. Revisions are only computed when a
-trace or a guard mode needs them.
+``"not-transmitted"`` and ``"superseded"``. A decision whose disposition was
+unknown gets a second record: with the reconciled ``disposition`` and
+``reconciled_from`` when the tracker reconciles it, or with
+``unresolved_at_phase_close: True`` (and the unknown disposition) when its phase
+occurrence ends first. Revisions are only computed when a trace or a guard mode
+needs them.
 
 Phase Handlers
 --------------

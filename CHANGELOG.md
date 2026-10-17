@@ -6,6 +6,30 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The disposition hook contract (IBEX-game_suite#37): with `Agent(on_unknown="block")`, an
+  `"unknown"` disposition no longer lifts on the next `phase_transition_event`. The block lifts
+  only when the tracker reports the same decision id again from `observe` with a disposition that is
+  not unknown, or when the agent moves to a different phase occurrence, in which case the decision
+  keeps its `"unknown"` disposition. A snapshot that is not evidence for the submission therefore
+  keeps the block within the phase. Trackers written for 0.6.0-0.7.1 that never report an unknown
+  decision again keep a blocking agent blocked until the phase occurrence ends.
+
+### Added
+
+- `decision_trace` gets a second record for a decision whose disposition was unknown: with the
+  reconciled `disposition` and `reconciled_from` when the tracker reconciles it, or with
+  `unresolved_at_phase_close: true` when its phase occurrence ends first.
+
+### Fixed
+
+- A snapshot that answered a request sent before a submission released `on_unknown="block"` while
+  the submission's outcome was still unknown.
+- An unknown disposition reported after the agent had moved to a later phase occurrence is closed
+  as unresolved instead of holding the new occurrence, and unknown decisions are no longer kept
+  past their phase occurrence under `on_unknown="continue"`.
+
 ## [0.7.1] - 2026-10-15
 
 ### Fixed

@@ -173,6 +173,64 @@ async def test_continue_policy_traces_a_later_reconciliation(tmp_path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("via", ["tracker", "timeout"])
+async def test_unknown_reported_after_the_phase_moved_does_not_hold_the_next_phase(tmp_path, via):
+    records: list[dict] = []
+    options: dict[str, Any] = {"disposition_tracker": Tracker(), "decision_trace": records.append}
+    if via == "timeout":
+        options["disposition_timeout"] = 0.2
+    role = Role()
+    agent, transport = make_agent(role, tmp_path, delay=3600, **options)
+    decided: list[str] = []
+
+    async def later(phase, state):
+        decided.append(phase)
+        return None
+
+    agent.register_phase_handler("later", later)
+    entry = asyncio.create_task(agent.on_event(snapshot()))
+    await spin()
+    moved = asyncio.create_task(agent.on_event(snapshot("later")))
+    await spin()
+    try:
+        assert len(transport.orders()) == 1
+        assert decided == [], "the pending disposition must hold the next phase until it is answered"
+        if via == "tracker":
+            await agent.on_event(Event(type="drop"))
+        else:
+            await asyncio.sleep(0.3)
+        await spin()
+        assert decided == ["later"], "an unknown from the closed market occurrence held the next phase"
+        closed = [r for r in records if r.get("unresolved_at_phase_close")]
+        assert [r["disposition"] for r in closed] == ["unknown"]
+        assert agent._unknown == {}
+    finally:
+        await shutdown(agent, entry, moved)
+
+
+@pytest.mark.asyncio
+async def test_continue_policy_forgets_unknowns_when_their_phase_closes(tmp_path):
+    records: list[dict] = []
+    role = Role()
+    agent, _ = make_agent(
+        role, tmp_path, delay=3600, disposition_tracker=Tracker(), decision_trace=records.append, on_unknown="continue"
+    )
+    entry = asyncio.create_task(agent.on_event(snapshot()))
+    await spin()
+    try:
+        await agent.on_event(Event(type="drop"))
+        assert len(agent._unknown) == 1
+        moved = asyncio.create_task(agent.on_event(snapshot("later")))
+        await spin()
+        assert agent._unknown == {}, "unknown decisions outlived their phase occurrence under 'continue'"
+        first = records[0]["decision_id"]
+        assert [r.get("unresolved_at_phase_close") for r in records if r["decision_id"] == first] == [None, True]
+        await shutdown(agent, moved)
+    finally:
+        await shutdown(agent, entry)
+
+
+@pytest.mark.asyncio
 async def test_block_policy_requests_reconciliation_a_bounded_number_of_times(tmp_path):
     requests: list[int] = []
     role = Role()
