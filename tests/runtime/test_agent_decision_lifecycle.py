@@ -13,9 +13,10 @@ Test groups:
   has ``submitted(decision_id, message, state) -> bool`` (True: wait for a disposition) and
   ``observe(event, state) -> list[(decision_id, disposition)]`` (IBEX-game_suite#22).
 * decision-gated: behavior that depended on an open researcher decision, encoded as the assumed
-  answers (IBEX-game_suite#22, pending Rutger/Sander): an ``unknown`` disposition blocks until a
-  snapshot reconciles (R4, ``on_unknown="block"``), and the decision input is a frozen copy (R5,
-  ``decision_input="frozen"``). Invert or rewrite them if the decision differs.
+  answers (IBEX-game_suite#22, pending Rutger/Sander): an ``unknown`` disposition blocks until the
+  tracker reports it reconciled (R4, ``on_unknown="block"``; IBEX-game_suite#37: a snapshot alone
+  does not), and the decision input is a frozen copy (R5, ``decision_input="frozen"``). Invert or
+  rewrite them if the decision differs.
 * guard: behavior that already works and that a fix must keep.
 """
 
@@ -125,6 +126,16 @@ class AckTracker:
         if event.type in ("ack", "nack") and self.pending:
             return [(self.pending.pop(0), "accepted" if event.type == "ack" else "refused")]
         return []
+
+
+class ReconcilingTracker(AckTracker):
+    """AckTracker whose ``snapshot`` events settle the first submission when they carry ``reconciled``."""
+
+    def observe(self, event: Event, state: Any) -> list[tuple[str, str]]:
+        reconciled = event.data.get("reconciled")
+        if event.type == "snapshot" and reconciled is not None and self.submissions:
+            return [(self.submissions[0][0], reconciled)]
+        return super().observe(event, state)
 
 
 def make_agent(role, tmp_path: Path, delay: int = 3600, **proposal: Any) -> tuple[Agent, FakeTransport]:
@@ -394,7 +405,7 @@ async def test_gated_unknown_disposition_blocks_until_snapshot_reconciles(tmp_pa
         role,
         tmp_path,
         delay=0,
-        disposition_tracker=AckTracker(),
+        disposition_tracker=ReconcilingTracker(),
         disposition_timeout=0.05,
         decision_trace=records.append,
     )
@@ -403,8 +414,41 @@ async def test_gated_unknown_disposition_blocks_until_snapshot_reconciles(tmp_pa
         assert await wait_for(lambda: bool(records)), "no decision record after the disposition timeout"
         await asyncio.sleep(0.2)
         assert role.calls == 1, f"{role.calls} decisions after an unknown disposition and no reconciling snapshot"
-        await agent.on_event(snapshot(MARKET))
+        await agent.on_event(Event(type="snapshot", data={"currentPhase": MARKET, "reconciled": "accepted"}))
         assert await wait_for(lambda: role.calls >= 2), "no decision after the reconciling snapshot"
+    finally:
+        await shutdown(agent, entry)
+
+
+@pytest.mark.asyncio
+async def test_gated_unknown_disposition_holds_until_the_tracker_reports_it_reconciled(tmp_path):
+    """IBEX-game_suite#37: a snapshot the tracker does not reconcile keeps the block and the 'unknown'."""
+    records: list[dict] = []
+    role = GatedRole(gated=False)
+    tracker = ReconcilingTracker()
+    agent, _ = make_agent(
+        role,
+        tmp_path,
+        delay=0,
+        disposition_tracker=tracker,
+        disposition_timeout=0.05,
+        decision_trace=records.append,
+    )
+    entry = asyncio.create_task(agent.on_event(snapshot(MARKET)))
+    try:
+        assert await wait_for(lambda: bool(records)), "no decision record after the disposition timeout"
+        decision_id = records[0]["decision_id"]
+        assert records[0]["disposition"] == "unknown"
+        await agent.on_event(snapshot(MARKET))
+        await asyncio.sleep(0.2)
+        assert role.calls == 1, "a snapshot the tracker did not reconcile released the unknown block"
+        await agent.on_event(Event(type="snapshot", data={"currentPhase": MARKET, "reconciled": "unknown"}))
+        await asyncio.sleep(0.2)
+        assert role.calls == 1, "a snapshot the tracker left 'unknown' released the block"
+        await agent.on_event(Event(type="snapshot", data={"currentPhase": MARKET, "reconciled": "not-applied"}))
+        assert await wait_for(lambda: role.calls >= 2), "no decision after the tracker reconciled the submission"
+        reconciled = [r for r in records if r["decision_id"] == decision_id and r["disposition"] != "unknown"]
+        assert [(r["disposition"], r.get("reconciled_from")) for r in reconciled] == [("not-applied", "unknown")]
     finally:
         await shutdown(agent, entry)
 
