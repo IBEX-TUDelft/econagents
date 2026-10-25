@@ -22,13 +22,17 @@ class BaseLLM(ABC):
 
         Serializes via the SDK model's ``model_dump_json`` when available so
         the whole response is captured — reasoning items (including any
-        summary), output content, and usage — falling back to ``str``. Logging
-        must never break the call, so serialization errors are swallowed.
+        summary), output content, and usage — falling back to ``str``. Nothing
+        is serialized unless the logger has DEBUG enabled. Pydantic's serializer
+        warnings are off: the SDK builds parsed responses with an unbound
+        generic, so every structured-output response would warn although the
+        JSON is complete. Logging must never break the call, so serialization
+        errors are swallowed.
         """
-        if logger is None:
+        if logger is None or not logger.isEnabledFor(logging.DEBUG):
             return
         try:
-            serialized = response.model_dump_json(indent=2)
+            serialized = response.model_dump_json(indent=2, warnings=False)
         except Exception:  # noqa: BLE001
             serialized = str(response)
         logger.debug("\n+-----LLM RESPONSE----+\n" + f"{serialized}\n+------------------+")

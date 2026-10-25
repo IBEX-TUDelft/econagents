@@ -1,3 +1,5 @@
+import logging
+import warnings
 from typing import Literal, get_args
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -213,6 +215,69 @@ class TestChatOpenAI:
 
         assert response == "ok"
         mock_response.model_dump_json.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_response_not_serialized_when_debug_disabled(self):
+        """A logger without DEBUG enabled gets nothing, and the response is never serialized."""
+        mock_response = MagicMock()
+        mock_response.output_text = "ok"
+
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=mock_response)
+        log = logging.getLogger("econagents.tests.info_only")
+        log.setLevel(logging.INFO)
+
+        with (
+            patch("importlib.util.find_spec", return_value=True),
+            patch("openai.AsyncOpenAI", return_value=mock_client),
+        ):
+            openai = ChatOpenAI(model_name="gpt-4.1-mini")
+            openai.observability = MagicMock()
+
+            await openai.get_response([{"role": "user", "content": "hi"}], tracing_extra={}, logger=log)
+
+        mock_response.model_dump_json.assert_not_called()
+
+    def test_parsed_response_logged_without_serializer_warnings(self):
+        """A structured-output response from the SDK's parse path logs in full without Pydantic warnings."""
+        from openai.lib._parsing._responses import parse_response
+        from openai.types.responses import Response
+
+        response = Response.model_validate(
+            {
+                "id": "resp_1",
+                "object": "response",
+                "created_at": 0,
+                "model": "gpt-5.4-mini",
+                "parallel_tool_calls": False,
+                "tool_choice": "auto",
+                "tools": [],
+                "status": "completed",
+                "output": [
+                    {"id": "rs_1", "type": "reasoning", "summary": [{"type": "summary_text", "text": "because"}]},
+                    {
+                        "id": "msg_1",
+                        "type": "message",
+                        "role": "assistant",
+                        "status": "completed",
+                        "content": [
+                            {"type": "output_text", "text": '{"gameId": 7, "action": "go"}', "annotations": []}
+                        ],
+                    },
+                ],
+            }
+        )
+        parsed = parse_response(text_format=_SampleSchema, input_tools=None, response=response)
+        log = MagicMock()
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            ChatOpenAI._log_response(parsed, log)
+
+        assert [str(w.message) for w in caught] == []
+        logged = log.debug.call_args.args[0]
+        assert '"gameId": 7' in logged
+        assert '"text": "because"' in logged
 
     @pytest.mark.asyncio
     async def test_get_response_import_error(self):
