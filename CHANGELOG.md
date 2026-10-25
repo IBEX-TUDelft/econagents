@@ -6,6 +6,15 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-25
+
+### Fixed
+
+- `LLM._log_response` no longer serializes a response unless the logger has DEBUG enabled, and it
+  serializes with Pydantic's serializer warnings off. Structured-output responses from the openai SDK
+  (built with an unbound generic) printed a block of `PydanticSerializationUnexpectedValue` warnings on
+  every call; the logged JSON is unchanged.
+
 ## [0.8.0] - 2026-10-17
 
 ### Changed
@@ -423,6 +432,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.8.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.6.1...v0.7.0
