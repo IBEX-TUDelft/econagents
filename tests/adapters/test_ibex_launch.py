@@ -1,4 +1,4 @@
-"""econagents.launch, used the way ibex's AgentService uses it.
+"""econagents.adapters.launch (ibex), used the way ibex's AgentService uses it.
 
 The contract between AgentService and the launcher is duplicated on each side: ibex tests
 AgentService against a mock agents program, and these tests drive the launcher with the
@@ -17,14 +17,14 @@ from econagents.adapters.llm.base import BaseLLM
 from econagents.adapters.protocol import IbexMessageCodec
 from econagents.domain.role import Role
 from econagents.domain.state.game import GameState
-from econagents.launch import (
-    GameSpec,
-    LaunchError,
+from econagents.adapters.launch.ibex import (
+    IbexGameSpec,
+    IbexLaunchError,
     build_agent,
     build_config,
     build_parser,
+    ibex_main,
     list_personas,
-    main,
     parse_seats,
     run,
 )
@@ -65,13 +65,13 @@ def persona_yaml(folder: Path, persona_id: str) -> None:
 
 
 @pytest.fixture
-def spec(tmp_path: Path) -> GameSpec:
+def spec(tmp_path: Path) -> IbexGameSpec:
     prompts = tmp_path / "prompts"
     prompts.mkdir()
     personas = tmp_path / "personas"
     persona_yaml(personas, "tit_for_tat")
     persona_yaml(personas / "nested", "grim_trigger")
-    return GameSpec(
+    return IbexGameSpec(
         game="prisoner_dilemma",
         state_cls=GameState,
         roles={"prisoner": Prisoner, "guard": Guard},
@@ -122,13 +122,13 @@ def test_available_personas_lists_the_folder_then_the_library(tmp_path: Path) ->
     assert list(sources) == sorted(sources)
 
 
-def test_list_personas_answers_the_agent_service_query(spec: GameSpec, capsys: pytest.CaptureFixture) -> None:
-    assert main(spec, ["--game", "prisoner_dilemma", "--list-personas"]) == 0
+def test_list_personas_answers_the_agent_service_query(spec: IbexGameSpec, capsys: pytest.CaptureFixture) -> None:
+    assert ibex_main(spec, ["--game", "prisoner_dilemma", "--list-personas"]) == 0
     ids = json.loads(capsys.readouterr().out)
     assert {"tit_for_tat", "grim_trigger"} <= set(ids)
     assert library_ids() <= set(ids)
 
-    assert main(spec, ["--game", "prisoner_dilemma", "--list-personas", "--with-source"]) == 0
+    assert ibex_main(spec, ["--game", "prisoner_dilemma", "--list-personas", "--with-source"]) == 0
     entries = json.loads(capsys.readouterr().out)
     by_id = {e["id"]: e["source"] for e in entries}
     assert by_id["tit_for_tat"] == "game"
@@ -136,22 +136,22 @@ def test_list_personas_answers_the_agent_service_query(spec: GameSpec, capsys: p
     assert {by_id[i] for i in library_ids()} == {"library"}
 
 
-def test_every_listed_persona_loads(spec: GameSpec) -> None:
+def test_every_listed_persona_loads(spec: IbexGameSpec) -> None:
     from econagents.personas import load_persona
 
     for pid in list_personas(spec):
         assert load_persona(pid, user_dir=spec.personas_dir).id == pid
 
 
-def test_another_game_is_refused(spec: GameSpec, capsys: pytest.CaptureFixture) -> None:
-    assert main(spec, ["--game", "futarchy", "--list-personas"]) == 2
+def test_another_game_is_refused(spec: IbexGameSpec, capsys: pytest.CaptureFixture) -> None:
+    assert ibex_main(spec, ["--game", "futarchy", "--list-personas"]) == 2
     assert "prisoner_dilemma" in capsys.readouterr().err
 
 
 # --- seats ---------------------------------------------------------------------------------
 
 
-def test_seats_follow_the_recovery_codes(spec: GameSpec) -> None:
+def test_seats_follow_the_recovery_codes(spec: IbexGameSpec) -> None:
     seats = parse_seats(spec, build_parser(spec).parse_args(agent_service_argv()))
     assert [(s.recovery, s.player_number, s.role, s.persona_id) for s in seats] == [
         ("r1", 1, "prisoner", "tit_for_tat"),
@@ -159,7 +159,7 @@ def test_seats_follow_the_recovery_codes(spec: GameSpec) -> None:
     ]
 
 
-def test_personas_may_be_left_out(spec: GameSpec) -> None:
+def test_personas_may_be_left_out(spec: IbexGameSpec) -> None:
     seats = parse_seats(spec, build_parser(spec).parse_args(agent_service_argv(persona=None)))
     assert [s.persona_id for s in seats] == [None, None]
 
@@ -175,20 +175,20 @@ def test_personas_may_be_left_out(spec: GameSpec) -> None:
         ({"port": None}, "--port"),
     ],
 )
-def test_inconsistent_seats_are_refused(spec: GameSpec, overrides: dict, message: str) -> None:
-    with pytest.raises(LaunchError, match=message):
+def test_inconsistent_seats_are_refused(spec: IbexGameSpec, overrides: dict, message: str) -> None:
+    with pytest.raises(IbexLaunchError, match=message):
         parse_seats(spec, build_parser(spec).parse_args(agent_service_argv(**overrides)))
 
 
-def test_main_reports_a_bad_command_line(spec: GameSpec, capsys: pytest.CaptureFixture) -> None:
-    assert main(spec, agent_service_argv(role=["prisoner"])) == 2
+def test_main_reports_a_bad_command_line(spec: IbexGameSpec, capsys: pytest.CaptureFixture) -> None:
+    assert ibex_main(spec, agent_service_argv(role=["prisoner"])) == 2
     assert "every seat needs both" in capsys.readouterr().err
 
 
 # --- configuration and agents ------------------------------------------------------------------
 
 
-def test_turn_based_configuration_with_ibex_defaults(spec: GameSpec, tmp_path: Path) -> None:
+def test_turn_based_configuration_with_ibex_defaults(spec: IbexGameSpec, tmp_path: Path) -> None:
     args = build_parser(spec).parse_args(agent_service_argv() + ["--logs-dir", str(tmp_path / "out")])
     config = build_config(spec, args)
 
@@ -204,8 +204,8 @@ def test_turn_based_configuration_with_ibex_defaults(spec: GameSpec, tmp_path: P
     assert again.run_id != config.run_id
 
 
-def test_continuous_phases_give_a_hybrid_configuration(spec: GameSpec) -> None:
-    hybrid = GameSpec(**{**spec.__dict__, "continuous_phases": frozenset({"market"})})
+def test_continuous_phases_give_a_hybrid_configuration(spec: IbexGameSpec) -> None:
+    hybrid = IbexGameSpec(**{**spec.__dict__, "continuous_phases": frozenset({"market"})})
     config = build_config(
         hybrid, build_parser(hybrid).parse_args(agent_service_argv() + ["--min-delay", "1", "--max-delay", "2"])
     )
@@ -214,14 +214,14 @@ def test_continuous_phases_give_a_hybrid_configuration(spec: GameSpec) -> None:
     assert (config.min_action_delay, config.max_action_delay) == (1, 2)
 
 
-def test_each_seat_gets_its_role_persona_and_identity(spec: GameSpec) -> None:
+def test_each_seat_gets_its_role_persona_and_identity(spec: IbexGameSpec) -> None:
     hooked: list[tuple[int, str]] = []
 
     def agent_kwargs(seat: Any, config: Any, role: Role) -> dict:
         hooked.append((seat.player_number, role.name))
         return {"on_unknown": "continue"}
 
-    spec = GameSpec(**{**spec.__dict__, "agent_kwargs": agent_kwargs})
+    spec = IbexGameSpec(**{**spec.__dict__, "agent_kwargs": agent_kwargs})
     args = build_parser(spec).parse_args(agent_service_argv())
     config = build_config(spec, args)
     agents = [build_agent(spec, config, seat) for seat in parse_seats(spec, args)]
@@ -283,7 +283,7 @@ class StandInServer:
 
 
 @pytest.mark.asyncio
-async def test_a_game_played_from_the_agent_service_command_line(spec: GameSpec, tmp_path: Path) -> None:
+async def test_a_game_played_from_the_agent_service_command_line(spec: IbexGameSpec, tmp_path: Path) -> None:
     server = StandInServer({"r1": 1, "r2": 2})
     async with websockets.serve(server.handler, "127.0.0.1", 0) as ws_server:
         port = ws_server.sockets[0].getsockname()[1]

@@ -1,7 +1,7 @@
 """Run a game's agents the way ibex's AgentService spawns them.
 
 A game's agents are one Python program that calls :func:`main` with the game's
-:class:`GameSpec`. ibex starts it once per game, for every agent seat at once,
+:class:`IbexGameSpec`. ibex starts it once per game, for every agent seat at once,
 and never lets it create, start or claim a game: every seat's identity arrives
 on the command line, one value per seat, in the same order::
 
@@ -59,7 +59,7 @@ GET_SNAPSHOT = json.dumps({"meta": {"type": "get-snapshot"}, "payload": {}})
 
 
 @dataclass(frozen=True)
-class Seat:
+class IbexSeat:
     """One agent seat, as the server claimed it."""
 
     recovery: str
@@ -69,7 +69,7 @@ class Seat:
 
 
 @dataclass(frozen=True)
-class GameSpec:
+class IbexGameSpec:
     """What one game's agents are made of.
 
     ``roles`` maps the server's role names to ``Role`` classes; each is built with
@@ -89,7 +89,7 @@ class GameSpec:
     continuous_phases: frozenset[str] = frozenset()
     action_delays: tuple[int, int] = (3, 8)
     message_codec: Callable[[], MessageCodec] = IbexMessageCodec
-    agent_kwargs: Optional[Callable[[Seat, RunnerConfig, Role], dict[str, Any]]] = None
+    agent_kwargs: Optional[Callable[[IbexSeat, RunnerConfig, Role], dict[str, Any]]] = None
     description: Optional[str] = None
 
     @property
@@ -97,11 +97,11 @@ class GameSpec:
         return bool(self.continuous_phases)
 
 
-class LaunchError(Exception):
+class IbexLaunchError(Exception):
     """The command line does not describe the seats of a game this program plays."""
 
 
-def list_personas(spec: GameSpec, with_source: bool = False) -> list[Any]:
+def list_personas(spec: IbexGameSpec, with_source: bool = False) -> list[Any]:
     """The persona ids a seat of this game may ask for, sorted (``--list-personas``)."""
     sources = available_personas(spec.personas_dir)
     if not with_source:
@@ -109,7 +109,7 @@ def list_personas(spec: GameSpec, with_source: bool = False) -> list[Any]:
     return [{"id": pid, "source": "game" if source == "user" else "library"} for pid, source in sources.items()]
 
 
-def build_parser(spec: GameSpec) -> argparse.ArgumentParser:
+def build_parser(spec: IbexGameSpec) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=f"{spec.game} agents",
         description=spec.description or __doc__,
@@ -137,29 +137,31 @@ def build_parser(spec: GameSpec) -> argparse.ArgumentParser:
     return parser
 
 
-def parse_seats(spec: GameSpec, args: argparse.Namespace) -> list[Seat]:
+def parse_seats(spec: IbexGameSpec, args: argparse.Namespace) -> list[IbexSeat]:
     """One seat per ``--recovery-code``; the other per-seat lists must match it."""
     missing = [flag for flag in ("game_id", "hostname", "port") if getattr(args, flag) is None]
     if missing:
-        raise LaunchError("missing " + ", ".join("--" + m.replace("_", "-") for m in missing))
+        raise IbexLaunchError("missing " + ", ".join("--" + m.replace("_", "-") for m in missing))
     n = len(args.recovery_codes)
     if n == 0:
-        raise LaunchError("no --recovery-code: there is no seat to play")
+        raise IbexLaunchError("no --recovery-code: there is no seat to play")
     if len(args.player_numbers) != n or len(args.roles) != n:
-        raise LaunchError(
+        raise IbexLaunchError(
             f"{n} seat(s) but {len(args.player_numbers)} --player-number and {len(args.roles)} --role: "
             "every seat needs both"
         )
     personas = args.personas or [""] * n
     if len(personas) != n:
-        raise LaunchError(f'{n} seat(s) but {len(personas)} --persona: give one per seat ("" for none)')
+        raise IbexLaunchError(f'{n} seat(s) but {len(personas)} --persona: give one per seat ("" for none)')
     seats = [
-        Seat(recovery=r, player_number=int(pn), role=role, persona_id=persona or None)
+        IbexSeat(recovery=r, player_number=int(pn), role=role, persona_id=persona or None)
         for r, pn, role, persona in zip(args.recovery_codes, args.player_numbers, args.roles, personas)
     ]
     unknown = sorted({s.role for s in seats if s.role not in spec.roles})
     if unknown:
-        raise LaunchError(f"no Role for server role(s) {', '.join(unknown)} (known: {', '.join(sorted(spec.roles))})")
+        raise IbexLaunchError(
+            f"no Role for server role(s) {', '.join(unknown)} (known: {', '.join(sorted(spec.roles))})"
+        )
     return seats
 
 
@@ -169,7 +171,7 @@ def run_logs_dir(base: Path, game_id: int) -> Path:
     return base / f"{stamp}-game{game_id}-{uuid.uuid4().hex[:6]}"
 
 
-def build_config(spec: GameSpec, args: argparse.Namespace) -> RunnerConfig:
+def build_config(spec: IbexGameSpec, args: argparse.Namespace) -> RunnerConfig:
     game_id = int(args.game_id)
     common: dict[str, Any] = dict(
         game_id=game_id,
@@ -194,7 +196,7 @@ def build_config(spec: GameSpec, args: argparse.Namespace) -> RunnerConfig:
     return TurnBasedGameRunnerConfig(**common)
 
 
-def build_agent(spec: GameSpec, config: RunnerConfig, seat: Seat) -> Agent:
+def build_agent(spec: IbexGameSpec, config: RunnerConfig, seat: IbexSeat) -> Agent:
     persona = load_persona(seat.persona_id, user_dir=spec.personas_dir) if seat.persona_id else None
     role = spec.roles[seat.role](persona=persona)
 
@@ -238,13 +240,13 @@ def build_agent(spec: GameSpec, config: RunnerConfig, seat: Seat) -> Agent:
     return agent
 
 
-async def run(spec: GameSpec, args: argparse.Namespace) -> None:
+async def run(spec: IbexGameSpec, args: argparse.Namespace) -> None:
     config = build_config(spec, args)
     agents = [build_agent(spec, config, seat) for seat in parse_seats(spec, args)]
     await GameRunner(config=config, agents=agents).run_game()
 
 
-def main(spec: GameSpec, argv: Optional[Sequence[str]] = None) -> int:
+def ibex_main(spec: IbexGameSpec, argv: Optional[Sequence[str]] = None) -> int:
     """The agents program's entry point: answers ``--list-personas`` or plays the seats."""
     parser = build_parser(spec)
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -256,7 +258,7 @@ def main(spec: GameSpec, argv: Optional[Sequence[str]] = None) -> int:
         return 0
     try:
         parse_seats(spec, args)
-    except LaunchError as e:
+    except IbexLaunchError as e:
         print(f"{spec.game} agents: {e}.", file=sys.stderr)
         return 2
     asyncio.run(run(spec, args))
@@ -264,15 +266,15 @@ def main(spec: GameSpec, argv: Optional[Sequence[str]] = None) -> int:
 
 
 __all__ = [
-    "GameSpec",
-    "LaunchError",
+    "IbexGameSpec",
+    "IbexLaunchError",
+    "IbexSeat",
     "RunnerConfig",
-    "Seat",
     "build_agent",
     "build_config",
     "build_parser",
+    "ibex_main",
     "list_personas",
-    "main",
     "parse_seats",
     "run",
 ]
