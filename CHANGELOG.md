@@ -13,6 +13,13 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the action's `meta.reasoning`, through `Role.attach_reasoning`, which a role can override for another
   message shape. An action without a `meta` object, or decided without reasoning, is sent as before.
   `IbexMessageCodec` cuts `meta.reasoning` to 4000 characters.
+- `econagents.launch`: the entry point for a game's agents spawned by ibex's `AgentService`.
+  `main(GameSpec(...))` reads AgentService's command line (one `--recovery-code`, `--player-number`,
+  `--role` and optional `--persona` per seat), builds one `Agent` per seat with ibex's defaults
+  (snapshot as phase transition, `JoinPayloadAuth`, no game watchdog, a logs folder per run) and runs
+  them; `--list-personas [--with-source]` prints the personas a seat may ask for. `GameSpec.agent_kwargs`
+  adds per-seat `Agent` arguments (decision gate, disposition tracker, traces). Changes no existing API.
+- `econagents.personas.available_personas(user_dir)`: every id `load_persona` resolves, with its source.
 
 ## [0.8.1] - 2026-10-25
 
