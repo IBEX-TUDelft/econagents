@@ -61,17 +61,16 @@ class IbexMessageCodec:
 
         return Event(type="", data={}, raw=decoded)
 
-    def encode_action(self, action: dict[str, Any] | Action, *, reasoning: str | None = None) -> str:
+    def encode_action(self, action: dict[str, Any] | Action) -> str:
         """Encode an action as a JSON string.
 
-        Dict actions are treated as already-shaped outbound payloads. ``reasoning`` goes in
-        ``meta.reasoning``, cut to ``MAX_REASONING_LENGTH`` characters; an action without a ``meta``
-        object is sent without it.
+        Dict actions are treated as already-shaped outbound payloads. A ``meta.reasoning`` text is cut to
+        ``MAX_REASONING_LENGTH`` characters.
         """
         payload = action.as_payload() if isinstance(action, Action) else action
         meta = payload.get("meta")
-        if reasoning and isinstance(meta, dict):
-            payload = {**payload, "meta": {**meta, "reasoning": reasoning[:MAX_REASONING_LENGTH]}}
+        if isinstance(meta, dict) and isinstance(meta.get("reasoning"), str):
+            payload = {**payload, "meta": {**meta, "reasoning": meta["reasoning"][:MAX_REASONING_LENGTH]}}
         return json.dumps(payload)
 
     def encode_join(self, payload: dict[str, Any]) -> str:

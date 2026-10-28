@@ -29,7 +29,7 @@ class FlatMessageCodec:
             raw=decoded,
         )
 
-    def encode_action(self, action: dict[str, Any] | Action, *, reasoning: str | None = None) -> str:
-        """Encode an action as a flat JSON string; the flat protocol has no place for ``reasoning``."""
+    def encode_action(self, action: dict[str, Any] | Action) -> str:
+        """Encode an action as a flat JSON string."""
         payload = action.as_payload() if isinstance(action, Action) else action
         return json.dumps(payload)

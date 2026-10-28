@@ -30,30 +30,13 @@ def test_encode_dict_action_preserves_payload_shape():
     assert json.loads(encoded) == {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
 
 
-def test_encode_action_puts_reasoning_in_meta_without_changing_the_action():
+def test_encode_action_cuts_reasoning_to_the_server_limit_without_changing_the_action():
     codec = IbexMessageCodec()
-    action = {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
-    encoded = codec.encode_action(action, reasoning="They cooperated last round.")
-
-    assert json.loads(encoded) == {
-        "meta": {"type": "submit-choice", "reasoning": "They cooperated last round."},
-        "payload": {"choice": "COOPERATE"},
-    }
-    assert action == {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
-
-
-def test_encode_action_cuts_reasoning_to_the_server_limit():
-    codec = IbexMessageCodec()
-    encoded = codec.encode_action({"meta": {"type": "x"}, "payload": {}}, reasoning="y" * (MAX_REASONING_LENGTH + 10))
+    action = {"meta": {"type": "x", "reasoning": "y" * (MAX_REASONING_LENGTH + 10)}, "payload": {}}
+    encoded = codec.encode_action(action)
 
     assert json.loads(encoded)["meta"]["reasoning"] == "y" * MAX_REASONING_LENGTH
-
-
-def test_encode_action_without_meta_ignores_reasoning():
-    codec = IbexMessageCodec()
-    encoded = codec.encode_action({"type": "choice", "choice": "DEFECT"}, reasoning="why")
-
-    assert json.loads(encoded) == {"type": "choice", "choice": "DEFECT"}
+    assert len(action["meta"]["reasoning"]) == MAX_REASONING_LENGTH + 10
 
 
 def test_encode_domain_action():

@@ -16,12 +16,8 @@ class MessageCodec(Protocol):
         """Decode a raw inbound message into a domain event."""
         ...
 
-    def encode_action(self, action: dict[str, Any] | Action, *, reasoning: str | None = None) -> str:
-        """Encode an outbound action for the transport.
-
-        ``reasoning`` is why the agent took the action, or ``None``; a protocol without a place for it
-        ignores it.
-        """
+    def encode_action(self, action: dict[str, Any] | Action) -> str:
+        """Encode an outbound action for the transport."""
         ...
 
     def encode_join(self, payload: dict[str, Any]) -> str:
