@@ -3,6 +3,7 @@ import json
 import pytest
 
 from econagents.adapters.protocol import IbexMessageCodec
+from econagents.adapters.protocol.ibex import MAX_REASONING_LENGTH
 from econagents.domain import Action
 from econagents.ports.codec import MessageDecodeError
 
@@ -27,6 +28,32 @@ def test_encode_dict_action_preserves_payload_shape():
     encoded = codec.encode_action({"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}})
 
     assert json.loads(encoded) == {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
+
+
+def test_encode_action_puts_reasoning_in_meta_without_changing_the_action():
+    codec = IbexMessageCodec()
+    action = {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
+    encoded = codec.encode_action(action, reasoning="They cooperated last round.")
+
+    assert json.loads(encoded) == {
+        "meta": {"type": "submit-choice", "reasoning": "They cooperated last round."},
+        "payload": {"choice": "COOPERATE"},
+    }
+    assert action == {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
+
+
+def test_encode_action_cuts_reasoning_to_the_server_limit():
+    codec = IbexMessageCodec()
+    encoded = codec.encode_action({"meta": {"type": "x"}, "payload": {}}, reasoning="y" * (MAX_REASONING_LENGTH + 10))
+
+    assert json.loads(encoded)["meta"]["reasoning"] == "y" * MAX_REASONING_LENGTH
+
+
+def test_encode_action_without_meta_ignores_reasoning():
+    codec = IbexMessageCodec()
+    encoded = codec.encode_action({"type": "choice", "choice": "DEFECT"}, reasoning="why")
+
+    assert json.loads(encoded) == {"type": "choice", "choice": "DEFECT"}
 
 
 def test_encode_domain_action():

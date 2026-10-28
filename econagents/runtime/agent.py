@@ -14,6 +14,7 @@ from econagents.adapters.state import EventFieldStateProjector
 from econagents.adapters.transport import AuthenticationMechanism, JoinPayloadAuth, WebSocketTransport
 from econagents.domain.role import Role
 from econagents.domain.logging import LoggerMixin
+from econagents.domain.reasoning import capture_reasoning
 from econagents.runtime.decision_gate import DecisionGate, DecisionOutcome, PhaseOccurrence
 from econagents.runtime.identity import (
     PLAYER_JOINED_EVENT,
@@ -113,9 +114,13 @@ class Agent(LoggerMixin):
     during the decision, and ``"guard-rerun"`` decides once more on the new state first. Revisions come
     from ``input_revision`` (default: sha256 of the state's JSON form).
 
+    Reasoning: the decision's reasoning (see ``econagents.domain.reasoning``) is passed to the codec
+    with the action; ``IbexMessageCodec`` puts it in ``meta.reasoning``.
+
     ``decision_trace`` receives one record per decision once it is settled: ``decision_id``, ``phase``,
     ``round``, ``phase_epoch``, ``input_revision``, ``send_revision``, ``input_changed_during_call``,
-    ``submitted`` (the frame, or ``None``), ``status`` (the ``ActionOutcome`` status) and
+    ``reasoning`` (the last text reported during the decision, see ``econagents.domain.reasoning``, or
+    ``None``), ``submitted`` (the frame, or ``None``), ``status`` (the ``ActionOutcome`` status) and
     ``disposition`` (the tracker's answer, ``"unknown"``, ``"sent"`` without a tracker, ``"no-action"``,
     ``"stale-phase"``, ``"not-transmitted"`` or ``"superseded"``). A decision whose disposition was unknown
     gets a second record when the tracker reconciles it, with the reconciled ``disposition`` and
@@ -401,7 +406,9 @@ class Agent(LoggerMixin):
             input_revision = self._revision()
             record["input_revision"] = input_revision
             try:
-                payload = await self._decide(phase)
+                with capture_reasoning() as reasons:
+                    payload = await self._decide(phase)
+                record["reasoning"] = reasons[-1] if reasons else None
             except asyncio.CancelledError:
                 if epoch != self._phase_epoch:
                     record.update(status="stale", disposition="stale-phase")
@@ -439,7 +446,7 @@ class Agent(LoggerMixin):
             outcome = ActionOutcome(phase, "superseded", payload, decision_id=decision_id)
             return await self._settle(outcome, record, "superseded")
 
-        frame = self.message_codec.encode_action(payload)
+        frame = self.message_codec.encode_action(payload, reasoning=record["reasoning"])
         record["submitted"] = frame
         awaited = self._announce(decision_id, payload, record)
         try:
@@ -480,6 +487,7 @@ class Agent(LoggerMixin):
             "input_revision": None,
             "send_revision": None,
             "input_changed_during_call": None,
+            "reasoning": None,
             "submitted": None,
             "status": None,
             "disposition": None,

@@ -6,6 +6,21 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Agents send the reasoning behind each action. `Role.handle_phase_with_llm` reports the text of the
+  decision's `reasoning` field (renamed or turned off with the `Role.reasoning_field` class attribute),
+  and a phase handler can report it itself with `econagents.domain.reasoning.report_reasoning`. The
+  agent sends it with the action, where `IbexMessageCodec` puts it in `meta.reasoning`, cut to 4000
+  characters, and writes it to every `decision_trace` record as `reasoning`. An action decided without
+  reasoning is sent as before.
+
+### Changed
+
+- `MessageCodec.encode_action` takes a keyword `reasoning` (`None` when there is none), which the agent
+  always passes. A custom codec that does not subclass `IbexMessageCodec` or `FlatMessageCodec` must
+  accept it.
+
 ## [0.8.1] - 2026-10-25
 
 ### Fixed
