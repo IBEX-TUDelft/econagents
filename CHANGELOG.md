@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Agents send the reasoning behind each action. `Role.handle_phase_with_llm` puts the text of the
+  decision's `reasoning` field (renamed or turned off with the `Role.reasoning_field` class attribute) in
+  the action's `meta.reasoning`, through `Role.attach_reasoning`, which a role can override for another
+  message shape. An action without a `meta` object, or decided without reasoning, is sent as before.
+  `IbexMessageCodec` cuts `meta.reasoning` to 4000 characters.
+
 ## [0.8.1] - 2026-10-25
 
 ### Fixed

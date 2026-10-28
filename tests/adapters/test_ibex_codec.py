@@ -3,6 +3,7 @@ import json
 import pytest
 
 from econagents.adapters.protocol import IbexMessageCodec
+from econagents.adapters.protocol.ibex import MAX_REASONING_LENGTH
 from econagents.domain import Action
 from econagents.ports.codec import MessageDecodeError
 
@@ -27,6 +28,15 @@ def test_encode_dict_action_preserves_payload_shape():
     encoded = codec.encode_action({"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}})
 
     assert json.loads(encoded) == {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
+
+
+def test_encode_action_cuts_reasoning_to_the_server_limit_without_changing_the_action():
+    codec = IbexMessageCodec()
+    action = {"meta": {"type": "x", "reasoning": "y" * (MAX_REASONING_LENGTH + 10)}, "payload": {}}
+    encoded = codec.encode_action(action)
+
+    assert json.loads(encoded)["meta"]["reasoning"] == "y" * MAX_REASONING_LENGTH
+    assert len(action["meta"]["reasoning"]) == MAX_REASONING_LENGTH + 10
 
 
 def test_encode_domain_action():

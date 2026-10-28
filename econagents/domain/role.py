@@ -119,6 +119,9 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
     """When ``True`` and a persona is attached, append a standard markdown block
     describing the persona to the end of the system prompt. Set to ``False`` to
     take full control via ``{{ persona }}`` in your own template."""
+    reasoning_field: ClassVar[Optional[str]] = "reasoning"
+    """Field of the model's decision that says why it acted. Its text is added to the action's
+    ``meta.reasoning`` when the action has a ``meta`` object. ``None`` adds nothing."""
 
     def __init__(
         self,
@@ -496,10 +499,40 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
             self.logger.error(f"Error getting LLM response: {error}")
             return {"error": str(error), "phase": phase}
         try:
-            return self.parse_phase_llm_response(response, state)
+            result = self.parse_phase_llm_response(response, state)
         except Exception as e:
             self.logger.error(f"Error getting LLM response: {e}")
             return {"error": str(e), "phase": phase}
+        return self.attach_reasoning(result, self.extract_reasoning(response))
+
+    def extract_reasoning(self, response: Any) -> Optional[str]:
+        """The ``reasoning_field`` text of a model response, or ``None``.
+
+        Reads the field of a structured response, or of a text response holding a JSON object.
+        """
+        if self.reasoning_field is None:
+            return None
+        if isinstance(response, BaseModel):
+            value = getattr(response, self.reasoning_field, None)
+        elif isinstance(response, str):
+            try:
+                decoded = json.loads(response)
+            except ValueError:
+                return None
+            value = decoded.get(self.reasoning_field) if isinstance(decoded, dict) else None
+        else:
+            return None
+        return (value.strip() or None) if isinstance(value, str) else None
+
+    def attach_reasoning(self, result: Any, reasoning: Optional[str]) -> Any:
+        """Put ``reasoning`` in the action's ``meta.reasoning``.
+
+        An action without a ``meta`` object, or without reasoning, is returned unchanged. Override to
+        place it elsewhere for another message shape.
+        """
+        if reasoning and isinstance(result, dict) and isinstance(result.get("meta"), dict):
+            return {**result, "meta": {**result["meta"], "reasoning": reasoning}}
+        return result
 
     @property
     def model_call_logger(self) -> logging.Logger:

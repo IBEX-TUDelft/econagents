@@ -7,6 +7,8 @@ from econagents.domain.messages import Action, Event
 from econagents.ports.codec import MessageDecodeError
 
 INTRODUCTION_PHASE = "introduction"
+MAX_REASONING_LENGTH = 4000
+"""The longest ``meta.reasoning`` the server accepts."""
 
 
 def build_message(
@@ -62,9 +64,13 @@ class IbexMessageCodec:
     def encode_action(self, action: dict[str, Any] | Action) -> str:
         """Encode an action as a JSON string.
 
-        Dict actions are treated as already-shaped outbound payloads.
+        Dict actions are treated as already-shaped outbound payloads. A ``meta.reasoning`` text is cut to
+        ``MAX_REASONING_LENGTH`` characters.
         """
         payload = action.as_payload() if isinstance(action, Action) else action
+        meta = payload.get("meta")
+        if isinstance(meta, dict) and isinstance(meta.get("reasoning"), str):
+            payload = {**payload, "meta": {**meta, "reasoning": meta["reasoning"][:MAX_REASONING_LENGTH]}}
         return json.dumps(payload)
 
     def encode_join(self, payload: dict[str, Any]) -> str:
