@@ -8,7 +8,7 @@ falling back to a bundled starter library.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,6 +37,14 @@ class Persona(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+def _default_user_dir(user_dir: Optional[Path]) -> Optional[Path]:
+    if user_dir is None:
+        candidate = Path.cwd() / "personas"
+        if candidate.is_dir():
+            return candidate
+    return user_dir
+
+
 def load_persona(persona_id: str, user_dir: Optional[Path] = None) -> Persona:
     """Resolve ``persona_id`` by checking ``user_dir`` first, then the bundled library.
 
@@ -52,10 +60,7 @@ def load_persona(persona_id: str, user_dir: Optional[Path] = None) -> Persona:
 
     Raises ``PersonaNotFoundError`` if not found in either location.
     """
-    if user_dir is None:
-        candidate = Path.cwd() / "personas"
-        if candidate.is_dir():
-            user_dir = candidate
+    user_dir = _default_user_dir(user_dir)
 
     searched: list[Path] = []
     for root in (user_dir, BUILTIN_LIBRARY):
@@ -68,6 +73,27 @@ def load_persona(persona_id: str, user_dir: Optional[Path] = None) -> Persona:
     raise PersonaNotFoundError(persona_id, searched)
 
 
+def available_personas(user_dir: Optional[Path] = None) -> dict[str, Literal["user", "library"]]:
+    """Every id ``load_persona(id, user_dir)`` resolves, sorted, with where it resolves from.
+
+    ``"user"`` for ids in ``user_dir`` (same default as ``load_persona``), ``"library"``
+    for the bundled ones. A user id hides a bundled id of the same name, as in
+    ``load_persona``, so each id appears once.
+    """
+    user_dir = _default_user_dir(user_dir)
+    sources: dict[str, Literal["user", "library"]] = {}
+    roots: tuple[tuple[Optional[Path], Literal["user", "library"]], ...] = (
+        (user_dir, "user"),
+        (BUILTIN_LIBRARY, "library"),
+    )
+    for root, source in roots:
+        if root is None or not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.yaml")):
+            sources.setdefault(path.stem, source)
+    return dict(sorted(sources.items()))
+
+
 def save_persona(persona: Persona, path: Path) -> None:
     """Write ``persona`` to ``path`` as YAML (sorted keys, unicode preserved)."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,6 +104,7 @@ __all__ = [
     "BUILTIN_LIBRARY",
     "Persona",
     "PersonaNotFoundError",
+    "available_personas",
     "load_persona",
     "save_persona",
 ]
