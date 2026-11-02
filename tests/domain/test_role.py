@@ -323,6 +323,4 @@ class TestPhaseSpecificMethods:
 
         result = await mock_role.handle_phase_with_llm(0, game_state, prompts_path)
 
-        assert "error" in result
-        assert result["phase"] == 0
-        assert "LLM error" in result["error"]
+        assert result is None
