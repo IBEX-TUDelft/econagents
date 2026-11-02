@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-02
+
 ### Added
 
 - Agents send the reasoning behind each action. `Role.handle_phase_with_llm` puts the text of the
@@ -447,6 +449,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.9.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.7.0...v0.7.1
