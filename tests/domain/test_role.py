@@ -4,6 +4,7 @@ from typing import ClassVar, Literal
 import pytest
 from pydantic import BaseModel
 
+from econagents.adapters.parsing import ResponseParseError
 from econagents.domain.role import Role
 from econagents.domain.state.game import GameStateProtocol
 from tests.conftest import MockLLM
@@ -228,11 +229,10 @@ class TestResponseParsing:
         assert result == {"message": "Hello"}
 
     def test_parse_phase_llm_response_invalid_json(self, mock_role, game_state):
-        """Test handling invalid JSON responses."""
-        response = "Not valid JSON"
-        result = mock_role.parse_phase_llm_response(response, game_state)
-        assert "error" in result
-        assert result["raw_response"] == "Not valid JSON"
+        """Invalid JSON raises instead of returning an error payload."""
+        with pytest.raises(ResponseParseError) as excinfo:
+            mock_role.parse_phase_llm_response("Not valid JSON", game_state)
+        assert excinfo.value.raw_response == "Not valid JSON"
 
     def test_custom_response_parser(self, mock_role, game_state):
         """Test registering and using a custom response parser."""
@@ -258,11 +258,11 @@ class TestResponseParsing:
         assert result == {"gameId": 7, "action": "stop"}
 
     def test_parse_with_registered_schema_invalid(self, mock_role, game_state):
-        """Invalid JSON surfaces a validation error payload when a schema is registered."""
+        """A response that does not match the registered schema raises."""
         mock_role.register_response_schema(game_state.meta.phase, _SampleSchema)
-        result = mock_role.parse_phase_llm_response('{"gameId": 7, "action": "sideways"}', game_state)
-        assert result["error"] == "Failed to validate response"
-        assert result["raw_response"] == '{"gameId": 7, "action": "sideways"}'
+        with pytest.raises(ResponseParseError, match="_SampleSchema") as excinfo:
+            mock_role.parse_phase_llm_response('{"gameId": 7, "action": "sideways"}', game_state)
+        assert excinfo.value.raw_response == '{"gameId": 7, "action": "sideways"}'
 
 
 class TestPhaseSpecificMethods:
