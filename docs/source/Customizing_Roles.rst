@@ -51,6 +51,24 @@ The handler is how the role decides *what to do* in a phase, while the prompt is
 6. **Return Phase Result**
    The custom or default handler returns the final result for that phase.
 
+When the model call or the response parsing fails, the default handler retries the decision
+``decision_retries`` times (``0`` by default), waiting ``decision_retry_backoff`` seconds between
+attempts. If every attempt fails it returns what ``on_decision_error`` returns: ``None`` by default,
+so the agent sends nothing. Override it to send a safe action instead:
+
+.. code-block:: python
+
+   class Prisoner(Role[PrisonerState]):
+       decision_retries = 2
+
+       def on_decision_error(self, phase, state, error):
+           return {
+               "meta": {"type": "submit-choice", "reasoning": "LLM unavailable: fallback to first option"},
+               "payload": {"choice": "COOPERATE"},
+           }
+
+A fallback action without its own ``meta.reasoning`` gets one saying the decision failed and why.
+
 Phase-Specific Customization Points
 -----------------------------------
 

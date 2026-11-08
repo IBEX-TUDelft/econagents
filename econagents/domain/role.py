@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -122,6 +123,11 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
     reasoning_field: ClassVar[Optional[str]] = "reasoning"
     """Field of the model's decision that says why it acted. Its text is added to the action's
     ``meta.reasoning`` when the action has a ``meta`` object. ``None`` adds nothing."""
+    decision_retries: ClassVar[int] = 0
+    """Extra attempts at a decision after the model call or the response parsing fails. Every
+    attempt is recorded in the model-call log."""
+    decision_retry_backoff: ClassVar[float] = 0.1
+    """Seconds to wait between decision attempts."""
 
     def __init__(
         self,
@@ -479,31 +485,52 @@ class Role(ABC, Generic[StateT_contra], LoggerMixin):
 
         tool_kwargs = self._build_tool_kwargs(phase, state)
 
-        response: Any = None
-        error: Optional[Exception] = None
-        with capture_llm_calls() as calls:
-            try:
-                response = await self.llm.get_response(
-                    messages=messages,
-                    tracing_extra={
-                        "state": state.model_dump(),
-                    },
-                    response_schema=self.get_response_schema(phase),
-                    logger=self.logger,
-                    **tool_kwargs,
-                )
-            except Exception as e:
-                error = e
-        self._record_model_call(phase, state, messages, calls, response, error)
-        if error is not None:
-            self.logger.error(f"Error getting LLM response: {error}")
-            return {"error": str(error), "phase": phase}
-        try:
-            result = self.parse_phase_llm_response(response, state)
-        except Exception as e:
-            self.logger.error(f"Error getting LLM response: {e}")
-            return {"error": str(e), "phase": phase}
-        return self.attach_reasoning(result, self.extract_reasoning(response))
+        last_error: Optional[Exception] = None
+        for attempt in range(self.decision_retries + 1):
+            response: Any = None
+            error: Optional[Exception] = None
+            result: Any = None
+            with capture_llm_calls() as calls:
+                try:
+                    response = await self.llm.get_response(
+                        messages=messages,
+                        tracing_extra={
+                            "state": state.model_dump(),
+                        },
+                        response_schema=self.get_response_schema(phase),
+                        logger=self.logger,
+                        **tool_kwargs,
+                    )
+                except Exception as e:
+                    error = e
+            if error is None:
+                try:
+                    result = self.parse_phase_llm_response(response, state)
+                except Exception as e:
+                    error = e
+            self._record_model_call(phase, state, messages, calls, response, error)
+            if error is None:
+                return self.attach_reasoning(result, self.extract_reasoning(response))
+            last_error = error
+            self.logger.error(
+                f"Decision failed in phase {phase} (attempt {attempt + 1} of {self.decision_retries + 1}): {error}"
+            )
+            if attempt < self.decision_retries and self.decision_retry_backoff > 0:
+                await asyncio.sleep(self.decision_retry_backoff)
+
+        assert last_error is not None
+        fallback = self.on_decision_error(phase, state, last_error)
+        if isinstance(fallback, dict) and isinstance(fallback.get("meta"), dict) and fallback["meta"].get("reasoning"):
+            return fallback
+        return self.attach_reasoning(fallback, f"Fallback action, the decision failed: {last_error}")
+
+    def on_decision_error(self, phase: PhaseId, state: StateT_contra, error: Exception) -> Optional[dict]:
+        """The action to send after every attempt at a decision failed, or ``None`` to send nothing.
+
+        The default sends nothing. Override it to return a safe action for the game. A returned
+        action without its own ``meta.reasoning`` gets one saying the decision failed and why.
+        """
+        return None
 
     def extract_reasoning(self, response: Any) -> Optional[str]:
         """The ``reasoning_field`` text of a model response, or ``None``.

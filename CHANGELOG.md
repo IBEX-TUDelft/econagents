@@ -6,6 +6,29 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `Role.decision_retries` (default `0`) and `Role.decision_retry_backoff` (default `0.1` s): retry a
+  decision whose model call or response parsing failed. Every attempt is written to the model-call log.
+- `Role.on_decision_error(phase, state, error)`: the action to send once every attempt failed. The default
+  returns `None`, so nothing is sent. A fallback action without its own `meta.reasoning` gets one that
+  says the decision failed and why.
+
+### Changed
+
+- `JsonResponseParser.parse` raises `ResponseParseError` (exported from `econagents.adapters.parsing`,
+  with the `raw_response`) for a response that is not valid JSON or does not match the phase's schema.
+  It used to return `{"error": ..., "raw_response": ...}`.
+- `Role.handle_phase_with_llm` returns `None` (or the `on_decision_error` action) for a failed decision,
+  not `{"error": ..., "phase": ...}`. A role that read that dict can return it from `on_decision_error`.
+
+### Fixed
+
+- A failed decision is no longer sent to the server as an action. `Role.handle_phase_with_llm` used to
+  return `{"error": ..., "phase": ...}` when the model call failed, and the parser's error dict when the
+  response did not parse. `Agent` sent both, since they are truthy. It now returns `None`, or the
+  `on_decision_error` action (#241).
+
 ## [0.9.0] - 2026-11-02
 
 ### Added

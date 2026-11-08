@@ -4,6 +4,7 @@ from typing import Any, ClassVar, Optional
 import pytest
 from pydantic import BaseModel
 
+from econagents.domain.messages import PhaseId
 from tests.conftest import MockRole
 
 ENVELOPE = {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
@@ -29,6 +30,23 @@ class EnvelopeRole(MockRole):
 
     def parse_phase_llm_response(self, response: Any, state: Any) -> Any:
         return self.parsed
+
+
+class RetryingRole(EnvelopeRole):
+    decision_retries = 2
+    decision_retry_backoff = 0
+
+    def __init__(self, responses: list[Any], **kwargs: Any) -> None:
+        super().__init__(responses[0] if responses else None, **kwargs)
+        remaining = iter(responses)
+
+        async def get_response(*args: Any, **kw: Any) -> Any:
+            response = next(remaining)
+            if isinstance(response, BaseException):
+                raise response
+            return response
+
+        self.llm.get_response = get_response  # type: ignore[method-assign]
 
 
 @pytest.mark.asyncio
@@ -91,6 +109,120 @@ async def test_default_parser_keeps_reasoning_as_a_decision_field(game_state, pr
     result = await role.handle_phase_with_llm(0, game_state, prompts_path)
 
     assert result == {"reasoning": "It pays more.", "message": "x"}
+
+
+@pytest.mark.asyncio
+async def test_llm_failure_retries_until_a_response_succeeds(game_state, prompts_path, logger):
+    role = RetryingRole([RuntimeError("temporary"), RuntimeError("temporary"), "ok"], logger=logger)
+
+    result = await role.handle_phase_with_llm(0, game_state, prompts_path)
+
+    assert result == ENVELOPE
+
+
+@pytest.mark.asyncio
+async def test_parse_failure_is_retried(game_state, prompts_path, logger):
+    class ParseRetryRole(RetryingRole):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(["first", "second"], **kwargs)
+            self.parse_calls = 0
+
+        def parse_phase_llm_response(self, response: Any, state: Any) -> Any:
+            self.parse_calls += 1
+            if self.parse_calls == 1:
+                raise ValueError("invalid response")
+            return self.parsed
+
+    role = ParseRetryRole(logger=logger)
+
+    result = await role.handle_phase_with_llm(0, game_state, prompts_path)
+
+    assert result == ENVELOPE
+    assert role.parse_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_failed_decision_uses_fallback_without_error_payload(game_state, prompts_path, logger):
+    class FallbackRole(RetryingRole):
+        def on_decision_error(self, phase: PhaseId, state: Any, error: Exception) -> dict:
+            return {"meta": {"type": "submit-choice"}, "payload": {"choice": "COOPERATE"}}
+
+    role = FallbackRole([RuntimeError("unavailable")] * 3, logger=logger)
+
+    result = await role.handle_phase_with_llm(0, game_state, prompts_path)
+
+    assert result == {
+        "meta": {"type": "submit-choice", "reasoning": "Fallback action, the decision failed: unavailable"},
+        "payload": {"choice": "COOPERATE"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_fallback_keeps_its_own_reasoning(game_state, prompts_path, logger):
+    own = {"meta": {"type": "submit-choice", "reasoning": "LLM unavailable: first option"}, "payload": {"choice": "A"}}
+
+    class FallbackRole(RetryingRole):
+        def on_decision_error(self, phase: PhaseId, state: Any, error: Exception) -> dict:
+            return own
+
+    role = FallbackRole([RuntimeError("unavailable")] * 3, logger=logger)
+
+    assert await role.handle_phase_with_llm(0, game_state, prompts_path) == own
+
+
+class SchemaRole(MockRole):
+    """A role with the default JSON parser and a response schema, whose model replies in turn."""
+
+    decision_retry_backoff = 0
+
+    def __init__(self, responses: list[Any], **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.llm = type(self.llm)()
+        self.calls = 0
+        remaining = iter(responses)
+
+        async def get_response(*args: Any, **kw: Any) -> Any:
+            self.calls += 1
+            return next(remaining)
+
+        self.llm.get_response = get_response  # type: ignore[method-assign]
+
+    def get_response_schema(self, phase: PhaseId) -> Any:
+        return Decision
+
+
+@pytest.mark.asyncio
+async def test_schema_invalid_response_is_retried_with_the_default_parser(game_state, prompts_path, logger):
+    class Retrying(SchemaRole):
+        decision_retries = 1
+
+    valid = json.dumps({"reasoning": "It pays more.", "choice": "COOPERATE"})
+    role = Retrying(['{"choice": 1}', valid], logger=logger)
+
+    result = await role.handle_phase_with_llm(0, game_state, prompts_path)
+
+    assert result == {"reasoning": "It pays more.", "choice": "COOPERATE"}
+    assert role.calls == 2
+
+
+@pytest.mark.parametrize("response", ["not json", '{"choice": 1}'])
+@pytest.mark.asyncio
+async def test_unparseable_response_sends_nothing_by_default(response, game_state, prompts_path, logger):
+    role = SchemaRole([response], logger=logger)
+
+    assert await role.handle_phase_with_llm(0, game_state, prompts_path) is None
+    assert role.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_every_attempt_is_recorded(game_state, prompts_path, logger, caplog):
+    role = RetryingRole([RuntimeError("down"), RuntimeError("down"), RuntimeError("down")], logger=logger)
+
+    with caplog.at_level("INFO", logger=role.model_call_logger.name):
+        assert await role.handle_phase_with_llm(0, game_state, prompts_path) is None
+
+    records = [json.loads(r.getMessage()) for r in caplog.records if r.name == role.model_call_logger.name]
+    assert [r["error"] for r in records] == ["RuntimeError: down"] * 3
 
 
 @pytest.mark.parametrize(
