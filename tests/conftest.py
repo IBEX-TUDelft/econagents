@@ -55,6 +55,35 @@ def logger():
 
 
 @pytest.fixture
+def byte_tokenizer(monkeypatch):
+    """Make tiktoken serve an in-memory encoding, so tests download no encoding file.
+
+    The encoding has one token per UTF-8 byte, plus one token for ``ab`` followed by the first byte of
+    ``é``. Yields the names of the encodings that were asked for.
+    """
+    import tiktoken
+
+    from econagents.adapters.llm.trimming import encoding_for
+
+    ranks = {bytes([i]): i for i in range(256)}
+    ranks[b"b\xc3"] = 256
+    ranks[b"ab\xc3"] = 257
+    encoding = tiktoken.Encoding(
+        "bytes", pat_str=r"[\s\S]+", mergeable_ranks=ranks, special_tokens={"<|endoftext|>": 258}
+    )
+    requested: list[str] = []
+
+    def get_encoding(name: str) -> tiktoken.Encoding:
+        requested.append(name)
+        return encoding
+
+    encoding_for.cache_clear()
+    monkeypatch.setattr(tiktoken, "get_encoding", get_encoding)
+    yield requested
+    encoding_for.cache_clear()
+
+
+@pytest.fixture
 def prompts_path(tmp_path):
     """Create a temporary directory with test prompt files."""
     prompts_dir = tmp_path / "prompts"

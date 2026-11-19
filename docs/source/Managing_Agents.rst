@@ -174,6 +174,46 @@ failed.
 Adapters other than ``ChatOpenAI`` do not report records yet, so the list stays
 empty for them.
 
+Prompt Size Limit
+-----------------
+
+A prompt that includes game state or text typed by participants can grow
+without bound. ``ChatOpenAI``, ``ChatOpenRouter`` and ``ChatOllama`` accept
+``max_message_tokens`` to cap it:
+
+.. code-block:: python
+
+   llm = ChatOpenAI(model_name="gpt-5.4-mini", max_message_tokens=4000)
+
+In a YAML config it goes under the role's ``llm_params``:
+
+.. code-block:: yaml
+
+   roles:
+     - role_id: 1
+       name: "player"
+       llm_type: "ChatOpenAI"
+       llm_params:
+         model_name: "gpt-5.4-mini"
+         max_message_tokens: 4000
+
+``build_messages`` then cuts the system prompt and the user prompt to their
+first ``max_message_tokens`` tokens each. The limit applies to each message,
+not to the two together, and it is the end of a prompt that is dropped. A
+prompt at or under the limit is sent unchanged. Each cut is logged as a
+WARNING with the token counts, for example ``user message trimmed from 5210
+to 2000 tokens``. The model-call log holds the messages after the cut. Tool
+results added during a tool loop and the model's output are never cut.
+
+Tokens are counted with ``tiktoken``, which the ``tokens`` extra installs
+(``pip install econagents[tokens]``). An adapter created with
+``max_message_tokens`` raises ``ImportError`` when it is missing. tiktoken
+only knows OpenAI models. For any other model name, which includes most Ollama
+and OpenRouter models, the count is made with the ``o200k_base`` encoding and
+is an estimate of what the model's own tokenizer gives. tiktoken downloads an
+encoding's file the first time it is used and caches it; the adapter loads it
+when it is created.
+
 Decision Gate
 -------------
 

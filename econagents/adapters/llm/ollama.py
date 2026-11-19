@@ -22,6 +22,7 @@ class ChatOllama(BaseLLM):
         model_name: str,
         host: Optional[str] = None,
         response_kwargs: Optional[dict[str, Any]] = None,
+        max_message_tokens: Optional[int] = None,
     ) -> None:
         """Initialize the Ollama LLM interface.
 
@@ -29,11 +30,18 @@ class ChatOllama(BaseLLM):
             model_name: The model name to use.
             host: The host for the Ollama API (e.g., "http://localhost:11434").
             response_kwargs: Extra keyword arguments forwarded to ``chat``.
+            max_message_tokens: Cut the system prompt and the user prompt to
+                at most this many tokens each. ``None`` sends them whole.
+                Tokens are counted with tiktoken, which only knows OpenAI
+                model names. For other names it uses ``o200k_base``, so the
+                count is an estimate for the model. Requires
+                ``pip install econagents[tokens]``.
         """
         self._check_ollama_available()
         self.model_name = model_name
         self.host = host
         self._response_kwargs = response_kwargs or {}
+        self._set_max_message_tokens(max_message_tokens)
 
     def _check_ollama_available(self) -> None:
         """Check if Ollama is available."""

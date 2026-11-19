@@ -151,6 +151,12 @@ roles:
 reasoning controls, provider routing options, and optional app attribution.
 `examples/prisoner/prisoner_openrouter.yaml` is a complete, runnable example.
 
+To cap the size of a role's prompts, add `max_message_tokens` to its
+`llm_params` (`ChatOpenAI`, `ChatOpenRouter` and `ChatOllama` accept it). The
+system prompt and the user prompt are each cut to their first
+`max_message_tokens` tokens, so the end of a longer prompt is dropped. It needs
+`pip install econagents[tokens]`.
+
 Relative `logs_dir` and `prompts_dir` values in the `runner` section of a YAML
 config are resolved against the directory containing the YAML file.
 
