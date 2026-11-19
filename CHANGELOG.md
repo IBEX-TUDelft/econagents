@@ -6,6 +6,15 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `max_message_tokens` on `ChatOpenAI`, `ChatOpenRouter` and `ChatOllama` (in YAML, under a role's
+  `llm_params`): `build_messages` cuts the system prompt and the user prompt to their first
+  `max_message_tokens` tokens each and logs a WARNING with the token counts when it cut one. The default
+  `None` sends prompts whole, as before. Tokens are counted with tiktoken, installed by the new `tokens`
+  extra (`pip install econagents[tokens]`). tiktoken only knows OpenAI models, so for other models the
+  count is an estimate made with `o200k_base`.
+
 ## [0.10.0] - 2026-11-08
 
 ### Added

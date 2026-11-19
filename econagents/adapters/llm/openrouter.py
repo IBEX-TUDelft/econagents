@@ -36,6 +36,7 @@ class ChatOpenRouter(BaseLLM):
         reasoning_max_tokens: Optional[int] = None,
         reasoning_exclude: Optional[bool] = None,
         response_kwargs: Optional[dict[str, Any]] = None,
+        max_message_tokens: Optional[int] = None,
     ) -> None:
         """Initialize the OpenRouter LLM interface.
 
@@ -54,6 +55,12 @@ class ChatOpenRouter(BaseLLM):
             response_kwargs: Extra keyword arguments forwarded to Chat
                 Completions. OpenRouter-only fields such as provider routing
                 preferences can be supplied under ``extra_body``.
+            max_message_tokens: Cut the system prompt and the user prompt to
+                at most this many tokens each. ``None`` sends them whole.
+                Tokens are counted with tiktoken, which only knows OpenAI
+                model names. For OpenRouter identifiers it uses
+                ``o200k_base``, so the count is an estimate for the model.
+                Requires ``pip install econagents[tokens]``.
         """
         if reasoning_effort is not None and reasoning_max_tokens is not None:
             raise ValueError("reasoning_effort and reasoning_max_tokens cannot be used together")
@@ -68,6 +75,7 @@ class ChatOpenRouter(BaseLLM):
         self.reasoning_max_tokens = reasoning_max_tokens
         self.reasoning_exclude = reasoning_exclude
         self._response_kwargs = response_kwargs or {}
+        self._set_max_message_tokens(max_message_tokens)
 
     @staticmethod
     def _check_openai_available() -> None:
