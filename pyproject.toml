@@ -31,9 +31,10 @@ ollama = ["ollama>=0.5.1"]
 langsmith = ["langsmith>=0.4.1"]
 langfuse = ["langfuse>=3.0.3"]
 monty = ["pydantic-monty>=1.0.0,<2"]
+tokens = ["tiktoken>=0.7.0"]
 standard = ["langsmith>=0.4.1"]
 examples = ["python-dotenv>=1.2.1,<2"]
-all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3", "pydantic-monty>=1.0.0,<2", "python-dotenv>=1.2.1,<2"]
+all = ["ollama>=0.5.1", "langsmith>=0.4.1", "langfuse>=3.0.3", "pydantic-monty>=1.0.0,<2", "python-dotenv>=1.2.1,<2", "tiktoken>=0.7.0"]
 
 [dependency-groups]
 docs = [
@@ -58,6 +59,7 @@ dev = [
     "pytest-asyncio>=1.2.0,<2",
     "types-pyyaml>=6.0.12.20250915,<7",
     "pydantic-monty>=1.0.0,<2",
+    "tiktoken>=0.7.0",
 ]
 debug = [
     "ipdb>=0.13.9",

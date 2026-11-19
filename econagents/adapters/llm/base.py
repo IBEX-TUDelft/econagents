@@ -5,16 +5,47 @@ from typing import TYPE_CHECKING, Any, Optional, Type, Union
 from pydantic import BaseModel
 
 from econagents.adapters.llm.observability import ObservabilityProvider, get_observability_provider
+from econagents.adapters.llm.trimming import check_token_limit, encoding_for, trim_to_tokens
 from econagents.ports.llm import LLMProvider
 
 if TYPE_CHECKING:
     from econagents.ports.tools import ToolExecutor, ToolSpec
+
+_logger = logging.getLogger(__name__)
 
 
 class BaseLLM(ABC):
     """Base class for LLM implementations."""
 
     observability: ObservabilityProvider = get_observability_provider("noop")
+    max_message_tokens: Optional[int] = None
+
+    def _set_max_message_tokens(self, max_message_tokens: Optional[int]) -> None:
+        """Set the token limit that ``build_messages`` applies to each message.
+
+        ``None`` leaves messages whole. Any other value is validated and the tokenizer for
+        ``model_name`` is loaded, so a wrong value or a missing tiktoken fails here and not
+        during a game. Call it once ``model_name`` is set.
+
+        Raises:
+            ValueError: If the limit is not a positive integer.
+            ImportError: If tiktoken is not installed.
+        """
+        if max_message_tokens is not None:
+            check_token_limit(max_message_tokens, "max_message_tokens")
+            encoding_for(getattr(self, "model_name", None))
+        self.max_message_tokens = max_message_tokens
+
+    def _trim_content(self, role: str, content: str) -> str:
+        """Cut one message's text to ``max_message_tokens`` tokens and log a WARNING when it was cut."""
+        if self.max_message_tokens is None:
+            return content
+        trimmed = trim_to_tokens(content, self.max_message_tokens, model=getattr(self, "model_name", None))
+        if trimmed.tokens_after < trimmed.tokens_before:
+            _logger.warning(
+                "%s message trimmed from %s to %s tokens", role, trimmed.tokens_before, trimmed.tokens_after
+            )
+        return trimmed.text
 
     @staticmethod
     def _log_response(response: Any, logger: Optional[logging.Logger]) -> None:
@@ -40,6 +71,9 @@ class BaseLLM(ABC):
     def build_messages(self, system_prompt: str, user_prompt: str) -> list[dict[str, Any]]:
         """Build messages for the LLM.
 
+        When ``max_message_tokens`` is set, each prompt is cut to its first
+        ``max_message_tokens`` tokens. A prompt at or under the limit is not changed.
+
         Args:
             system_prompt: The system prompt for the LLM.
             user_prompt: The user prompt for the LLM.
@@ -48,8 +82,8 @@ class BaseLLM(ABC):
             The messages for the LLM.
         """
         return [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "system", "content": self._trim_content("system", system_prompt)},
+            {"role": "user", "content": self._trim_content("user", user_prompt)},
         ]
 
     @abstractmethod

@@ -124,6 +124,20 @@ class TestYamlExperimentLoader:
             await parser.run_experiment([], game_id=7)
         run_experiment.assert_awaited_once_with([], 7, base_dir=config_file.resolve().parent)
 
+    def test_max_message_tokens_in_llm_params_reaches_the_adapter(
+        self, sample_config_dict: Dict[str, Any], tmp_path: Path, byte_tokenizer: List[str]
+    ):
+        """``max_message_tokens`` under a role's ``llm_params`` sets the limit of the role's adapter."""
+        sample_config_dict["roles"][0]["llm_params"]["max_message_tokens"] = 8
+        config_path = tmp_path / "trimmed.yaml"
+        config_path.write_text(yaml.dump(sample_config_dict))
+
+        role = YamlExperimentLoader(config_path=config_path).config.roles[0].create_role()
+
+        assert role.llm.max_message_tokens == 8
+        messages = role.llm.build_messages("Short.", "A user prompt over the limit")
+        assert [message["content"] for message in messages] == ["Short.", "A user p"]
+
     def test_create_state_class_basic(self, config_file: Path):
         """Test creating the dynamic GameState class."""
         parser = YamlExperimentLoader(config_path=config_file)

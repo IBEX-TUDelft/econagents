@@ -35,6 +35,7 @@ class ChatOpenAI(BaseLLM):
         reasoning_effort: Optional[ReasoningEffort] = None,
         reasoning_summary: Optional[ReasoningSummary] = None,
         response_kwargs: Optional[dict[str, Any]] = None,
+        max_message_tokens: Optional[int] = None,
     ) -> None:
         """Initialize the OpenAI LLM interface.
 
@@ -50,6 +51,11 @@ class ChatOpenAI(BaseLLM):
             response_kwargs: Extra keyword arguments forwarded to the
                 Responses API call (e.g., ``temperature`` on non-reasoning
                 models, ``max_output_tokens``).
+            max_message_tokens: Cut the system prompt and the user prompt to
+                at most this many tokens each. ``None`` sends them whole.
+                Tokens are counted with tiktoken's encoding for
+                ``model_name`` (``o200k_base`` when tiktoken does not know the
+                model). Requires ``pip install econagents[tokens]``.
         """
         self.model_name = model_name
         self.api_key = api_key
@@ -57,6 +63,7 @@ class ChatOpenAI(BaseLLM):
         self.reasoning_summary = reasoning_summary
         self._check_openai_available()
         self._response_kwargs = response_kwargs or {}
+        self._set_max_message_tokens(max_message_tokens)
 
     def _check_openai_available(self) -> None:
         """Check if OpenAI is available."""

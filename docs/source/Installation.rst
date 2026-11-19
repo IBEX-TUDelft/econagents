@@ -73,6 +73,12 @@ LLM Providers
 
       pip install econagents[ollama]
 
+- ``tokens``: Installs ``tiktoken``, needed by the ``max_message_tokens`` setting of the LLM adapters (see :doc:`Managing_Agents`)
+
+   .. code-block:: bash
+
+      pip install econagents[tokens]
+
 Observability Providers
 ~~~~~~~~~~~~~~~~~~~~~~~
 
