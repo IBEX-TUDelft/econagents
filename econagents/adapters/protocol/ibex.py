@@ -9,6 +9,13 @@ from econagents.ports.codec import MessageDecodeError
 INTRODUCTION_PHASE = "introduction"
 MAX_REASONING_LENGTH = 4000
 """The longest ``meta.reasoning`` the server accepts."""
+GAME_PAUSED_EVENT = "game-paused"
+GAME_RESUMED_EVENT = "game-resumed"
+MESSAGE_REFUSED_EVENT = "message-refused"
+REFUSED_PAUSED = "paused"
+"""``message-refused`` reason: the game was paused, so the message never reached it."""
+REFUSED_LATE = "late"
+"""``message-refused`` reason: the message's game time was past the phase's deadline."""
 
 
 def build_message(
