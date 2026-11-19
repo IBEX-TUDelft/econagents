@@ -79,6 +79,7 @@ class TestChatOpenRouter:
                 "HTTP-Referer": "https://example.com",
                 "X-OpenRouter-Title": "Example Experiment",
             },
+            timeout=120.0,
         )
         llm.observability.track_llm_call.assert_called_once()
 

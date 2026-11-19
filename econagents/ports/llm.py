@@ -26,7 +26,10 @@ class LLMCallRecord:
     re-raises the decoding error. ``response_id`` is the provider's id for the response, and ``messages``
     the request input exactly as sent (for a tool-calling loop, the conversation of that request).
     ``reasoning_summary`` holds the provider's summary text entries in response order, or ``None``
-    when none were returned. It is separate from the model's action output.
+    when none were returned. It is separate from the model's action output. ``moderation`` holds the
+    provider's moderation of the request's ``input`` and of the model's ``output`` when the adapter asked
+    for it (``ChatOpenAI(moderation=...)``): per side ``flagged``, the flagged ``categories``, the
+    ``category_scores`` and the moderation ``model``, or ``error`` and ``message`` when moderation failed.
     """
 
     provider: str
@@ -39,6 +42,7 @@ class LLMCallRecord:
     response_id: Optional[str] = None
     messages: Optional[list[Any]] = None
     reasoning_summary: Optional[list[str]] = None
+    moderation: Optional[dict[str, Any]] = None
 
 
 @runtime_checkable
