@@ -157,6 +157,12 @@ system prompt and the user prompt are each cut to their first
 `max_message_tokens` tokens, so the end of a longer prompt is dropped. It needs
 `pip install econagents[tokens]`.
 
+A request from `ChatOpenAI` or `ChatOpenRouter` times out after 120 seconds
+(`timeout`); `max_retries` sets how often a failed request is sent again.
+`ChatOpenAI` can also ask OpenAI to moderate each call's input and output
+(`moderation: true`, reported in the model-call log, never blocking) and send
+a `safety_identifier`. See "Request Limits and Moderation" in the docs.
+
 Relative `logs_dir` and `prompts_dir` values in the `runner` section of a YAML
 config are resolved against the directory containing the YAML file.
 

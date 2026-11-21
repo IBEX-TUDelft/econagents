@@ -14,6 +14,21 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `None` sends prompts whole, as before. Tokens are counted with tiktoken, installed by the new `tokens`
   extra (`pip install econagents[tokens]`). tiktoken only knows OpenAI models, so for other models the
   count is an estimate made with `o200k_base`.
+- `timeout` and `max_retries` on `ChatOpenAI` and `ChatOpenRouter`: the seconds one request may take, and
+  how often the `openai` package sends a failed request again. `max_retries=None` leaves the package's
+  default (2); `max_retries=0` makes one model call one request.
+- `moderation` on `ChatOpenAI`: OpenAI moderates the request's input and the model's output on the same
+  call. The result never blocks or changes the response; it is reported in the new
+  `LLMCallRecord.moderation`, which the model-call log includes, and flagged content is logged as a
+  WARNING. Off by default.
+- `safety_identifier` on `ChatOpenAI`: a stable, hashed identifier for the end user behind the requests.
+  Off by default.
+
+### Changed
+
+- A request from `ChatOpenAI` or `ChatOpenRouter` times out after 120 seconds. It used to wait the
+  `openai` package's 600 seconds, and with the package's two retries a call that never answered took 30
+  minutes to fail. `timeout=None` restores the old behavior.
 
 ## [0.10.0] - 2026-11-08
 

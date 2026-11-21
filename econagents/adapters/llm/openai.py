@@ -1,11 +1,12 @@
 import importlib.util
+import inspect
 import json
 import logging
 from typing import TYPE_CHECKING, Any, Literal, Optional, Type, Union
 
 from pydantic import BaseModel
 
-from econagents.adapters.llm.base import BaseLLM
+from econagents.adapters.llm.base import DEFAULT_TIMEOUT_S, BaseLLM, sdk_client_options
 from econagents.adapters.llm.call_records import report_llm_call
 from econagents.ports.llm import LLMCallRecord
 from econagents.ports.tools import ToolCall
@@ -17,6 +18,7 @@ _logger = logging.getLogger(__name__)
 
 ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh"]
 ReasoningSummary = Literal["auto", "concise", "detailed"]
+MODERATION_MODEL = "omni-moderation-latest"
 
 
 class ChatOpenAI(BaseLLM):
@@ -36,6 +38,10 @@ class ChatOpenAI(BaseLLM):
         reasoning_summary: Optional[ReasoningSummary] = None,
         response_kwargs: Optional[dict[str, Any]] = None,
         max_message_tokens: Optional[int] = None,
+        timeout: Optional[float] = DEFAULT_TIMEOUT_S,
+        max_retries: Optional[int] = None,
+        moderation: Union[bool, str] = False,
+        safety_identifier: Optional[str] = None,
     ) -> None:
         """Initialize the OpenAI LLM interface.
 
@@ -56,6 +62,29 @@ class ChatOpenAI(BaseLLM):
                 Tokens are counted with tiktoken's encoding for
                 ``model_name`` (``o200k_base`` when tiktoken does not know the
                 model). Requires ``pip install econagents[tokens]``.
+            timeout: Seconds one request may take before it fails with a
+                timeout, which counts as a failed attempt. Defaults to 120.
+                ``None`` leaves the ``openai`` package's default (600).
+            max_retries: How often the ``openai`` package sends a failed
+                request again (connection errors, timeouts and 408, 409, 429
+                and 5xx answers). ``None`` leaves the package's default (2);
+                ``0`` makes one model call one request.
+            moderation: Ask OpenAI to moderate the request's input and the
+                model's output on the same call. ``True`` uses
+                ``omni-moderation-latest``; a string names another moderation
+                model. The result never blocks or changes the response: it is
+                reported in ``LLMCallRecord.moderation`` and a WARNING is
+                logged for flagged content.
+            safety_identifier: A stable identifier for the end user behind the
+                requests, sent as ``safety_identifier``, so OpenAI can act on
+                one user instead of the whole organization. Send a hash, not a
+                name or an address.
+
+        Raises:
+            ValueError: If ``timeout``, ``max_retries``, ``moderation`` or
+                ``safety_identifier`` has an invalid value.
+            ImportError: If the installed ``openai`` package is too old for
+                ``moderation`` or ``safety_identifier``.
         """
         self.model_name = model_name
         self.api_key = api_key
@@ -64,6 +93,27 @@ class ChatOpenAI(BaseLLM):
         self._check_openai_available()
         self._response_kwargs = response_kwargs or {}
         self._set_max_message_tokens(max_message_tokens)
+        self._client_options = sdk_client_options(timeout, max_retries)
+        self._guardrail_kwargs = self._build_guardrail_kwargs(moderation, safety_identifier)
+
+    def _build_guardrail_kwargs(self, moderation: Union[bool, str], safety_identifier: Optional[str]) -> dict[str, Any]:
+        """The Responses API parameters for ``moderation`` and ``safety_identifier``."""
+        kwargs: dict[str, Any] = {}
+        if moderation is not False:
+            if moderation is not True and (not isinstance(moderation, str) or not moderation):
+                raise ValueError(f"moderation must be True, False or a moderation model name, got {moderation!r}")
+            kwargs["moderation"] = {"model": MODERATION_MODEL if moderation is True else moderation}
+        if safety_identifier is not None:
+            if not isinstance(safety_identifier, str) or not safety_identifier:
+                raise ValueError(f"safety_identifier must be a non-empty string or None, got {safety_identifier!r}")
+            kwargs["safety_identifier"] = safety_identifier
+        unsupported = sorted(set(kwargs) - _responses_parameters()) if kwargs else []
+        if unsupported:
+            raise ImportError(
+                f"{' and '.join(unsupported)} need a newer openai package than the one installed. "
+                "Upgrade it with: pip install -U openai"
+            )
+        return kwargs
 
     def _check_openai_available(self) -> None:
         """Check if OpenAI is available."""
@@ -160,6 +210,12 @@ class ChatOpenAI(BaseLLM):
             metadata=metadata,
         )
         self._log_response(response, logger)
+        moderation = _moderation(response)
+        for side, result in (moderation or {}).items():
+            if result.get("flagged"):
+                (logger or _logger).warning(
+                    f"Moderation flagged the {side} of a {self.model_name} call: {', '.join(result['categories'])}"
+                )
         report_llm_call(
             LLMCallRecord(
                 provider="openai",
@@ -172,6 +228,7 @@ class ChatOpenAI(BaseLLM):
                 response_id=_response_id(response),
                 messages=list(messages),
                 reasoning_summary=_reasoning_summary(response),
+                moderation=moderation,
             )
         )
 
@@ -219,10 +276,11 @@ class ChatOpenAI(BaseLLM):
         try:
             from openai import AsyncOpenAI
 
-            client = AsyncOpenAI(api_key=self.api_key)
+            client = AsyncOpenAI(api_key=self.api_key, **self._client_options)
 
             base_kwargs: dict[str, Any] = {
                 "model": self.model_name,
+                **self._guardrail_kwargs,
                 **self._response_kwargs,
             }
             reasoning = self._build_reasoning()
@@ -279,6 +337,37 @@ class ChatOpenAI(BaseLLM):
         except ImportError as e:
             _logger.error(f"Failed to import OpenAI: {e}")
             raise ImportError("OpenAI is not installed. Install it with: pip install econagents[openai]") from e
+
+
+def _responses_parameters() -> frozenset[str]:
+    """The request parameters the installed ``openai`` package's Responses API accepts."""
+    from openai.resources.responses import AsyncResponses
+
+    return frozenset(inspect.signature(AsyncResponses.create).parameters)
+
+
+def _field(value: Any, name: str) -> Any:
+    return value.get(name) if isinstance(value, dict) else getattr(value, name, None)
+
+
+def _moderation(response: Any) -> Optional[dict[str, Any]]:
+    """The moderation of a response's input and output as plain data, or ``None`` when it carries none."""
+    moderation = _field(response, "moderation")
+    record: dict[str, Any] = {}
+    for side in ("input", "output"):
+        result = _field(moderation, side)
+        kind = _field(result, "type")
+        if kind == "moderation_result":
+            categories = _field(result, "categories") or {}
+            record[side] = {
+                "flagged": _field(result, "flagged") is True,
+                "categories": sorted(name for name, hit in dict(categories).items() if hit is True),
+                "category_scores": dict(_field(result, "category_scores") or {}),
+                "model": _field(result, "model"),
+            }
+        elif kind == "error":
+            record[side] = {"error": _field(result, "code"), "message": _field(result, "message")}
+    return record or None
 
 
 def _finish_reason(response: Any) -> Optional[str]:
