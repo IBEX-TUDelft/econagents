@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-21
+
 ### Added
 
 - Agents hold their decisions while an administrator has paused the game (ibex 0.9.0). `Agent.paused` is
@@ -42,9 +44,6 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A request from `ChatOpenAI` or `ChatOpenRouter` times out after 120 seconds. It used to wait the
   `openai` package's 600 seconds, and with the package's two retries a call that never answered took 30
   minutes to fail. `timeout=None` restores the old behavior.
-
-### Changed
-
 - `GameRunner`'s `max_game_duration` and `max_pre_game_duration` do not count the time during which the
   game is paused.
 
@@ -516,6 +515,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed dictator local server payout ordering so phase-two prompts receive the
   resolved decision and payout state before the payout phase starts.
 
+[0.11.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/IBEX-TUDelft/econagents/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/IBEX-TUDelft/econagents/compare/v0.8.0...v0.8.1
