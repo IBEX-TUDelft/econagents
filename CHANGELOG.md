@@ -8,6 +8,19 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Agents hold their decisions while an administrator has paused the game (ibex 0.9.0). `Agent.paused` is
+  true from `game-paused`, from a snapshot with `paused: true` or from a `message-refused` with reason
+  `"paused"`, until `game-resumed` or a snapshot without the flag. While paused, no decision starts and
+  no action is sent; an action decided during the pause is sent after the resume if the agent is still
+  in the same phase occurrence.
+- `Agent.game_time` (`GameTime`, exported from `econagents.runtime`): the game's time from the
+  `meta.gametime` of every message. It stands still during a pause, so `game_time.remaining(end)` is the
+  same after the resume as before the pause.
+- A refusal with reason `"paused"` or `"late"` is logged at INFO. Without a disposition tracker, the
+  action of a non-continuous phase that was refused as `"paused"` is sent again, unchanged, after the
+  resume. A `"late"` action is never sent again.
+- `GAME_PAUSED_EVENT`, `GAME_RESUMED_EVENT`, `MESSAGE_REFUSED_EVENT`, `REFUSED_PAUSED` and `REFUSED_LATE`
+  in `econagents.adapters.protocol`.
 - `max_message_tokens` on `ChatOpenAI`, `ChatOpenRouter` and `ChatOllama` (in YAML, under a role's
   `llm_params`): `build_messages` cuts the system prompt and the user prompt to their first
   `max_message_tokens` tokens each and logs a WARNING with the token counts when it cut one. The default
@@ -29,6 +42,11 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A request from `ChatOpenAI` or `ChatOpenRouter` times out after 120 seconds. It used to wait the
   `openai` package's 600 seconds, and with the package's two retries a call that never answered took 30
   minutes to fail. `timeout=None` restores the old behavior.
+
+### Changed
+
+- `GameRunner`'s `max_game_duration` and `max_pre_game_duration` do not count the time during which the
+  game is paused.
 
 ## [0.10.0] - 2026-11-08
 

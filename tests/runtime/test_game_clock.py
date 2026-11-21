@@ -96,3 +96,52 @@ async def test_no_budget_in_force_waits_until_a_phase_change():
 
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(clock.wait_for_timeout(), 0.4)
+
+
+@pytest.mark.asyncio
+async def test_a_paused_game_does_not_use_up_the_gameplay_budget():
+    clock = make_clock(gameplay=0.3)
+    clock.observe(1, "market")
+
+    async def pause_and_resume() -> None:
+        await asyncio.sleep(0.1)
+        clock.set_paused(True)
+        await asyncio.sleep(0.4)
+        clock.set_paused(False)
+
+    asyncio.create_task(pause_and_resume())
+    reason, elapsed = await timeout_after(clock)
+    assert reason == "gameplay"
+    assert 0.65 <= elapsed <= 0.95
+
+
+@pytest.mark.asyncio
+async def test_a_paused_game_does_not_use_up_the_pre_game_budget():
+    clock = make_clock(pre_game=0.3)
+    clock.observe(1, "introduction")
+
+    async def pause_and_resume() -> None:
+        await asyncio.sleep(0.1)
+        clock.set_paused(True)
+        clock.set_paused(True)
+        await asyncio.sleep(0.4)
+        clock.set_paused(False)
+
+    asyncio.create_task(pause_and_resume())
+    reason, elapsed = await timeout_after(clock)
+    assert reason == "pre_game"
+    assert 0.65 <= elapsed <= 0.95
+
+
+@pytest.mark.asyncio
+async def test_a_phase_reported_during_a_pause_starts_counting_at_the_resume():
+    clock = make_clock(gameplay=0.3)
+    clock.observe(1, "introduction")
+    clock.set_paused(True)
+    clock.observe(1, "market")
+    await asyncio.sleep(0.3)
+    clock.set_paused(False)
+
+    reason, elapsed = await timeout_after(clock)
+    assert reason == "gameplay"
+    assert 0.25 <= elapsed <= 0.5

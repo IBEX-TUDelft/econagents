@@ -7,7 +7,16 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
-from econagents.adapters.protocol import INTRODUCTION_PHASE, IbexMessageCodec, ready_message
+from econagents.adapters.protocol import (
+    GAME_PAUSED_EVENT,
+    GAME_RESUMED_EVENT,
+    INTRODUCTION_PHASE,
+    MESSAGE_REFUSED_EVENT,
+    REFUSED_LATE,
+    REFUSED_PAUSED,
+    IbexMessageCodec,
+    ready_message,
+)
 from econagents.adapters.parsing import JsonResponseParser
 from econagents.adapters.prompts import JinjaPromptRenderer
 from econagents.adapters.state import EventFieldStateProjector
@@ -31,6 +40,7 @@ from econagents.runtime.dispositions import (
     is_unknown,
     state_revision,
 )
+from econagents.runtime.game_time import GameTime
 from econagents.runtime.phase_engine import PhaseEngine
 from econagents.domain.messages import Event, PhaseId
 from econagents.domain.state.game import GameState
@@ -73,6 +83,18 @@ class ActionOutcome:
 
 
 ActionListener = Callable[[ActionOutcome], Any]
+
+
+def _answers(refusal: dict[str, Any], action: dict[str, Any]) -> bool:
+    """Whether a ``message-refused`` payload names ``action`` (its type and, when the action has one, its component)."""
+    meta = action.get("meta") if isinstance(action, dict) else None
+    if not isinstance(meta, dict) or refusal.get("messageType") != meta.get("type"):
+        return False
+    sent = meta.get("component")
+    if not isinstance(sent, dict):
+        return True
+    refused = refusal.get("component") if isinstance(refusal.get("component"), dict) else {}
+    return refused.get("type") == sent.get("type") and refused.get("name") == sent.get("name")
 
 
 class Agent(LoggerMixin):
@@ -122,6 +144,22 @@ class Agent(LoggerMixin):
     ``reconciled_from`` set to the unknown one, or, when its phase occurrence has ended unreconciled
     (also when the unknown arrives after the agent moved on), with the unknown ``disposition`` and
     ``unresolved_at_phase_close`` set to ``True``; the agent then stops tracking it.
+
+    Pauses (ibex 0.9.0): an administrator can pause a game, and a paused game refuses every player's
+    message. The agent is ``paused`` from ``game-paused``, from a snapshot with ``paused: true`` or from a
+    ``message-refused`` with reason ``"paused"``, until ``game-resumed`` or a snapshot without it. While
+    paused it starts no decision and sends no action: a decision already running finishes, and its action
+    is held and sent after the resume if the agent is still in the same phase occurrence. A turn-based
+    game's agent may act when it is its turn and ``paused`` is false. ``game_time`` (see ``GameTime``)
+    follows the game's time from ``meta.gametime`` and stands still during a pause, so a countdown read
+    from ``game_time.remaining(end)`` is the same after the resume as before the pause.
+
+    A refusal with reason ``"paused"`` or ``"late"`` (the phase's time was up) says nothing about the
+    action itself and is logged at INFO. Without a ``disposition_tracker``, the action of a
+    non-continuous phase that was refused as ``"paused"`` is sent again, unchanged, after the resume if
+    the agent is still in that phase occurrence; it stays the same decision, with no new outcome or trace
+    record. A continuous phase decides again in its loop. With a tracker, the tracker sees the refusal
+    and what follows is its business. A ``"late"`` action is never sent again.
     """
 
     def __init__(
@@ -220,6 +258,11 @@ class Agent(LoggerMixin):
         self._settled = asyncio.Event()
         self._unknown: dict[str, dict[str, Any]] = {}
         self._reconcile_task: asyncio.Task | None = None
+        self.game_time = GameTime()
+        self._resumed = asyncio.Event()
+        self._resumed.set()
+        self._last_action: tuple[int, PhaseId, dict[str, Any], str] | None = None
+        self._resend_task: asyncio.Task | None = None
         self._phase_handlers: dict[PhaseId, PhaseHandler] = {
             INTRODUCTION_PHASE: self._handle_introduction,
         }
@@ -228,6 +271,11 @@ class Agent(LoggerMixin):
     def llm_provider(self):
         """Return the LLM provider used by the role."""
         return getattr(self.role, "llm", None)
+
+    @property
+    def paused(self) -> bool:
+        """Whether the game is paused, as far as the server has told this agent."""
+        return not self._resumed.is_set()
 
     def register_event_handler(self, event_type: str, handler: EventHandler) -> "Agent":
         """Register a handler that runs after state projection."""
@@ -286,6 +334,7 @@ class Agent(LoggerMixin):
         if not self._resolve_player_number(event):
             await self.stop()
             return
+        self._observe_time_flow(event)
         self._observe_dispositions(event)
 
         for handler in self._event_handlers.get(event.type, []):
@@ -402,6 +451,9 @@ class Agent(LoggerMixin):
             record["input_revision"] = input_revision
             try:
                 payload = await self._decide(phase)
+                if payload and self.paused:
+                    self.logger.info(f"Holding the action decided in phase {phase} until the game resumes")
+                    await self._wait_until_resumed()
             except asyncio.CancelledError:
                 if epoch != self._phase_epoch:
                     record.update(status="stale", disposition="stale-phase")
@@ -451,6 +503,7 @@ class Agent(LoggerMixin):
             outcome = ActionOutcome(phase, "not-transmitted", payload, frame, exc, decision_id=decision_id)
             return await self._settle(outcome, record, "not-transmitted")
         self._record_decided(occurrence, epoch, "sent")
+        self._last_action = (epoch, phase, payload, frame)
         outcome = ActionOutcome(phase, "sent", payload, frame, decision_id=decision_id)
         if awaited:
             return await self._notify(outcome)
@@ -632,10 +685,71 @@ class Agent(LoggerMixin):
             )
 
     async def _wait_until_settled(self) -> None:
-        """Wait until no submission awaits a disposition and no unknown disposition blocks decisions."""
-        while self._pending or self._blocked_on_unknown:
+        """Wait until the game is not paused, no submission awaits a disposition and no unknown one blocks decisions."""
+        while self.paused or self._pending or self._blocked_on_unknown:
+            if self.paused:
+                await self._resumed.wait()
+                continue
             self._settled.clear()
             await self._settled.wait()
+
+    async def _wait_until_resumed(self) -> None:
+        while self.paused:
+            await self._resumed.wait()
+
+    def _observe_time_flow(self, event: Event) -> None:
+        """Follow the game's time, its pauses and the refusals they cause."""
+        meta = event.raw.get("meta") if isinstance(event.raw, dict) else None
+        gametime = meta.get("gametime") if isinstance(meta, dict) else None
+        data = event.data or {}
+        if event.type == GAME_PAUSED_EVENT:
+            self._set_paused(True, data.get("gametime", gametime))
+        elif event.type == GAME_RESUMED_EVENT:
+            self._set_paused(False, data.get("gametime", gametime))
+        elif event.type == SNAPSHOT_EVENT:
+            self._set_paused(data.get("paused") is True, gametime)
+        elif event.type == MESSAGE_REFUSED_EVENT and data.get("reason") == REFUSED_PAUSED:
+            self._set_paused(True, gametime)
+            self.logger.info(f"The server refused {data.get('messageType')!r}: the game is paused")
+            self._resend_after_resume(data)
+        elif event.type == MESSAGE_REFUSED_EVENT and data.get("reason") == REFUSED_LATE:
+            self.logger.info(f"The server refused {data.get('messageType')!r}: the phase's time was up")
+        self.game_time.observe(gametime)
+
+    def _set_paused(self, paused: bool, gametime: Any) -> None:
+        if paused == self.paused:
+            return
+        if paused:
+            self._resumed.clear()
+            self.game_time.pause(gametime)
+            self.logger.info("The game is paused: no decision starts and no action is sent until it resumes")
+        else:
+            self.game_time.resume(gametime)
+            self._resumed.set()
+            self.logger.info("The game resumed")
+
+    def _resend_after_resume(self, refusal: dict[str, Any]) -> None:
+        """Send the refused action of the current non-continuous phase again once the game resumes."""
+        if self.disposition_tracker is not None or self._last_action is None:
+            return
+        epoch, phase, payload, frame = self._last_action
+        if epoch != self._phase_epoch or self.phase_engine.is_continuous(phase):
+            return
+        if not _answers(refusal, payload):
+            return
+        if self._resend_task is not None and not self._resend_task.done():
+            return
+        self._resend_task = asyncio.create_task(self._send_again(epoch, phase, frame))
+
+    async def _send_again(self, epoch: int, phase: PhaseId, frame: str) -> None:
+        await self._wait_until_resumed()
+        if epoch != self._phase_epoch or not self.running:
+            return
+        self.logger.info(f"Sending the action of phase {phase} again: the server refused it while the game was paused")
+        try:
+            await self.transport.send(frame)
+        except ConnectionError as exc:
+            self.logger.error(f"Action of phase {phase} was not transmitted again after the pause ({exc}): {frame}")
 
     async def _notify(self, outcome: ActionOutcome) -> ActionOutcome:
         for listener in self._action_listeners:
@@ -705,11 +819,12 @@ class Agent(LoggerMixin):
     def _cancel_phase_tasks(self) -> None:
         self.in_continuous_phase = False
         current = asyncio.current_task()
-        for task in (self._continuous_task, self._entry_task):
+        for task in (self._continuous_task, self._entry_task, self._resend_task):
             if task is not None and task is not current:
                 task.cancel()
         self._continuous_task = None
         self._entry_task = None
+        self._resend_task = None
 
     async def _handle_introduction(self, phase: PhaseId, state: GameState) -> dict[str, Any]:
         """Return the ready message for the standard introduction phase."""
