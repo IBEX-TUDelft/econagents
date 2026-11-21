@@ -333,6 +333,39 @@ unknown gets a second record: with the reconciled ``disposition`` and
 occurrence ends first. Revisions are only computed when a trace or a guard mode
 needs them.
 
+Paused Games
+------------
+
+An administrator can pause a running ibex game (ibex 0.9.0). A paused game
+refuses every player's message with ``message-refused`` and reason
+``"paused"``, and its time stands still. An agent follows this without any
+configuration:
+
+- ``agent.paused`` is true from ``game-paused``, from a snapshot with
+  ``paused: true`` (an agent that joins during a pause) or from a refusal with
+  reason ``"paused"``, until ``game-resumed`` or a snapshot without the flag.
+- While paused, no decision starts and no action is sent. A decision that was
+  already running finishes, and its action is sent after the resume if the
+  agent is still in the same phase occurrence. A continuous phase's loop waits
+  too.
+- A refusal with reason ``"paused"`` or ``"late"`` (the message arrived after
+  the phase's deadline) says nothing about the action and is logged at INFO.
+  Without a disposition tracker, the action of a non-continuous phase that was
+  refused as ``"paused"`` is sent again, unchanged, after the resume. A
+  ``"late"`` action is never sent again. With a tracker, the tracker sees the
+  refusal and decides what follows.
+- ``agent.game_time`` (``GameTime``) follows the game's time from the
+  ``meta.gametime`` of every message. It stands still during a pause, so the
+  time left until a phase timer's end is the same after the resume as before
+  the pause:
+
+.. code-block:: python
+
+   left_ms = agent.game_time.remaining(timer_end)  # None before any message carried a game time
+
+In a phase with turns, an agent may act when it is its turn and
+``agent.paused`` is false.
+
 Phase Handlers
 --------------
 
@@ -365,8 +398,9 @@ Runner Supervision
 ``GameRunner`` supervises agents. It assigns per-agent loggers, starts all
 agents concurrently, enforces ``max_game_duration``, and stops running
 agents during cleanup. Agent construction belongs in code or YAML assembly;
-the runner does not build agents. It only registers one event handler per
-agent on the agent's phase event, to follow the phase for its timeout clock.
+the runner does not build agents. It only registers event handlers on each
+agent, on its phase event and on the pause events, to follow the phase and the
+pauses for its timeout clock.
 
 ``max_game_duration`` bounds gameplay, not waiting for players. Time spent
 in ``pre_game_phases`` (default ``{"introduction"}``) does not count, so a
@@ -383,6 +417,10 @@ The wait before gameplay is unbounded by default. Set
 the run, exceeds it; that timeout is logged as ``pre-game wait timeout``.
 After a run, ``runner.timeout_reason`` is ``"gameplay"``, ``"pre_game"`` or
 ``None``.
+
+Neither budget counts the time during which the game is paused: each agent
+reports the pause to the clock, which counts on from the same values after the
+resume.
 
 Agent Logs and Identity
 -----------------------

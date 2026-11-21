@@ -21,6 +21,8 @@ class GameClock:
 
     Until the first report, the gameplay budget also counts from the start of the run, so agents that
     never report a phase keep the from-start timeout. The first report discards that provisional time.
+
+    Neither budget counts the time during which an administrator has paused the game (``set_paused``).
     """
 
     def __init__(
@@ -38,6 +40,7 @@ class GameClock:
         self.phase: Optional[PhaseId] = None
         self.round: Any = None
         self.gameplay_start_phase: Optional[PhaseId] = None
+        self.paused = False
         self._loop = asyncio.get_running_loop()
         self._since = self._loop.time()
         self._gameplay = 0.0
@@ -82,6 +85,19 @@ class GameClock:
             )
         self._changed.set()
 
+    def set_paused(self, paused: bool) -> None:
+        """Stop both budgets while the game is paused, and count on from the same values when it resumes."""
+        if paused == self.paused:
+            return
+        self._accumulate()
+        self.paused = paused
+        self.logger.info(
+            f"Game {'paused' if paused else 'resumed'} (phase={self.phase}, round={self.round}): the timeout "
+            f"budgets {'stand still' if paused else 'count again'}, gameplay at {self._gameplay:.1f}s of "
+            f"{self._budget_text()}"
+        )
+        self._changed.set()
+
     async def wait_for_timeout(self) -> TimeoutReason:
         """Return once a budget is used up, naming which one."""
         while True:
@@ -96,7 +112,7 @@ class GameClock:
 
     def _accumulate(self) -> None:
         now = self._loop.time()
-        elapsed = now - self._since
+        elapsed = 0.0 if self.paused else now - self._since
         if self.in_gameplay:
             self._gameplay += elapsed
         else:
@@ -106,6 +122,8 @@ class GameClock:
         self._since = now
 
     def _next_timeout(self) -> tuple[Optional[float], Optional[TimeoutReason]]:
+        if self.paused:
+            return None, None
         elapsed = self._loop.time() - self._since
         candidates: list[tuple[float, TimeoutReason]] = []
         if self.gameplay_budget is not None and (self.in_gameplay or self.phase is None):

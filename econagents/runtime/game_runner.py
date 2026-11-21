@@ -10,12 +10,12 @@ from typing import Any, Literal, Optional, List
 from pydantic import BaseModel, Field
 
 from econagents.adapters.llm.observability import get_observability_provider
-from econagents.adapters.protocol import INTRODUCTION_PHASE
+from econagents.adapters.protocol import GAME_PAUSED_EVENT, GAME_RESUMED_EVENT, INTRODUCTION_PHASE
 from econagents.adapters.transport import AuthenticationMechanism, JoinPayloadAuth
 from econagents.domain.messages import Event, PhaseId
 from econagents.runtime.agent import Agent
 from econagents.runtime.game_clock import GameClock, TimeoutReason
-from econagents.runtime.identity import TRACE_SCHEMA_VERSION, json_record
+from econagents.runtime.identity import SNAPSHOT_EVENT, TRACE_SCHEMA_VERSION, json_record
 
 AgentLogNaming = Literal["player-number", "launch-index"]
 
@@ -157,7 +157,8 @@ class GameRunner:
         """Feed each agent's phase events into the game clock.
 
         Agents without ``register_event_handler`` report nothing; if none reports a phase, the gameplay
-        budget counts from the start of the run.
+        budget counts from the start of the run. Each agent also reports whether the game is paused, so the
+        clock does not count a pause.
         """
         for agent in self.agents:
             register = getattr(agent, "register_event_handler", None)
@@ -171,6 +172,13 @@ class GameRunner:
                     self._clock.observe(self._event_round(agent, event), event.data.get(phase_key))
 
             register(event_type, observe)
+
+            def observe_pause(event: Event, agent: Agent = agent) -> None:
+                if self._clock is not None:
+                    self._clock.set_paused(bool(getattr(agent, "paused", False)))
+
+            for pause_event in (GAME_PAUSED_EVENT, GAME_RESUMED_EVENT, SNAPSHOT_EVENT):
+                register(pause_event, observe_pause)
 
     @staticmethod
     def _event_round(agent: Agent, event: Event) -> Any:
