@@ -214,6 +214,60 @@ is an estimate of what the model's own tokenizer gives. tiktoken downloads an
 encoding's file the first time it is used and caches it; the adapter loads it
 when it is created.
 
+Request Limits and Moderation
+-----------------------------
+
+``ChatOpenAI`` and ``ChatOpenRouter`` bound how long a model call can take:
+
+- ``timeout`` (seconds, default ``120``): one request fails with a timeout
+  after that long. The ``openai`` package's own default is 600 seconds;
+  ``timeout=None`` restores it.
+- ``max_retries`` (default ``None``, the package's 2): how often the package
+  sends a failed request again, after a connection error, a timeout or a 408,
+  409, 429 or 5xx answer. So a call that never answers fails after
+  ``timeout x (max_retries + 1)`` seconds, six minutes by default. With
+  ``max_retries=0`` one model call is one request, and ``Role.decision_retries``
+  is then the only retry.
+
+``ChatOpenAI`` has two more settings, both off by default:
+
+- ``moderation``: OpenAI moderates the request's input and the model's output
+  on the same call. ``True`` uses ``omni-moderation-latest``; a string names
+  another moderation model. The result never blocks or changes the response.
+  It is reported in ``LLMCallRecord.moderation`` (per side: ``flagged``, the
+  flagged ``categories``, the ``category_scores`` and the moderation ``model``,
+  or ``error`` and ``message`` when moderation failed), which the model-call
+  log includes, and flagged content is logged as a WARNING. Use it when prompts
+  carry text typed by participants. It sends a ``moderation`` parameter with
+  every request, which a server that only imitates the Responses API may
+  refuse.
+- ``safety_identifier``: a stable identifier for the end user behind the
+  requests, so that OpenAI can act on one user rather than on the whole
+  organization. Send a hash, never a name or an address.
+
+.. code-block:: python
+
+   llm = ChatOpenAI(
+       model_name="gpt-5.4-mini",
+       timeout=60,
+       max_retries=0,
+       moderation=True,
+       safety_identifier="3f1c9a52",
+   )
+
+In a YAML config they go under the role's ``llm_params``, like
+``max_message_tokens``.
+
+Other limits of the Responses API go through ``response_kwargs``, unchanged:
+``max_output_tokens`` caps the output including reasoning tokens (a response
+cut there has the finish reason ``max_output_tokens`` in its call record, and
+a structured output cut there fails to parse), and ``store: False`` keeps
+OpenAI from storing the response. A key in ``response_kwargs`` wins over the
+setting of the same name.
+
+Spending limits are not request parameters: set a budget for the API key's
+project in the provider's dashboard.
+
 Decision Gate
 -------------
 

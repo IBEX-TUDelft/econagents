@@ -13,6 +13,27 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
+DEFAULT_TIMEOUT_S = 120.0
+"""Seconds one request to the provider may take. The ``openai`` package waits 600 seconds by default."""
+
+
+def sdk_client_options(timeout: Optional[float], max_retries: Optional[int]) -> dict[str, Any]:
+    """The ``openai`` client options for a request timeout and a retry count; ``None`` leaves the package's default.
+
+    Raises:
+        ValueError: If ``timeout`` is not a positive number or ``max_retries`` is not a non-negative integer.
+    """
+    options: dict[str, Any] = {}
+    if timeout is not None:
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+            raise ValueError(f"timeout must be a positive number of seconds or None, got {timeout!r}")
+        options["timeout"] = float(timeout)
+    if max_retries is not None:
+        if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0:
+            raise ValueError(f"max_retries must be a non-negative integer or None, got {max_retries!r}")
+        options["max_retries"] = max_retries
+    return options
+
 
 class BaseLLM(ABC):
     """Base class for LLM implementations."""

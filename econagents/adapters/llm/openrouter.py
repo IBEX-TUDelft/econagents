@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Type, Union
 
 from pydantic import BaseModel
 
-from econagents.adapters.llm.base import BaseLLM
+from econagents.adapters.llm.base import DEFAULT_TIMEOUT_S, BaseLLM, sdk_client_options
 from econagents.ports.tools import ToolCall
 
 if TYPE_CHECKING:
@@ -37,6 +37,8 @@ class ChatOpenRouter(BaseLLM):
         reasoning_exclude: Optional[bool] = None,
         response_kwargs: Optional[dict[str, Any]] = None,
         max_message_tokens: Optional[int] = None,
+        timeout: Optional[float] = DEFAULT_TIMEOUT_S,
+        max_retries: Optional[int] = None,
     ) -> None:
         """Initialize the OpenRouter LLM interface.
 
@@ -61,6 +63,15 @@ class ChatOpenRouter(BaseLLM):
                 model names. For OpenRouter identifiers it uses
                 ``o200k_base``, so the count is an estimate for the model.
                 Requires ``pip install econagents[tokens]``.
+            timeout: Seconds one request may take before it fails with a
+                timeout. Defaults to 120. ``None`` leaves the ``openai``
+                package's default (600).
+            max_retries: How often the ``openai`` package sends a failed
+                request again. ``None`` leaves the package's default (2).
+
+        Raises:
+            ValueError: If the reasoning settings conflict, or ``timeout`` or
+                ``max_retries`` has an invalid value.
         """
         if reasoning_effort is not None and reasoning_max_tokens is not None:
             raise ValueError("reasoning_effort and reasoning_max_tokens cannot be used together")
@@ -76,6 +87,7 @@ class ChatOpenRouter(BaseLLM):
         self.reasoning_exclude = reasoning_exclude
         self._response_kwargs = response_kwargs or {}
         self._set_max_message_tokens(max_message_tokens)
+        self._client_options = sdk_client_options(timeout, max_retries)
 
     @staticmethod
     def _check_openai_available() -> None:
@@ -194,6 +206,7 @@ class ChatOpenRouter(BaseLLM):
                 api_key=self._get_api_key(),
                 base_url=self.base_url,
                 default_headers=self._default_headers(),
+                **self._client_options,
             )
 
             base_kwargs: dict[str, Any] = {
